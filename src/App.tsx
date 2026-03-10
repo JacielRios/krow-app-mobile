@@ -1,7 +1,5 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
+ * Punto de entrada principal de la aplicación
  * @format
  */
 
