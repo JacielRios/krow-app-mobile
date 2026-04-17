@@ -8,14 +8,13 @@ interface MapPlaceholderProps {
 
 export const MapPlaceholder: React.FC<MapPlaceholderProps> = ({ children }) => {
   return (
-    <ImageBackground 
-      source={{ uri: 'https://miro.medium.com/v2/resize:fit:1200/1*qYUvhGdpNdIvaBpNM0cG1Q.jpeg' }} 
+    <ImageBackground
+      source={{ uri: 'https://miro.medium.com/v2/resize:fit:1200/1*qYUvhGdpNdIvaBpNM0cG1Q.jpeg' }}
       style={styles.container}
       resizeMode="cover"
     >
       <View style={styles.overlayTextContainer}>
         <Text style={styles.mapText}>Mapa Interactivo</Text>
-        <Text style={styles.mapSubText}>(Simulación usando imagen estática)</Text>
       </View>
       {/* Content over the map (like bottom sheets or floating buttons) */}
       <View style={styles.contentOverlay}>

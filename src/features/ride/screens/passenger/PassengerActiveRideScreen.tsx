@@ -1,11 +1,26 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Animated, ScrollView } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../../core/theme/colors';
 import { MapPlaceholder } from '../../components/MapPlaceholder';
 import { Button } from '../../../../core/components/ui/Button';
 
 export const PassengerActiveRideScreen = ({ navigation }: any) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy < -50) {
+          setIsExpanded(true);
+        } else if (gestureState.dy > 50) {
+          setIsExpanded(false);
+        }
+      },
+    })
+  ).current;
+
   return (
     <MapPlaceholder>
       {/* Back Button Floating */}
@@ -16,16 +31,30 @@ export const PassengerActiveRideScreen = ({ navigation }: any) => {
         <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
       </TouchableOpacity>
 
-      {/* Driver & Ride Info Bottom Sheet */}
-      <View style={styles.bottomSheet}>
-        {/* Drag Indicator (Visual only) */}
-        <View style={styles.dragIndicator} />
+      {/* Chat Button Floating */}
+      <TouchableOpacity
+        style={styles.chatButtonFloating}
+        onPress={() => { /* TODO: Navigate to chat screen */ }}
+      >
+        <MaterialIcons name="chat" size={24} color={colors.text.inverse} />
+      </TouchableOpacity>
 
-        {/* Ride Status Header */}
-        <View style={styles.header}>
-          <Text style={styles.statusText}>Viaje en curso</Text>
-          <Text style={styles.etaText}>Llegada aprox. 14:30</Text>
+      {/* Driver & Ride Info Bottom Sheet */}
+      <Animated.View style={[styles.bottomSheet, isExpanded && styles.bottomSheetExpanded]}>
+        {/* Drag Indicator (Visual only) */}
+        <View style={styles.dragHandler} {...panResponder.panHandlers}>
+          <View style={styles.dragIndicator} />
         </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+          {/* Ride Status Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.statusText}>Viaje en curso</Text>
+              <Text style={styles.fareText}>Tarifa: $50.00 MXN</Text>
+            </View>
+            <Text style={styles.etaText}>Llegada aprox. 14:30</Text>
+          </View>
 
         {/* Driver Info */}
         <View style={styles.driverSection}>
@@ -73,7 +102,8 @@ export const PassengerActiveRideScreen = ({ navigation }: any) => {
             <Text style={styles.cancelButtonText}>Cancelar Viaje</Text>
           </TouchableOpacity>
         </View>
-      </View>
+        </ScrollView>
+      </Animated.View>
     </MapPlaceholder>
   );
 };
@@ -92,24 +122,45 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  chatButtonFloating: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: colors.primary,
+    padding: 12,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
   bottomSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
+    maxHeight: '40%',
+  },
+  bottomSheetExpanded: {
+    maxHeight: '80%',
+  },
+  dragHandler: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 12,
   },
   dragIndicator: {
     width: 40,
     height: 4,
     backgroundColor: colors.border.default,
     borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -121,6 +172,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.primary,
+  },
+  fareText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 4,
   },
   etaText: {
     fontSize: 16,

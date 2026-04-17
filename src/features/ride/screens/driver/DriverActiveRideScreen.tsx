@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, PanResponder } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../../core/theme/colors';
 import { MapPlaceholder } from '../../components/MapPlaceholder';
@@ -7,12 +7,25 @@ import { Button } from '../../../../core/components/ui/Button';
 
 // Dummy data for passengers
 const passengers = [
-  { id: '1', name: 'Ana S.', stop: 'Av. Universidad 123', status: 'En viaje' },
-  { id: '2', name: 'Luis M.', stop: 'Facultad de Derecho', status: 'En viaje' },
+  { id: '1', name: 'Ana S.', stop: 'Av. Universidad 123', status: 'En viaje', fare: '$45.00' },
+  { id: '2', name: 'Luis M.', stop: 'Facultad de Derecho', status: 'En viaje', fare: '$50.00' },
 ];
 
 export const DriverActiveRideScreen = ({ navigation }: any) => {
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy < -50) {
+          setIsExpanded(true);
+        } else if (gestureState.dy > 50) {
+          setIsExpanded(false);
+        }
+      },
+    })
+  ).current;
 
   return (
     <MapPlaceholder>
@@ -24,31 +37,31 @@ export const DriverActiveRideScreen = ({ navigation }: any) => {
         >
           <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.viewRouteBtn}
-          onPress={() => setIsMapExpanded(!isMapExpanded)}
+        
+        {/* Chat Button Floating */}
+        <TouchableOpacity
+          style={styles.chatButtonFloating}
+          onPress={() => { /* TODO: Navigate to chat screen */ }}
         >
-          <MaterialIcons 
-            name={isMapExpanded ? "format-list-bulleted" : "map"} 
-            size={20} 
-            color={colors.primary} 
-          />
-          <Text style={styles.viewRouteText}>
-            {isMapExpanded ? "Ver detalles" : "Ver ruta"}
-          </Text>
+          <MaterialIcons name="chat" size={24} color={colors.text.inverse} />
         </TouchableOpacity>
       </View>
 
       {/* Ride Info Bottom Sheet */}
-      {!isMapExpanded && (
-        <View style={styles.bottomSheet}>
-        <View style={styles.dragIndicator} />
+      <Animated.View style={[styles.bottomSheet, isExpanded && styles.bottomSheetExpanded]}>
+        <View style={styles.dragHandler} {...panResponder.panHandlers}>
+          <View style={styles.dragIndicator} />
+        </View>
 
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
         {/* Destination Header */}
         <View style={styles.header}>
           <Text style={styles.destinationLabel}>Destino Final</Text>
           <Text style={styles.destinationValue}>Campus Central</Text>
-          <Text style={styles.etaText}>Estimado: 14:45</Text>
+          <View style={styles.headerDetailsContainer}>
+            <Text style={styles.etaText}>Estimado: 14:45</Text>
+            <Text style={styles.fareText}>Total: $95.00 MXN</Text>
+          </View>
         </View>
 
         <View style={styles.divider} />
@@ -65,7 +78,10 @@ export const DriverActiveRideScreen = ({ navigation }: any) => {
                   </View>
                   <View style={styles.passengerInfo}>
                     <Text style={styles.passengerName}>{p.name}</Text>
-                    <Text style={styles.passengerStatus}>{p.status}</Text>
+                    <View style={styles.passengerMetaRow}>
+                      <Text style={styles.passengerStatus}>{p.status}</Text>
+                      <Text style={styles.passengerFare}>{p.fare}</Text>
+                    </View>
                   </View>
                   <TouchableOpacity style={styles.stopActionBtn}>
                     <Text style={styles.stopActionText}>Dejar aquí</Text>
@@ -94,8 +110,8 @@ export const DriverActiveRideScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        </View>
-      )}
+        </ScrollView>
+      </Animated.View>
     </MapPlaceholder>
   );
 };
@@ -120,43 +136,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  viewRouteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    elevation: 3,
+  chatButtonFloating: {
+    backgroundColor: colors.primary,
+    padding: 12,
+    borderRadius: 25,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-  },
-  viewRouteText: {
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginLeft: 6,
   },
   bottomSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
-    maxHeight: '70%',
+    maxHeight: '40%',
+  },
+  bottomSheetExpanded: {
+    maxHeight: '80%',
+  },
+  dragHandler: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 12,
   },
   dragIndicator: {
     width: 40,
     height: 4,
     backgroundColor: colors.border.default,
     borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
   },
   header: {
     alignItems: 'center',
@@ -172,10 +187,22 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginVertical: 4,
   },
+  headerDetailsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    gap: 16,
+  },
   etaText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.primaryLight,
+  },
+  fareText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.primary,
   },
   divider: {
     height: 1,
@@ -224,9 +251,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text.primary,
   },
+  passengerMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    paddingRight: 10,
+  },
   passengerStatus: {
     fontSize: 12,
     color: colors.status.success,
+  },
+  passengerFare: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: colors.text.secondary,
   },
   stopActionBtn: {
     backgroundColor: colors.surface,
