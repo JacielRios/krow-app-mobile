@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { consumeSkipSplashOnNextAuthMount } from '../../../core/auth/authEntryPreference';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -14,9 +15,11 @@ export type AuthStackParamList = {
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthNavigator() {
+  const skipSplash = consumeSkipSplashOnNextAuthMount();
+
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
+      initialRouteName={skipSplash ? 'Login' : 'Splash'}
       screenOptions={{
         headerShown: false,
       }}

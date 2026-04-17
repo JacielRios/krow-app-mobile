@@ -4,18 +4,22 @@ import {
   Text,
   View,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Image,
   Animated,
-  Dimensions
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input } from '../../../core/components/ui/Input';
 import { Button } from '../../../core/components/ui/Button';
+import { CustomAlert, AlertType } from '../../../core/components/ui/CustomAlert';
+import { setConductorLoginGateBlocking } from '../../../core/auth/conductorLoginGate';
+import { setSessionLoginMode } from '../../../core/auth/sessionLoginMode';
 import { colors } from '../../../core/theme/colors';
+import { supabase } from '../../../lib/supabase';
 
 type UserType = 'pasajero' | 'conductor';
 
@@ -23,6 +27,13 @@ export default function LoginScreen({ navigation }: any) {
   const [userType, setUserType] = useState<UserType>('pasajero');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'error' as AlertType,
+    title: '',
+    message: '',
+  });
 
   // Animation handling
   const { width } = Dimensions.get('window');
@@ -39,9 +50,84 @@ export default function LoginScreen({ navigation }: any) {
     }).start();
   }, [userType, slideWidth]);
 
-  const handleLogin = () => {
-    // Navigate to Home eventually, for now just log
-    console.log('Login', { email, password, userType });
+  const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+    setAlertConfig({ visible: true, title, message, type });
+  };
+
+  const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      showAlert('Error', 'Por favor ingresa tu correo y contraseña.', 'error');
+      return;
+    }
+
+    const isConductor = userType === 'conductor';
+    if (isConductor) {
+      setConductorLoginGateBlocking(true);
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizeEmail(email),
+        password,
+      });
+
+      if (signInError) {
+        if (isConductor) {
+          setConductorLoginGateBlocking(false);
+        }
+        showAlert('Error al iniciar sesión', signInError.message, 'error');
+        return;
+      }
+
+      if (isConductor) {
+        try {
+          const userId = signInData.session?.user?.id;
+          if (!userId) {
+            await supabase.auth.signOut();
+            showAlert(
+              'Sesión incompleta',
+              'No se pudo verificar tu cuenta. Vuelve a intentar o confirma tu correo si aplica.',
+              'error',
+            );
+            return;
+          }
+
+          const { data: driverRows, error: driverError } = await supabase
+            .from('driver_profiles')
+            .select('driver_id')
+            .eq('user_id', userId)
+            .limit(1);
+
+          if (driverError) {
+            await supabase.auth.signOut();
+            showAlert('Error al verificar conductor', driverError.message, 'error');
+            return;
+          }
+
+          if (!driverRows?.length) {
+            await supabase.auth.signOut();
+            showAlert(
+              'Sin permisos de conductor',
+              'Tu cuenta no tiene perfil de conductor autorizado. Si crees que es un error, contacta a administración.',
+              'error',
+            );
+            return;
+          }
+
+          await setSessionLoginMode('conductor');
+        } finally {
+          setConductorLoginGateBlocking(false);
+        }
+      } else {
+        await setSessionLoginMode('pasajero');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,6 +193,7 @@ export default function LoginScreen({ navigation }: any) {
               <Button
                 title="Iniciar Sesión"
                 onPress={handleLogin}
+                loading={loading}
                 style={styles.loginButton}
               />
 
@@ -133,6 +220,14 @@ export default function LoginScreen({ navigation }: any) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
