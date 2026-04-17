@@ -33,6 +33,7 @@ export default function SplashScreen({ navigation }: any) {
         <Image
           source={require('../../../assets/Krow Logo White.png')}
           resizeMode="contain"
+          style={styles.logoImage}
         />
       </Animated.View>
     </View>
@@ -48,5 +49,9 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
+  },
+  logoImage: {
+    width: 400,
+    height: 400,
   },
 });
