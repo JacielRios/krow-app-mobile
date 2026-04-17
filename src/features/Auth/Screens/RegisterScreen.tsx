@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Input } from '../../../core/components/ui/Input';
 import { Button } from '../../../core/components/ui/Button';
 import { Dropdown } from '../../../core/components/ui/Dropdown';
+import { CustomAlert, AlertType } from '../../../core/components/ui/CustomAlert';
 import { colors } from '../../../core/theme/colors';
+import { supabase } from '../../../lib/supabase';
 
 const CARRERAS = [
   'Ing Sistemas Computacionales',
@@ -28,9 +31,129 @@ export default function RegisterScreen({ navigation }: any) {
     password: '',
     confirmPassword: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'error' as AlertType,
+    title: '',
+    message: '',
+    onCloseUrl: false, // flag to navigate back
+  });
+
+  const showAlert = (title: string, message: string, type: AlertType = 'error', onCloseUrl = false) => {
+    setAlertConfig({ visible: true, title, message, type, onCloseUrl });
+  };
+
+  const handleAlertClose = () => {
+    setAlertConfig(prev => ({ ...prev, visible: false }));
+    if (alertConfig.onCloseUrl) {
+      navigation.goBack();
+    }
+  };
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const normalizeInstitutionalEmail = (input: string) => input.trim().toLowerCase();
+
+  const isValidInstitutionalEmail = (email: string) => /^[^\s@]+@[^\s@]+\.tecnm\.mx$/i.test(email);
+
+  const handleRegister = async () => {
+    const {
+      nombre,
+      numeroControl,
+      correo,
+      carrera,
+      semestre,
+      password,
+      confirmPassword,
+    } = formData;
+
+    if (!nombre || !numeroControl || !correo || !carrera || !semestre || !password || !confirmPassword) {
+      showAlert('Campos incompletos', 'Por favor completa todos los campos.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showAlert('Contraseñas distintas', 'La contraseña y su confirmación deben coincidir.');
+      return;
+    }
+
+    if (password.length < 6) {
+      showAlert('Contraseña inválida', 'La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    const email = normalizeInstitutionalEmail(correo);
+    if (!isValidInstitutionalEmail(email)) {
+      showAlert('Correo inválido', 'Usa formato institucional: usuario@algo.tecnm.mx');
+      return;
+    }
+
+    setLoading(true);
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: nombre.trim(),
+          institutional_id: numeroControl.trim(),
+          academic_program: carrera,
+          academic_period: semestre,
+        },
+      },
+    });
+
+    if (signUpError || !signUpData.user) {
+      setLoading(false);
+      showAlert('Error al registrar', signUpError?.message ?? 'No se pudo crear la cuenta.', 'error');
+      return;
+    }
+
+    const periodValue = Number.parseInt(semestre, 10);
+
+    const { error: profileError } = await supabase.from('users').upsert(
+      {
+        uuid: signUpData.user.id,
+        full_name: nombre.trim(),
+        email_address: email,
+        institutional_id: numeroControl.trim(),
+        academic_program: carrera,
+        academic_period: Number.isNaN(periodValue) ? null : periodValue,
+        is_active: true,
+      },
+      {
+        onConflict: 'uuid',
+      },
+    );
+
+    setLoading(false);
+
+    if (profileError) {
+      console.error('Profile insert error:', {
+        message: profileError.message,
+        code: profileError.code,
+        details: profileError.details,
+        hint: profileError.hint,
+        hasSessionAfterSignUp: Boolean(signUpData.session),
+      });
+
+      showAlert(
+        'Cuenta creada con advertencia',
+        `Se creó la cuenta de acceso, pero no se guardó el perfil.\n\nError: ${profileError.message}${profileError.code ? ` (${profileError.code})` : ''}`,
+        'warning'
+      );
+      return;
+    }
+
+    showAlert(
+      'Cuenta creada',
+      'Tu cuenta fue creada correctamente. Si tienes confirmación por correo, revísala antes de iniciar sesión.',
+      'success',
+      true
+    );
   };
 
   return (
@@ -62,13 +185,12 @@ export default function RegisterScreen({ navigation }: any) {
             />
             
             <Input 
-              placeholder="Correo" 
+              placeholder="ej. alumno@campus.tecnm.mx" 
               value={formData.correo}
               onChangeText={(text) => handleChange('correo', text)}
               keyboardType="email-address"
               autoCapitalize="none"
               icon={<Icon name="email" size={24} color={colors.text.secondary} />}
-              rightElement={<Text style={styles.domainText}>@tecnm.mx</Text>}
             />
             
             <Dropdown 
@@ -105,7 +227,8 @@ export default function RegisterScreen({ navigation }: any) {
 
             <Button 
               title="Registrarse" 
-              onPress={() => console.log('Registrar', formData)}
+              onPress={handleRegister}
+              loading={loading}
               style={styles.registerButton}
             />
 
@@ -119,6 +242,14 @@ export default function RegisterScreen({ navigation }: any) {
           
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={handleAlertClose}
+      />
     </SafeAreaView>
   );
 }
