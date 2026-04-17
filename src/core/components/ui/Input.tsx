@@ -15,7 +15,10 @@ export const Input: React.FC<InputProps> = ({
   icon,
   rightElement,
   style,
-  ...props
+  secureTextEntry,
+  autoCapitalize,
+  autoCorrect,
+  ...rest
 }) => {
   return (
     <View style={styles.container}>
@@ -25,7 +28,10 @@ export const Input: React.FC<InputProps> = ({
         <TextInput
           style={[styles.input, style]}
           placeholderTextColor={colors.text.placeholder}
-          {...props}
+          {...rest}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize ?? (secureTextEntry ? 'none' : undefined)}
+          autoCorrect={autoCorrect ?? (secureTextEntry ? false : undefined)}
         />
         {rightElement && <View style={styles.rightElementContainer}>{rightElement}</View>}
       </View>
