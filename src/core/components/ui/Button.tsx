@@ -1,104 +1,150 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, TouchableOpacityProps, ActivityIndicator } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  View,
+  StyleSheet,
+  TouchableOpacityProps,
+  ActivityIndicator,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { colors } from '../../theme/colors';
+import { spacing, radii, typography } from '../../theme/tokens';
 
-interface ButtonProps extends TouchableOpacityProps {
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'text'
+  | 'destructive';
+
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+export interface ButtonProps extends TouchableOpacityProps {
   title: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'text';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
+  fullWidth?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  contentStyle?: ViewStyle;
+  labelStyle?: TextStyle;
 }
+
+const SIZE_CONFIG: Record<ButtonSize, { height: number; paddingHorizontal: number; fontSize: number }> = {
+  sm: { height: 36, paddingHorizontal: spacing.md, fontSize: typography.size.sm },
+  md: { height: 48, paddingHorizontal: spacing.lg, fontSize: typography.size.lg },
+  lg: { height: 56, paddingHorizontal: spacing.xl, fontSize: typography.size.xl },
+};
 
 export const Button: React.FC<ButtonProps> = ({
   title,
   variant = 'primary',
+  size = 'md',
   loading = false,
+  fullWidth = true,
+  leftIcon,
+  rightIcon,
   style,
+  contentStyle,
+  labelStyle,
   disabled,
   ...props
 }) => {
-  const isPrimary = variant === 'primary';
-  const isSecondary = variant === 'secondary';
-  const isOutline = variant === 'outline';
-  const isText = variant === 'text';
+  const isDisabled = disabled || loading;
+  const sizeConfig = SIZE_CONFIG[size];
 
-  const getContainerStyle = () => {
-    switch (variant) {
-      case 'primary':
-      case 'secondary':
-        return styles.primaryContainer;
-      case 'outline':
-        return styles.outlineContainer;
-      case 'text':
-        return styles.textContainer;
-      default:
-        return styles.primaryContainer;
-    }
-  };
-
-  const getBackgroundColor = () => {
-    if (disabled) return '#A0B4DE';
-    if (isPrimary) return colors.primaryLight; // Based on the blue from design
-    if (isSecondary) return colors.primary;
+  const getBackgroundColor = (): string => {
+    if (variant === 'primary') return isDisabled ? '#A0B4DE' : colors.primaryLight;
+    if (variant === 'secondary') return isDisabled ? '#7B9BD0' : colors.primary;
+    if (variant === 'destructive') return isDisabled ? '#F4A5A5' : colors.status.error;
+    if (variant === 'ghost') return `${colors.primary}12`;
     return 'transparent';
   };
 
-  const getTextColor = () => {
-    if (isPrimary || isSecondary) return colors.text.inverse;
-    return colors.primary;
+  const getBorderStyle = (): ViewStyle => {
+    if (variant === 'outline') {
+      return {
+        borderWidth: 1.5,
+        borderColor: isDisabled ? colors.border.default : colors.primary,
+      };
+    }
+    return {};
   };
+
+  const getTextColor = (): string => {
+    if (variant === 'primary' || variant === 'secondary' || variant === 'destructive') {
+      return colors.text.inverse;
+    }
+    return isDisabled ? colors.text.muted : colors.primary;
+  };
+
+  const textColor = getTextColor();
 
   return (
     <TouchableOpacity
       style={[
-        getContainerStyle(),
-        { backgroundColor: getBackgroundColor() },
+        styles.base,
+        {
+          height: sizeConfig.height,
+          paddingHorizontal: sizeConfig.paddingHorizontal,
+          backgroundColor: getBackgroundColor(),
+          width: fullWidth ? '100%' : undefined,
+        },
+        getBorderStyle(),
         style,
       ]}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
+      disabled={isDisabled}
+      activeOpacity={0.75}
       {...props}
     >
-      {loading ? (
-        <ActivityIndicator color={getTextColor()} />
-      ) : (
-        <Text style={[styles.text, { color: getTextColor() }, isText && styles.textVariantText]}>
-          {title}
-        </Text>
-      )}
+      <View style={[styles.content, contentStyle]}>
+        {loading ? (
+          <ActivityIndicator color={textColor} size="small" />
+        ) : (
+          <>
+            {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+            <Text
+              style={[
+                styles.label,
+                { color: textColor, fontSize: sizeConfig.fontSize },
+                labelStyle,
+              ]}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+          </>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  primaryContainer: {
-    height: 52,
-    borderRadius: 8,
+  base: {
+    borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    marginVertical: 8,
+    marginVertical: spacing.xs,
+    alignSelf: 'stretch',
   },
-  outlineContainer: {
-    height: 52,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    justifyContent: 'center',
+  content: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    marginVertical: 8,
-  },
-  textContainer: {
-    paddingVertical: 12,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  text: {
-    fontSize: 16,
-    fontWeight: '600',
+  label: {
+    fontWeight: typography.weight.semibold,
   },
-  textVariantText: {
-    fontWeight: '500',
-    fontSize: 14,
+  iconLeft: {
+    marginRight: spacing.xs + 2,
+  },
+  iconRight: {
+    marginLeft: spacing.xs + 2,
   },
 });

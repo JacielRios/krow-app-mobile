@@ -63,6 +63,17 @@ export const HomeScreen = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Desarrollo</Text>
+        <View style={styles.buttonContainer}>
+          <Button
+            title="UI Components"
+            variant="ghost"
+            onPress={() => navigation.navigate('UIShowcase')}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pasajero</Text>
         <View style={styles.buttonContainer}>
           <Button
@@ -82,13 +93,21 @@ export const HomeScreen = () => {
         <Text style={styles.sectionTitle}>Conductor</Text>
         <View style={styles.buttonContainer}>
           <Button
+            title="Publicar viaje"
+            onPress={() => navigation.navigate('PublishRide')}
+          />
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button
             title="Viaje Iniciado"
+            variant="secondary"
             onPress={() => navigation.navigate('DriverActiveRide')}
           />
         </View>
         <View style={styles.buttonContainer}>
           <Button
             title="Viaje Finalizado"
+            variant="secondary"
             onPress={() => navigation.navigate('DriverFinishedRide')}
           />
         </View>
