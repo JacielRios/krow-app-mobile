@@ -11,9 +11,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../../../core/theme/colors';
 import { Button } from '../../../../core/components/ui/Button';
-import { RideForm, RideFormErrors, RideFormValues } from '../../components/RideForm';
-import { useDriverVehicles } from '../../hooks/useDriverVehicles';
-import { useCreateRide } from '../../hooks/useCreateRide';
+import { RideForm } from '../../components';
+import type { RideFormErrors, RideFormValues } from '../../components';
+import { useDriverVehicles, useCreateRide } from '../../hooks';
 
 const INITIAL_FORM: RideFormValues = {
   origin_lat: '',

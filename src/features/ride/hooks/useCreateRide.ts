@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { CreateRidePayload, CreateRideResult } from '../types/ride.types';
+import type { CreateRidePayload, CreateRideResult } from '../types';
 
 interface UseCreateRideResult {
   createRide: (payload: CreateRidePayload) => Promise<CreateRideResult>;

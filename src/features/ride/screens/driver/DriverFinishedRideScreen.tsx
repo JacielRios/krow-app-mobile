@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../../core/theme/colors';
-import { StarRating } from '../../components/StarRating';
+import { StarRating } from '../../components';
 import { Button } from '../../../../core/components/ui/Button';
 
 // Dummy data for passengers

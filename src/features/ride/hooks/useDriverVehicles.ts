@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { DriverVehicle } from '../types/ride.types';
+import type { DriverVehicle } from '../types';
 
 interface UseDriverVehiclesResult {
   vehicles: DriverVehicle[];

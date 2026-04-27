@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../core/theme/colors';
-import { DriverVehicle } from '../types/ride.types';
+import type { DriverVehicle } from '../types';
 
 interface VehiclePickerProps {
   label?: string;

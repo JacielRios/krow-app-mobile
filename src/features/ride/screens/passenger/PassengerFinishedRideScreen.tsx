@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../../core/theme/colors';
-import { StarRating } from '../../components/StarRating';
+import { StarRating } from '../../components';
 import { Button } from '../../../../core/components/ui/Button';
 
 export const PassengerFinishedRideScreen = ({ navigation }: any) => {

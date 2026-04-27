@@ -2,11 +2,13 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { HomeScreen } from '../../features/home/screens/HomeScreen';
-import { PassengerActiveRideScreen } from '../../features/ride/screens/passenger/PassengerActiveRideScreen';
-import { PassengerFinishedRideScreen } from '../../features/ride/screens/passenger/PassengerFinishedRideScreen';
-import { DriverActiveRideScreen } from '../../features/ride/screens/driver/DriverActiveRideScreen';
-import { DriverFinishedRideScreen } from '../../features/ride/screens/driver/DriverFinishedRideScreen';
-import { PublishRideScreen } from '../../features/ride/screens/driver/PublishRideScreen';
+import {
+  PassengerActiveRideScreen,
+  PassengerFinishedRideScreen,
+  DriverActiveRideScreen,
+  DriverFinishedRideScreen,
+  PublishRideScreen,
+} from '../../features/ride';
 import { UIShowcaseScreen } from '../../features/ui-showcase/screens/UIShowcaseScreen';
 
 const Stack = createNativeStackNavigator();

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { Input } from '../../../core/components/ui/Input';
 import { colors } from '../../../core/theme/colors';
-import { DriverVehicle } from '../types/ride.types';
+import type { DriverVehicle } from '../types';
 import { VehiclePicker } from './VehiclePicker';
 import { RideDateTimePicker } from './RideDateTimePicker';
 
