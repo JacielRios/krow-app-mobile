@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { supabase } from '../../lib/supabase';
-import { useConductorLoginGateBlocking } from '../auth/conductorLoginGate';
+import { supabase } from '../../services/supabase';
+import { useConductorLoginGateBlocking } from '../conductorLoginGate';
 import AuthNavigator from '../../features/auth/navigation/AuthNavigator';
 import MainNavigator from './MainNavigator';
 

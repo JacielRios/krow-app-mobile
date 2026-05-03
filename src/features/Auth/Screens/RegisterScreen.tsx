@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Input } from '../../../core/components/ui/Input';
-import { Button } from '../../../core/components/ui/Button';
-import { Dropdown } from '../../../core/components/ui/Dropdown';
-import { CustomAlert, AlertType } from '../../../core/components/ui/CustomAlert';
-import { colors } from '../../../core/theme/colors';
-import { supabase } from '../../../lib/supabase';
+import { Input } from '../../../shared/components/ui/Input';
+import { Button } from '../../../shared/components/ui/Button';
+import { Dropdown } from '../../../shared/components/ui/Dropdown';
+import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAlert';
+import { colors } from '../../../shared/theme/colors';
+import { supabase } from '../../../services/supabase';
 
 const CARRERAS = [
   'Ing Sistemas Computacionales',

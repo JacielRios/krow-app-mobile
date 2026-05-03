@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { consumeSkipSplashOnNextAuthMount } from '../../../core/auth/authEntryPreference';
+import { consumeSkipSplashOnNextAuthMount } from '../../../app/authEntryPreference';
 import SplashScreen from '../Screens/SplashScreen';
 import LoginScreen from '../Screens/LoginScreen';
 import RegisterScreen from '../Screens/RegisterScreen';

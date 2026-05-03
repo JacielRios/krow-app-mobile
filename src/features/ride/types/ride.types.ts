@@ -1,10 +1,14 @@
-export interface CreateRidePayload {
+export interface PublishRidePayload {
   vehicle_id: string;
   origin_lat: number;
   origin_lng: number;
   destination_lat: number;
   destination_lng: number;
-  departure_time: string; // ISO 8601 con timezone, ej: "2026-04-25T10:00:00-06:00"
+  origin_address?: string;
+  destination_address?: string;
+  /** Polyline encoded de Google Directions (overview_polyline.points). */
+  route_polyline?: string;
+  departure_time: string; // ISO 8601 con timezone
   available_seats: number;
   price_per_seat: number;
 }
@@ -17,7 +21,7 @@ export interface DriverVehicle {
   license_plate: string;
 }
 
-export interface CreateRideResult {
+export interface PublishRideResult {
   rideId: string | null;
   error: string | null;
 }

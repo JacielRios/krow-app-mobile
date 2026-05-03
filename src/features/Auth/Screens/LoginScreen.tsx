@@ -13,13 +13,13 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Input } from '../../../core/components/ui/Input';
-import { Button } from '../../../core/components/ui/Button';
-import { CustomAlert, AlertType } from '../../../core/components/ui/CustomAlert';
-import { setConductorLoginGateBlocking } from '../../../core/auth/conductorLoginGate';
-import { setSessionLoginMode } from '../../../core/auth/sessionLoginMode';
-import { colors } from '../../../core/theme/colors';
-import { supabase } from '../../../lib/supabase';
+import { Input } from '../../../shared/components/ui/Input';
+import { Button } from '../../../shared/components/ui/Button';
+import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAlert';
+import { setConductorLoginGateBlocking } from '../../../app/conductorLoginGate';
+import { setSessionLoginMode } from '../../../app/sessionLoginMode';
+import { colors } from '../../../shared/theme/colors';
+import { supabase } from '../../../services/supabase';
 
 type UserType = 'pasajero' | 'conductor';
 

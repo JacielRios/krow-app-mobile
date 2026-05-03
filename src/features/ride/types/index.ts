@@ -1,5 +1,20 @@
 export type {
-  CreateRidePayload,
+  PublishRidePayload,
   DriverVehicle,
-  CreateRideResult,
+  PublishRideResult,
 } from './ride.types';
+
+export type {
+  BookingStatus,
+  BookingMutableStatus,
+  RequestBookingPayload,
+  RequestBookingResult,
+  UpdateBookingStatusResult,
+  BookingRequest,
+  RideHeader,
+} from './booking.types';
+
+export type {
+  AvailableRide,
+  SearchRidesParams,
+} from './rideSearch.types';

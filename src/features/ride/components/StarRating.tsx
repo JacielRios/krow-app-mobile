@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../core/theme/colors';
+import { colors } from '../../../shared/theme/colors';
 
 interface StarRatingProps {
   maxStars?: number;

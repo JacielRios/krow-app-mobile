@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, ImageBackground } from 'react-native';
-import { colors } from '../../../core/theme/colors';
+import { colors } from '../../../shared/theme/colors';
 
 interface MapPlaceholderProps {
   children?: React.ReactNode;

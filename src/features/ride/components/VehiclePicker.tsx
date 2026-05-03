@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../core/theme/colors';
+import { colors } from '../../../shared/theme/colors';
 import type { DriverVehicle } from '../types';
 
 interface VehiclePickerProps {

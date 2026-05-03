@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
-import { colors } from '../../../core/theme/colors';
+import { colors } from '../../../shared/theme/colors';
 
 export default function SplashScreen({ navigation }: any) {
   const scaleValue = useRef(new Animated.Value(0.9)).current;

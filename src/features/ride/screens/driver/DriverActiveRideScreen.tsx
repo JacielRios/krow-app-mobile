@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, PanResponder } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../../core/theme/colors';
+import { colors } from '../../../../shared/theme/colors';
 import { MapPlaceholder } from '../../components';
-import { Button } from '../../../../core/components/ui/Button';
+import { Button } from '../../../../shared/components/ui/Button';
 
 // Dummy data for passengers
 const passengers = [

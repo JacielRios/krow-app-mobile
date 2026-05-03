@@ -1,5 +1,5 @@
 {
-  "extends": "@react-native/typescript-config/tsconfig.json",
+  "extends": "./node_modules/@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
@@ -9,10 +9,14 @@
     "noEmit": true,
     "isolatedModules": true,
     "strict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@app/*": ["src/app/*"],
+      "@shared/*": ["src/shared/*"],
+      "@services/*": ["src/services/*"],
+      "@features/*": ["src/features/*"]
     },
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
