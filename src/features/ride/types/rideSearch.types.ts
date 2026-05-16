@@ -3,6 +3,8 @@
  * Incluye datos derivados del conductor y vehículo para que el componente de
  * matching pueda mostrar la información sin queries adicionales.
  */
+import type { RideStatus } from './ride.types';
+
 export interface AvailableRide {
   rideId: string;
   driverId: string;
@@ -31,7 +33,7 @@ export interface AvailableRide {
   departureTime: string; // ISO 8601
   availableSeats: number;
   pricePerSeat: number;
-  status: string;
+  status: RideStatus;
 }
 
 export interface SearchRidesParams {

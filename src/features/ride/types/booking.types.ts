@@ -1,8 +1,21 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+import type { RideStatus } from './ride.types';
 
+export type BookingStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'rejected'
+  | 'cancelled'
+  | 'in_progress'
+  | 'completed';
+
+/**
+ * Estados a los que el cliente puede transicionar via `update_booking_status`.
+ * - Conductor → 'confirmed' | 'rejected'
+ * - Pasajero  → 'cancelled'
+ */
 export type BookingMutableStatus = Extract<
   BookingStatus,
-  'confirmed' | 'cancelled'
+  'confirmed' | 'rejected' | 'cancelled'
 >;
 
 /**
@@ -52,7 +65,7 @@ export interface RideHeader {
   departureTime: string;
   availableSeats: number;
   pricePerSeat: number;
-  status: string;
+  status: RideStatus;
   originAddress: string | null;
   destinationAddress: string | null;
 }

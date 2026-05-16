@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../shared/theme/colors';
+import { spacing } from '../../../shared/theme/tokens';
 
 interface StarRatingProps {
   maxStars?: number;
@@ -31,18 +32,19 @@ export const StarRating: React.FC<StarRatingProps> = ({
     <View style={styles.container}>
       {Array.from({ length: maxStars }).map((_, index) => {
         const starNumber = index + 1;
+        const filled = starNumber <= rating;
         return (
           <TouchableOpacity
             key={`star-${index}`}
-            activeOpacity={0.7}
+            activeOpacity={0.6}
             disabled={disabled}
             onPress={() => handlePress(starNumber)}
+            style={styles.starBtn}
           >
             <MaterialIcons
-              name={starNumber <= rating ? 'star' : 'star-border'}
+              name={filled ? 'star' : 'star-border'}
               size={size}
-              color={starNumber <= rating ? colors.status.warning : colors.border.default}
-              style={styles.star}
+              color={filled ? '#F59E0B' : colors.border.default}
             />
           </TouchableOpacity>
         );
@@ -56,9 +58,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: spacing.sm,
   },
-  star: {
-    marginHorizontal: 4,
+  starBtn: {
+    paddingHorizontal: 3,
   },
 });

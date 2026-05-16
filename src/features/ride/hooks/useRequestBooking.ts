@@ -21,7 +21,7 @@ interface UseRequestBookingResult {
  * (opcionalmente) `seats_reserved`.
  *
  * Además, la RPC valida server-side:
- *   - que el ride exista, esté 'scheduled' y no haya partido.
+ *   - que el ride exista, esté en fase previa (`open`|`full`) y pueda admitir solicitud según reglas server-side.
  *   - que haya asientos suficientes.
  *   - que el solicitante NO sea el conductor del ride.
  *   - que el solicitante NO tenga ya una booking activa (pending|confirmed)

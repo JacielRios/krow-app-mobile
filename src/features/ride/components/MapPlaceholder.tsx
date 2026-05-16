@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text, ImageBackground } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
+import { radii, spacing, typography } from '../../../shared/theme/tokens';
 
 interface MapPlaceholderProps {
   children?: React.ReactNode;
@@ -33,20 +34,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 100,
     alignSelf: 'center',
-    padding: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: radii.xl,
   },
   mapText: {
-    color: colors.text.muted,
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  mapSubText: {
-    color: colors.text.muted,
-    fontSize: 14,
+    color: colors.text.secondary,
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
     textAlign: 'center',
   },
   contentOverlay: {

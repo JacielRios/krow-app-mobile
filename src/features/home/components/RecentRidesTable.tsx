@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -23,7 +24,9 @@ interface Props {
 }
 
 const STATUS_TO_BADGE: Record<RecentRideStatus, BadgeStatus> = {
-  scheduled: 'pending',
+  scheduled: 'open',
+  open: 'open',
+  full: 'full',
   in_progress: 'in_progress',
   completed: 'completed',
   cancelled: 'cancelled',
@@ -48,9 +51,14 @@ const formatPrice = (price: number | null): string => {
 const RideRow: React.FC<{
   ride: RecentRide;
   onPress?: () => void;
-}> = ({ ride }) => {
+}> = memo(({ ride, onPress }) => {
+  const Container: any = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.row}>
+    <Container
+      style={styles.row}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : undefined}
+    >
       <View style={styles.rowHeader}>
         <Text style={styles.rowDate}>{formatDate(ride.departureTime)}</Text>
         <StatusBadge status={STATUS_TO_BADGE[ride.status]} size="sm" />
@@ -90,9 +98,9 @@ const RideRow: React.FC<{
         </View>
         <Text style={styles.priceText}>{formatPrice(ride.pricePerSeat)}</Text>
       </View>
-    </View>
+    </Container>
   );
-};
+});
 
 export const RecentRidesTable: React.FC<Props> = ({
   rides,

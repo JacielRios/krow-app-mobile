@@ -6,7 +6,12 @@ import { spacing, radii, typography } from '../../theme/tokens';
 export type BadgeStatus =
   | 'completed'
   | 'pending'
+  | 'confirmed'
+  | 'rejected'
   | 'cancelled'
+  | 'open'
+  | 'full'
+  | 'scheduled'
   | 'verified'
   | 'active'
   | 'inactive'
@@ -28,7 +33,12 @@ export interface StatusBadgeProps {
 const STATUS_MAP: Record<BadgeStatus, { tone: BadgeTone; label: string }> = {
   completed:   { tone: 'success',  label: 'Completado'  },
   pending:     { tone: 'warning',  label: 'Pendiente'   },
-  cancelled:   { tone: 'error',    label: 'Cancelado'   },
+  confirmed:   { tone: 'success',  label: 'Confirmada'  },
+  rejected:    { tone: 'error',    label: 'Rechazada'   },
+  cancelled:   { tone: 'neutral',  label: 'Cancelada'   },
+  open:        { tone: 'info',     label: 'Abierto'     },
+  full:        { tone: 'warning',  label: 'Completo'    },
+  scheduled:   { tone: 'info',     label: 'Programado'  },
   verified:    { tone: 'primary',  label: 'Verificado'  },
   active:      { tone: 'success',  label: 'Activo'      },
   inactive:    { tone: 'neutral',  label: 'Inactivo'    },

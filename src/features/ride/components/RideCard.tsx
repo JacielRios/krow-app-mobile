@@ -7,8 +7,26 @@ import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { Avatar } from '../../../shared/components/ui/Avatar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
-import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
+import { StatusBadge, type BadgeStatus } from '../../../shared/components/ui/StatusBadge';
 import type { AvailableRide } from '../types/rideSearch.types';
+import { coerceRideStatus, type RideStatus } from '../types';
+
+const rideStatusToBadge = (s: RideStatus): BadgeStatus => {
+  switch (s) {
+    case 'open':
+      return 'open';
+    case 'full':
+      return 'full';
+    case 'in_progress':
+      return 'in_progress';
+    case 'completed':
+      return 'completed';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'open';
+  }
+};
 
 interface RideCardProps {
   ride: AvailableRide;
@@ -82,7 +100,10 @@ export const RideCard: React.FC<RideCardProps> = ({
             </View>
           )}
         </View>
-        <StatusBadge tone="info" label="Programado" size="sm" />
+        <StatusBadge
+          status={rideStatusToBadge(coerceRideStatus(ride.status))}
+          size="sm"
+        />
       </View>
 
       <View style={styles.routeBlock}>

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '../../../services/supabase';
 import type { AvailableRide } from '../types/rideSearch.types';
+import { coerceRideStatus } from '../types';
 
 interface RawSearchRow {
   ride_id: string;
@@ -61,7 +62,7 @@ const mapRow = (row: RawSearchRow): AvailableRide => ({
   departureTime: row.departure_time,
   availableSeats: row.available_seats,
   pricePerSeat: toNum(row.price_per_seat),
-  status: row.status,
+  status: coerceRideStatus(row.status),
 });
 
 export interface UseSearchRidesResult {

@@ -1,312 +1,675 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, PanResponder } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
 import { colors } from '../../../../shared/theme/colors';
-import { MapPlaceholder } from '../../components';
+import { radii, shadows, spacing, typography } from '../../../../shared/theme/tokens';
 import { Button } from '../../../../shared/components/ui/Button';
+import { RoutePreviewMap } from '../../../maps';
+import {
+  useCancelRide,
+  useCompleteRide,
+  useCompleteStop,
+  useDriverLocationBroadcast,
+  useFakeDriverLocation,
+  useRideRealtime,
+} from '../../hooks';
+import { activeRideStore } from '../../../../app/store/activeRideStore';
+import { supabase } from '../../../../services/supabase';
+import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
+import type { BookingRequest } from '../../types/booking.types';
 
-// Dummy data for passengers
-const passengers = [
-  { id: '1', name: 'Ana S.', stop: 'Av. Universidad 123', status: 'En viaje', fare: '$45.00' },
-  { id: '2', name: 'Luis M.', stop: 'Facultad de Derecho', status: 'En viaje', fare: '$50.00' },
-];
+const { height: SCREEN_H } = Dimensions.get('window');
+const MAP_HEIGHT = SCREEN_H * 0.38;
 
-export const DriverActiveRideScreen = ({ navigation }: any) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+interface RideCoords {
+  originLat: number;
+  originLng: number;
+  destLat: number;
+  destLng: number;
+  routePolyline: string | null;
+}
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy < -50) {
-          setIsExpanded(true);
-        } else if (gestureState.dy > 50) {
-          setIsExpanded(false);
-        }
+type RouteProp = NativeStackScreenProps<
+  MainStackParamList,
+  'DriverActiveRide'
+>['route'];
+type Nav = NativeStackNavigationProp<MainStackParamList, 'DriverActiveRide'>;
+
+// Avatar initial with color rotation
+const getAvatarColor = (index: number) =>
+  colors.avatarColors[index % colors.avatarColors.length];
+
+export const DriverActiveRideScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteProp>();
+  const insets = useSafeAreaInsets();
+  const rideId = route.params?.rideId ?? null;
+
+  const { ride, bookings, loading, error, realtimeStatus } =
+    useRideRealtime(rideId);
+
+  const { completeRide, loading: completing } = useCompleteRide();
+  const { cancelRide, loading: cancelling } = useCancelRide();
+  const { completeStop, loading: completingStop } = useCompleteStop();
+
+  const activePassengers = useMemo(
+    () =>
+      bookings.filter(
+        b => b.status === 'confirmed' || b.status === 'in_progress',
+      ),
+    [bookings],
+  );
+
+  const completedPassengers = useMemo(
+    () => bookings.filter(b => b.status === 'completed'),
+    [bookings],
+  );
+
+  const allStopsCompleted =
+    activePassengers.length === 0 && completedPassengers.length > 0;
+
+  const totalEarnings = useMemo(() => {
+    const confirmed = bookings.filter(
+      b =>
+        b.status === 'confirmed' ||
+        b.status === 'in_progress' ||
+        b.status === 'completed',
+    );
+    if (!ride?.pricePerSeat) return null;
+    return confirmed.reduce(
+      (acc, b) => acc + (ride.pricePerSeat ?? 0) * b.seatsReserved,
+      0,
+    );
+  }, [bookings, ride?.pricePerSeat]);
+
+  // Coords & polyline
+  const [coords, setCoords] = useState<RideCoords | null>(null);
+  useEffect(() => {
+    if (!rideId) return;
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from('rides')
+        .select(
+          'origin_lat, origin_lng, destination_lat, destination_lng, route_polyline',
+        )
+        .eq('ride_id', rideId)
+        .maybeSingle();
+      if (!active || !data) return;
+      setCoords({
+        originLat: Number(data.origin_lat),
+        originLng: Number(data.origin_lng),
+        destLat: Number(data.destination_lat),
+        destLng: Number(data.destination_lng),
+        routePolyline: data.route_polyline,
+      });
+    })();
+    return () => { active = false; };
+  }, [rideId]);
+
+  const fakeLocation = useFakeDriverLocation({
+    routePolyline: coords?.routePolyline ?? null,
+    origin: coords
+      ? { lat: coords.originLat, lng: coords.originLng }
+      : { lat: 0, lng: 0 },
+    destination: coords
+      ? { lat: coords.destLat, lng: coords.destLng }
+      : { lat: 0, lng: 0 },
+    active: ride?.status === 'in_progress' && coords != null,
+  });
+
+  useDriverLocationBroadcast({
+    rideId: ride?.status === 'in_progress' ? rideId : null,
+    location: fakeLocation,
+  });
+
+  // Auto-navigate on completion
+  useEffect(() => {
+    if (ride?.status === 'completed') {
+      activeRideStore.clear();
+      navigation.replace('DriverFinishedRide', { rideId: ride.rideId });
+    }
+  }, [ride?.status, ride?.rideId, navigation]);
+
+  const [completingBookingId, setCompletingBookingId] = useState<string | null>(null);
+
+  const handleCompleteStop = (booking: BookingRequest) => {
+    if (completingStop || completingBookingId) return;
+    Alert.alert(
+      'Completar parada',
+      `¿${booking.passenger.fullName ?? 'El pasajero'} llegó a su destino?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, llegó',
+          onPress: async () => {
+            setCompletingBookingId(booking.bookingId);
+            const { success, error: err } = await completeStop(booking.bookingId);
+            setCompletingBookingId(null);
+            if (!success) Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+          },
+        },
+      ],
+    );
+  };
+
+  const handleComplete = () => {
+    if (!ride) return;
+    Alert.alert('Finalizar viaje', '¿Confirmas que el viaje ha terminado?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Finalizar',
+        onPress: async () => {
+          const { success, error: err } = await completeRide(ride.rideId);
+          if (!success) {
+            Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+            return;
+          }
+          activeRideStore.clear();
+          navigation.replace('DriverFinishedRide', { rideId: ride.rideId });
+        },
       },
-    })
-  ).current;
+    ]);
+  };
+
+  const handleCancel = () => {
+    if (!ride) return;
+    Alert.alert(
+      'Cancelar viaje',
+      'Todas las reservas activas serán canceladas. ¿Continuar?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Cancelar viaje',
+          style: 'destructive',
+          onPress: async () => {
+            const { success, error: err } = await cancelRide(ride.rideId, 'driver_action');
+            if (!success) {
+              Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+              return;
+            }
+            activeRideStore.clear();
+            navigation.replace('Home');
+          },
+        },
+      ],
+    );
+  };
+
+  // ─── Loading / Error ───────────────────────────────────────────────
+  if (loading && !ride) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.mutedText}>Cargando viaje…</Text>
+      </View>
+    );
+  }
+
+  if (error || !ride) {
+    return (
+      <View style={styles.center}>
+        <MaterialIcons name="error-outline" size={32} color={colors.status.error} />
+        <Text style={styles.errorText}>{error ?? 'No se encontró el viaje.'}</Text>
+        <Button title="Volver" variant="outline" onPress={() => navigation.goBack()} />
+      </View>
+    );
+  }
 
   return (
-    <MapPlaceholder>
-      {/* Route & Cancel Buttons Floating on Map */}
-      <View style={styles.floatingTopActions}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        
-        {/* Chat Button Floating */}
-        <TouchableOpacity
-          style={styles.chatButtonFloating}
-          onPress={() => { /* TODO: Navigate to chat screen */ }}
-        >
-          <MaterialIcons name="chat" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
+    <View style={styles.screen}>
+      {/* ─── Map Area ──────────────────────────────── */}
+      <View style={[styles.mapArea, { paddingTop: insets.top }]}>
+        {coords ? (
+          <RoutePreviewMap
+            origin={{ lat: coords.originLat, lng: coords.originLng }}
+            destination={{ lat: coords.destLat, lng: coords.destLng }}
+            encodedPolyline={coords.routePolyline}
+            height={MAP_HEIGHT}
+          />
+        ) : (
+          <View style={styles.mapPlaceholder}>
+            <MaterialIcons name="map" size={48} color={colors.text.muted} />
+          </View>
+        )}
+
+        {/* Floating buttons */}
+        <View style={[styles.floatingBtnRow, { top: insets.top + spacing.sm }]}>
+          <TouchableOpacity style={styles.floatingBtn} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={22} color={colors.text.primary} />
+          </TouchableOpacity>
+          {ride.status === 'in_progress' && (
+            <TouchableOpacity
+              style={styles.floatingBtnChat}
+              onPress={() => navigation.navigate('Chat', { rideId: ride.rideId })}
+            >
+              <MaterialIcons name="chat" size={22} color={colors.surface} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Ride Info Bottom Sheet */}
-      <Animated.View style={[styles.bottomSheet, isExpanded && styles.bottomSheetExpanded]}>
-        <View style={styles.dragHandler} {...panResponder.panHandlers}>
-          <View style={styles.dragIndicator} />
+      {/* ─── Bottom Sheet ──────────────────────────── */}
+      <View style={styles.sheet}>
+        {/* Pill indicator */}
+        <View style={styles.pillWrap}>
+          <View style={styles.pill} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-        {/* Destination Header */}
-        <View style={styles.header}>
-          <Text style={styles.destinationLabel}>Destino Final</Text>
-          <Text style={styles.destinationValue}>Campus Central</Text>
-          <View style={styles.headerDetailsContainer}>
-            <Text style={styles.etaText}>Estimado: 14:45</Text>
-            <Text style={styles.fareText}>Total: $95.00 MXN</Text>
+        {/* Realtime reconnecting banner */}
+        {realtimeStatus === 'reconnecting' && (
+          <View style={styles.rtBanner}>
+            <ActivityIndicator size="small" color={colors.status.warning} />
+            <Text style={styles.rtBannerText}>Reconectando…</Text>
           </View>
+        )}
+
+        {/* Destination header */}
+        <Text style={styles.destLabel}>DESTINO FINAL</Text>
+        <Text style={styles.destName} numberOfLines={2}>
+          {ride.destinationAddress ?? 'Destino'}
+        </Text>
+
+        {/* Estimated & Total */}
+        <View style={styles.statsRow}>
+          {totalEarnings != null && (
+            <Text style={styles.statTotal}>
+              Total: ${totalEarnings.toFixed(0)} MXN
+            </Text>
+          )}
         </View>
 
         <View style={styles.divider} />
 
-        {/* Passengers List */}
-        <View style={styles.passengersSection}>
-          <Text style={styles.sectionTitle}>Pasajeros y paradas ({passengers.length})</Text>
-          <ScrollView style={styles.passengersList}>
-            {passengers.map((p, index) => (
-              <View key={p.id} style={styles.passengerItem}>
-                <View style={styles.passengerHeader}>
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarInitial}>{p.name.charAt(0)}</Text>
-                  </View>
-                  <View style={styles.passengerInfo}>
-                    <Text style={styles.passengerName}>{p.name}</Text>
-                    <View style={styles.passengerMetaRow}>
-                      <Text style={styles.passengerStatus}>{p.status}</Text>
-                      <Text style={styles.passengerFare}>{p.fare}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.stopActionBtn}>
-                    <Text style={styles.stopActionText}>Dejar aquí</Text>
-                  </TouchableOpacity>
-                </View>
+        <ScrollView
+          style={styles.scrollFlex}
+          contentContainerStyle={[
+            styles.scrollInner,
+            { paddingBottom: insets.bottom + spacing.xl },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Passengers header */}
+          <Text style={styles.sectionTitle}>
+            Pasajeros y paradas ({activePassengers.length + completedPassengers.length})
+          </Text>
 
-                <View style={styles.stopRow}>
-                  <MaterialIcons name="location-pin" size={16} color={colors.status.info} />
-                  <Text style={styles.stopAddress}>{p.stop}</Text>
+          {/* Active passengers */}
+          {activePassengers.map((p, idx) => (
+            <View key={p.bookingId} style={styles.passengerCard}>
+              <View style={styles.pRow}>
+                <View style={[styles.avatar, { backgroundColor: getAvatarColor(idx) }]}>
+                  <Text style={styles.avatarText}>
+                    {(p.passenger.fullName ?? 'P').charAt(0).toUpperCase()}
+                  </Text>
                 </View>
-
-                {index < passengers.length - 1 && <View style={styles.itemDivider} />}
+                <View style={styles.pInfo}>
+                  <Text style={styles.pName}>
+                    {p.passenger.fullName ?? 'Pasajero'}
+                  </Text>
+                  <View style={styles.pStatusRow}>
+                    <View style={styles.pStatusDot} />
+                    <Text style={styles.pStatusText}>En viaje</Text>
+                  </View>
+                </View>
+                <Text style={styles.pPrice}>
+                  ${((ride.pricePerSeat ?? 0) * p.seatsReserved).toFixed(0)}
+                </Text>
               </View>
-            ))}
-          </ScrollView>
-        </View>
 
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          <Button
-            title="Finalizar Viaje completo"
-            onPress={() => navigation.navigate('DriverFinishedRide')}
-          />
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>Cancelar Viaje</Text>
-          </TouchableOpacity>
-        </View>
+              {/* Stop address (if we know it from dropoff) */}
+              <View style={styles.pStopRow}>
+                <MaterialIcons name="place" size={16} color={colors.status.error} />
+                <Text style={styles.pStopText} numberOfLines={1}>
+                  {ride.destinationAddress ?? 'Destino'}
+                </Text>
+              </View>
 
+              <TouchableOpacity
+                style={styles.dropOffBtn}
+                onPress={() => handleCompleteStop(p)}
+                disabled={completingBookingId !== null}
+              >
+                <Text style={styles.dropOffText}>
+                  {completingBookingId === p.bookingId ? 'Completando…' : 'Dejar aquí'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          {/* Completed passengers */}
+          {completedPassengers.map((p, idx) => (
+            <View key={p.bookingId} style={[styles.passengerCard, styles.completedCard]}>
+              <View style={styles.pRow}>
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: getAvatarColor(activePassengers.length + idx) },
+                    { opacity: 0.5 },
+                  ]}
+                >
+                  <Text style={styles.avatarText}>
+                    {(p.passenger.fullName ?? 'P').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.pInfo}>
+                  <Text style={[styles.pName, { color: colors.text.secondary }]}>
+                    {p.passenger.fullName ?? 'Pasajero'}
+                  </Text>
+                  <Text style={styles.completedLabel}>✓ Completado</Text>
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {activePassengers.length === 0 && completedPassengers.length > 0 && (
+            <View style={styles.allDoneBanner}>
+              <MaterialIcons name="check-circle" size={20} color={colors.status.success} />
+              <Text style={styles.allDoneText}>
+                Todos los pasajeros llegaron a su destino.
+              </Text>
+            </View>
+          )}
+
+          {/* CTA Buttons */}
+          <View style={styles.ctaSection}>
+            {ride.status === 'in_progress' && allStopsCompleted && (
+              <Button
+                title={completing ? 'Finalizando…' : 'Finalizar Viaje completo'}
+                onPress={handleComplete}
+                loading={completing}
+                disabled={completing || cancelling}
+              />
+            )}
+            {(ride.status === 'open' ||
+              ride.status === 'full' ||
+              ride.status === 'in_progress') && (
+              <TouchableOpacity
+                onPress={handleCancel}
+                disabled={cancelling}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>
+                  {cancelling ? 'Cancelando…' : 'Cancelar Viaje'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </ScrollView>
-      </Animated.View>
-    </MapPlaceholder>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  floatingTopActions: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  iconButton: {
+  screen: { flex: 1, backgroundColor: colors.map.background },
+  center: {
+    flex: 1,
     backgroundColor: colors.background,
-    padding: 10,
-    borderRadius: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  chatButtonFloating: {
-    backgroundColor: colors.primary,
-    padding: 12,
-    borderRadius: 25,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  bottomSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    maxHeight: '40%',
-  },
-  bottomSheetExpanded: {
-    maxHeight: '80%',
-  },
-  dragHandler: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  dragIndicator: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.border.default,
-    borderRadius: 2,
-  },
-  header: {
-    alignItems: 'center',
-  },
-  destinationLabel: {
-    fontSize: 12,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-  },
-  destinationValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginVertical: 4,
-  },
-  headerDetailsContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
-    gap: 16,
+    padding: spacing.lg,
+    rowGap: spacing.md,
   },
-  etaText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primaryLight,
+  mutedText: {
+    fontSize: typography.size.md,
+    color: colors.text.secondary,
   },
-  fareText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.primary,
+  errorText: {
+    fontSize: typography.size.md,
+    color: colors.status.error,
+    textAlign: 'center',
+  },
+
+  // ── Map ─────────────────────────────────
+  mapArea: {
+    height: MAP_HEIGHT,
+    backgroundColor: colors.map.background,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingBtnRow: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  floatingBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.lg,
+  },
+  floatingBtnChat: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.lg,
+  },
+
+  // ── Sheet ───────────────────────────────
+  sheet: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
+    marginTop: -spacing.md,
+    ...shadows.xl,
+  },
+  pillWrap: {
+    alignItems: 'center',
+    paddingTop: spacing.sm + 2,
+    paddingBottom: spacing.sm,
+  },
+  pill: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.border.default,
+  },
+  rtBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    backgroundColor: colors.status.warningLight,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    marginBottom: spacing.sm,
+  },
+  rtBannerText: {
+    fontSize: typography.size.sm,
+    color: '#92400E',
+  },
+  destLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  destName: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
+    color: colors.text.primary,
+    paddingHorizontal: spacing.lg,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  statTotal: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.status.success,
   },
   divider: {
     height: 1,
     backgroundColor: colors.border.light,
-    marginVertical: 16,
+    marginHorizontal: spacing.lg,
   },
-  passengersSection: {
-    flex: 1,
+  scrollFlex: { flex: 1 },
+  scrollInner: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
     color: colors.text.primary,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  passengersList: {
-    marginBottom: 16,
+
+  // ── Passenger Card ──────────────────────
+  passengerCard: {
+    backgroundColor: colors.background,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
-  passengerItem: {
-    paddingVertical: 12,
+  completedCard: {
+    opacity: 0.6,
   },
-  passengerHeader: {
+  pRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    columnGap: spacing.md,
   },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  avatarInitial: {
+  avatarText: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
     color: colors.text.inverse,
-    fontWeight: 'bold',
-    fontSize: 16,
   },
-  passengerInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  passengerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  pInfo: { flex: 1 },
+  pName: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
     color: colors.text.primary,
   },
-  passengerMetaRow: {
+  pStatusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 2,
-    paddingRight: 10,
   },
-  passengerStatus: {
-    fontSize: 12,
+  pStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.status.success,
+    marginRight: spacing.xs,
+  },
+  pStatusText: {
+    fontSize: typography.size.sm,
     color: colors.status.success,
+    fontWeight: typography.weight.medium,
   },
-  passengerFare: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: colors.text.secondary,
+  pPrice: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.primary,
   },
-  stopActionBtn: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  stopActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  stopRow: {
+  pStopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 52, // Align with text
+    marginTop: spacing.sm,
+    marginLeft: spacing.xxl + spacing.xs,
+    columnGap: spacing.xs,
   },
-  stopAddress: {
-    fontSize: 14,
+  pStopText: {
+    flex: 1,
+    fontSize: typography.size.sm,
     color: colors.text.secondary,
-    marginLeft: 6,
   },
-  itemDivider: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginTop: 12,
-    marginLeft: 52,
+  dropOffBtn: {
+    alignSelf: 'flex-end',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    marginTop: spacing.sm,
   },
-  actionsContainer: {
-    marginTop: 10,
-    gap: 12,
+  dropOffText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary,
   },
-  cancelButton: {
-    paddingVertical: 12,
+  completedLabel: {
+    fontSize: typography.size.sm,
+    color: colors.status.success,
+    fontWeight: typography.weight.medium,
+    marginTop: 2,
+  },
+  allDoneBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    backgroundColor: colors.status.successLight,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  allDoneText: {
+    flex: 1,
+    fontSize: typography.size.md,
+    color: '#166534',
+    fontWeight: typography.weight.medium,
+  },
+  ctaSection: {
+    marginTop: spacing.md,
+    rowGap: spacing.sm,
+  },
+  cancelBtn: {
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  cancelButtonText: {
+  cancelText: {
     color: colors.status.error,
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
   },
 });

@@ -6,11 +6,10 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../shared/theme/colors';
+import { radii, spacing, typography } from '../../../shared/theme/tokens';
 
 interface RideDateTimePickerProps {
   label?: string;
@@ -35,6 +34,8 @@ function formatDateTime(date: Date): string {
  * En Android, DateTimePicker solo muestra una cosa a la vez (fecha O hora).
  * Por eso usamos un flujo de dos pasos: primero fecha, luego hora.
  * En iOS usamos mode="datetime" que muestra ambos en un solo selector inline.
+ *
+ * Usa `onValueChange` (v9+) en lugar del deprecado `onChange`.
  */
 export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
   label,
@@ -51,9 +52,9 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
   // Fecha de trabajo interna para el flujo de dos pasos en Android
   const [tempDate, setTempDate] = useState<Date>(value ?? new Date());
 
-  const handleAndroidDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
-    if (!selected) {
-      // El usuario canceló
+  // ── Android: paso 1 — fecha ────────────────────────────────────────
+  const handleAndroidDateSelect = (_event: any, selected: Date) => {
+    if (_event?.type === 'dismissed' || _event?.nativeEvent?.type === 'dismissed') {
       setAndroidStep(null);
       return;
     }
@@ -62,10 +63,10 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
     setAndroidStep('time');
   };
 
-  const handleAndroidTimeChange = (_event: DateTimePickerEvent, selected?: Date) => {
+  // ── Android: paso 2 — hora ─────────────────────────────────────────
+  const handleAndroidTimeSelect = (_event: any, selected: Date) => {
     setAndroidStep(null);
-    if (!selected) return;
-
+    if (_event?.type === 'dismissed' || _event?.nativeEvent?.type === 'dismissed') return;
     // Combinar la fecha del paso 1 con la hora del paso 2
     const combined = new Date(
       tempDate.getFullYear(),
@@ -77,8 +78,9 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
     onChange(combined);
   };
 
-  const handleIOSChange = (_event: DateTimePickerEvent, selected?: Date) => {
-    if (selected) onChange(selected);
+  // ── iOS: inline datetime ───────────────────────────────────────────
+  const handleIOSValueChange = (_event: any, selected: Date) => {
+    onChange(selected);
   };
 
   const placeholder = 'Selecciona fecha y hora';
@@ -103,7 +105,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
         <MaterialIcons
           name="schedule"
           size={20}
-          color={colors.text.muted}
+          color={colors.text.tertiary}
           style={styles.icon}
         />
         <Text style={[styles.valueText, !value && styles.placeholder]}>
@@ -112,7 +114,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
         <MaterialIcons
           name={showIOS ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={20}
-          color={colors.text.muted}
+          color={colors.text.tertiary}
         />
       </TouchableOpacity>
 
@@ -126,7 +128,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
             mode="datetime"
             display="spinner"
             minimumDate={minimumDate}
-            onChange={handleIOSChange}
+            onValueChange={handleIOSValueChange}
             locale="es-MX"
           />
         </View>
@@ -139,7 +141,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           mode="date"
           display="default"
           minimumDate={minimumDate}
-          onChange={handleAndroidDateChange}
+          onValueChange={handleAndroidDateSelect}
         />
       )}
 
@@ -149,7 +151,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           value={tempDate}
           mode="time"
           display="default"
-          onChange={handleAndroidTimeChange}
+          onValueChange={handleAndroidTimeSelect}
           is24Hour={false}
         />
       )}
@@ -159,34 +161,34 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     width: '100%',
   },
   label: {
     color: colors.text.secondary,
-    marginBottom: 6,
-    fontSize: 14,
-    fontWeight: '500',
+    marginBottom: spacing.xs + 2,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.medium,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: colors.border.default,
-    borderRadius: 8,
-    backgroundColor: colors.background,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
     minHeight: 50,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
   },
   inputError: {
     borderColor: colors.status.error,
   },
   icon: {
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   valueText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: typography.size.lg,
     color: colors.text.primary,
   },
   placeholder: {
@@ -194,14 +196,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.status.error,
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: typography.size.sm,
+    marginTop: spacing.xs,
   },
   iosPickerWrapper: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 8,
+    borderRadius: radii.xl,
     overflow: 'hidden',
     backgroundColor: colors.surface,
   },

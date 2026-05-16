@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../services/supabase';
 import { SessionLoginMode } from '../../../app/sessionLoginMode';
+import { coerceRideStatus, type RideStatus } from '../../../features/ride/types';
 
-export type RecentRideStatus =
-  | 'scheduled'
-  | 'in_progress'
-  | 'completed'
-  | 'cancelled';
+/** Alias estable para listados recientes: mismos valores que RideStatus del dominio. */
+export type RecentRideStatus = RideStatus;
 
 export interface RecentRide {
   rideId: string;
@@ -31,27 +29,28 @@ export interface UseRecentRidesResult {
 }
 
 const RIDE_COLUMNS =
-  'ride_id, status, departure_time, origin_lat, origin_lng, destination_lat, destination_lng, available_seats, price_per_seat';
+  'ride_id, status, departure_time, origin_lat, origin_lng, destination_lat, destination_lng, origin_address, destination_address, available_seats, price_per_seat';
 
 const PG_RELATION_NOT_FOUND = '42P01';
 
-const formatCoord = (lat: number | null, lng: number | null): string => {
-  if (lat == null || lng == null) return 'Ubicación no disponible';
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+/** Estados del viaje para cupos activos vs historial (home conductor y pasajero). */
+const RIDE_HOME_ACTIVE_STATUSES = [
+  'scheduled',
+  'open',
+  'full',
+  'in_progress',
+] as const;
+const RIDE_HOME_HISTORY_STATUSES = ['completed', 'cancelled'] as const;
+
+/** PostgREST a veces devuelve numeric como string; normalizamos antes de toFixed. */
+const formatCoord = (lat: unknown, lng: unknown): string => {
+  const la = lat == null || lat === '' ? NaN : Number(lat);
+  const ln = lng == null || lng === '' ? NaN : Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return 'Ubicación no disponible';
+  return `${la.toFixed(4)}, ${ln.toFixed(4)}`;
 };
 
-const normalizeStatus = (raw: unknown): RecentRideStatus => {
-  if (
-    raw === 'scheduled' ||
-    raw === 'in_progress' ||
-    raw === 'completed' ||
-    raw === 'cancelled'
-  ) {
-    return raw;
-  }
-  return 'scheduled';
-};
-
+const normalizeStatus = (raw: unknown): RecentRideStatus => coerceRideStatus(raw);
 interface RawRide {
   ride_id: string;
   status: string | null;
@@ -60,56 +59,264 @@ interface RawRide {
   origin_lng: number | null;
   destination_lat: number | null;
   destination_lng: number | null;
+  origin_address: string | null;
+  destination_address: string | null;
   available_seats: number | null;
   price_per_seat: number | null;
 }
 
 const mapRawRide = (raw: RawRide): RecentRide => ({
-  rideId: raw.ride_id,
+  rideId: String(raw.ride_id ?? ''),
   status: normalizeStatus(raw.status),
-  departureTime: raw.departure_time,
-  originLabel: formatCoord(raw.origin_lat, raw.origin_lng),
-  destinationLabel: formatCoord(raw.destination_lat, raw.destination_lng),
+  departureTime:
+    raw.departure_time != null && raw.departure_time !== ''
+      ? String(raw.departure_time)
+      : '',
+  originLabel: raw.origin_address ?? formatCoord(raw.origin_lat, raw.origin_lng),
+  destinationLabel: raw.destination_address ?? formatCoord(raw.destination_lat, raw.destination_lng),
   seats: raw.available_seats ?? 0,
   pricePerSeat:
     raw.price_per_seat != null ? Number(raw.price_per_seat) : null,
 });
 
+/** Evita que una fila corrupta tire toda la respuesta RPC/postgrest. */
+function mapRpcRowsToRecentRides(rows: unknown[]): RecentRide[] {
+  const out: RecentRide[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    try {
+      const row = rows[i];
+      if (row == null || typeof row !== 'object') continue;
+      const o = row as Record<string, unknown>;
+      const rideId = o.ride_id ?? o.rideId;
+      if (rideId == null || String(rideId).trim() === '') continue;
+      const raw = {
+        ...o,
+        ride_id: String(rideId),
+        status: (o.status as string | null) ?? null,
+        departure_time:
+          o.departure_time != null && o.departure_time !== ''
+            ? String(o.departure_time)
+            : ((o.departureTime as string | undefined) ?? ''),
+        origin_lat: (o.origin_lat as number | null) ?? (o.originLat as number | null) ?? null,
+        origin_lng: (o.origin_lng as number | null) ?? (o.originLng as number | null) ?? null,
+        destination_lat:
+          (o.destination_lat as number | null) ?? (o.destinationLat as number | null) ?? null,
+        destination_lng:
+          (o.destination_lng as number | null) ?? (o.destinationLng as number | null) ?? null,
+        origin_address:
+          (o.origin_address as string | null) ?? (o.originAddress as string | null) ?? null,
+        destination_address:
+          (o.destination_address as string | null) ??
+          (o.destinationAddress as string | null) ??
+          null,
+        available_seats:
+          (o.available_seats as number | null) ?? (o.availableSeats as number | null) ?? null,
+        price_per_seat:
+          (o.price_per_seat as number | null) ?? (o.pricePerSeat as number | null) ?? null,
+      } as RawRide;
+      out.push(mapRawRide(raw));
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[useRecentRides] fila omitida al mapear:', i, e);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Respaldo cuando la RPC falla o devuelve vacío: RLS permite al conductor
+ * ver sus filas en `rides` vía private.can_view_ride.
+ */
+async function fetchDriverRidesFromTable(
+  userId: string,
+  limit: number,
+): Promise<{ rides: RecentRide[]; error: string | null }> {
+  const { data: dp, error: dpError } = await supabase
+    .from('driver_profiles')
+    .select('driver_id')
+    .eq('user_id', userId)
+    .eq('status', 'approved')
+    .maybeSingle();
+
+  if (dpError) {
+    return { rides: [], error: dpError.message };
+  }
+  if (!dp?.driver_id) {
+    return { rides: [], error: null };
+  }
+
+  const activeQ = supabase
+    .from('rides')
+    .select(RIDE_COLUMNS)
+    .eq('driver_id', dp.driver_id)
+    .in('status', [...RIDE_HOME_ACTIVE_STATUSES])
+    .order('departure_time', { ascending: true })
+    .limit(limit);
+
+  const historyQ = supabase
+    .from('rides')
+    .select(RIDE_COLUMNS)
+    .eq('driver_id', dp.driver_id)
+    .in('status', [...RIDE_HOME_HISTORY_STATUSES])
+    .order('departure_time', { ascending: false })
+    .limit(limit);
+
+  const [activeRes, historyRes] = await Promise.all([activeQ, historyQ]);
+
+  if (activeRes.error && historyRes.error) {
+    return { rides: [], error: activeRes.error.message };
+  }
+
+  const a = (activeRes.data ?? []) as RawRide[];
+  const h = (historyRes.data ?? []) as RawRide[];
+  const rows = [...a, ...h];
+
+  return {
+    rides: mapRpcRowsToRecentRides(rows as unknown[]),
+    error: null,
+  };
+}
+
 async function fetchDriverRides(
   userId: string,
   limit: number,
 ): Promise<{ rides: RecentRide[]; error: string | null }> {
-  const { data: driverRow, error: driverError } = await supabase
-    .from('driver_profiles')
-    .select('driver_id')
+  console.log('[useRecentRides] fetchDriverRides via RPC, limit:', limit);
+
+  let rpcErrorMsg: string | null = null;
+
+  try {
+    const { data, error: rpcError } = await supabase.rpc('get_my_driver_rides', {
+      p_limit: limit,
+    });
+
+    if (__DEV__) {
+      const len = Array.isArray(data) ? data.length : 0;
+      console.log('[useRecentRides] RPC supabase raw:', { data, error: rpcError });
+      console.log('[useRecentRides] RPC resumen:', {
+        filas: len,
+        error: rpcError?.message ?? null,
+        primeraFila: len > 0 ? (data as unknown[])[0] : null,
+      });
+    }
+
+    if (!rpcError && Array.isArray(data) && data.length > 0) {
+      const rows = data as unknown[];
+      const mapped = mapRpcRowsToRecentRides(rows);
+      if (__DEV__) {
+        console.log('[useRecentRides] fetchDriverRides mapeados:', mapped.length, 'de', rows.length);
+      }
+      return {
+        rides: mapped.slice(),
+        error: null,
+      };
+    }
+
+    if (rpcError) {
+      rpcErrorMsg = rpcError.message;
+      console.warn('[useRecentRides] RPC ERROR:', rpcError.message);
+    } else {
+      console.warn('[useRecentRides] RPC empty/null, trying rides table fallback');
+    }
+  } catch (e: any) {
+    rpcErrorMsg = e?.message ?? 'Error al cargar viajes.';
+    console.error('[useRecentRides] fetchDriverRides RPC EXCEPTION:', e);
+  }
+
+  const fallback = await fetchDriverRidesFromTable(userId, limit);
+  if (fallback.rides.length > 0) {
+    return { rides: fallback.rides, error: null };
+  }
+  if (fallback.error) {
+    return { rides: [], error: fallback.error };
+  }
+
+  return { rides: [], error: rpcErrorMsg };
+}
+
+const BOOKING_RIDE_SELECT = `status, seats_reserved, ride:rides!inner(${RIDE_COLUMNS})`;
+
+/** Filas de bookings con ride embebido → RecentRide (asientos = reserva del pasajero). */
+function mapPassengerBookingRows(
+  data:
+    | Array<{
+        status: string | null;
+        seats_reserved: number | null;
+        ride: RawRide | RawRide[] | null;
+      }>
+    | null,
+): RecentRide[] {
+  const rows = data ?? [];
+  return rows
+    .map(row => {
+      const ride = Array.isArray(row.ride) ? row.ride[0] : row.ride;
+      if (!ride) return null;
+      return mapRawRide({
+        ...ride,
+        available_seats: row.seats_reserved ?? ride.available_seats,
+      });
+    })
+    .filter((r): r is RecentRide => r != null);
+}
+
+function isBookingsSchemaMissingMessage(message: string, code?: string): boolean {
+  return (
+    code === PG_RELATION_NOT_FOUND ||
+    /relation .* does not exist/i.test(message) ||
+    message.includes('Could not find the table')
+  );
+}
+
+/**
+ * Respaldo: dos consultas (viajes activos + historial) como get_my_passenger_rides.
+ * RLS: lectura de bookings propias y rides vinculadas vía private.can_view_ride.
+ */
+async function fetchPassengerRidesFromTable(
+  userId: string,
+  limit: number,
+): Promise<{
+  rides: RecentRide[];
+  error: string | null;
+  notice: string | null;
+}> {
+  const activeQ = supabase
+    .from('bookings')
+    .select(BOOKING_RIDE_SELECT)
     .eq('user_id', userId)
-    .maybeSingle();
-
-  if (driverError) {
-    return { rides: [], error: driverError.message };
-  }
-  if (!driverRow) {
-    return {
-      rides: [],
-      error: 'No se encontró el perfil de conductor.',
-    };
-  }
-
-  const { data, error: ridesError } = await supabase
-    .from('rides')
-    .select(RIDE_COLUMNS)
-    .eq('driver_id', driverRow.driver_id)
-    .order('departure_time', { ascending: false })
+    .in('ride.status', [...RIDE_HOME_ACTIVE_STATUSES])
+    .order('departure_time', { ascending: true, foreignTable: 'rides' })
     .limit(limit);
 
-  if (ridesError) {
-    return { rides: [], error: ridesError.message };
+  const historyQ = supabase
+    .from('bookings')
+    .select(BOOKING_RIDE_SELECT)
+    .eq('user_id', userId)
+    .in('ride.status', [...RIDE_HOME_HISTORY_STATUSES])
+    .order('departure_time', { ascending: false, foreignTable: 'rides' })
+    .limit(limit);
+
+  const [activeRes, historyRes] = await Promise.all([activeQ, historyQ]);
+
+  if (activeRes.error && historyRes.error) {
+    const err = activeRes.error ?? historyRes.error!;
+    if (isBookingsSchemaMissingMessage(err.message, err.code)) {
+      return {
+        rides: [],
+        error: null,
+        notice:
+          'La tabla de reservas aún no está disponible. Funcionalidad pendiente.',
+      };
+    }
+    return { rides: [], error: err.message, notice: null };
   }
 
-  return {
-    rides: ((data ?? []) as RawRide[]).map(mapRawRide),
-    error: null,
-  };
+  const rides = [
+    ...mapPassengerBookingRows(activeRes.data),
+    ...mapPassengerBookingRows(historyRes.data),
+  ];
+
+  return { rides, error: null, notice: null };
 }
 
 async function fetchPassengerRides(
@@ -120,53 +327,71 @@ async function fetchPassengerRides(
   error: string | null;
   notice: string | null;
 }> {
-  // El pasajero ve sus rides via la tabla `bookings` (FK: bookings.user_id ->
-  // auth.uid()). RLS `bookings_select_parties` permite al pasajero leer las
-  // suyas; el join contra `rides` está cubierto por `private.can_view_ride`
-  // (que permite ver el ride si tienes una booking en él).
-  const { data, error } = await supabase
-    .from('bookings')
-    .select(`status, seats_reserved, ride:rides(${RIDE_COLUMNS})`)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    if (
-      error.code === PG_RELATION_NOT_FOUND ||
-      /relation .* does not exist/i.test(error.message) ||
-      error.message?.includes('Could not find the table')
-    ) {
-      return {
-        rides: [],
-        error: null,
-        notice:
-          'La tabla de reservas aún no está disponible. Funcionalidad pendiente.',
-      };
-    }
-    return { rides: [], error: error.message, notice: null };
+  if (__DEV__) {
+    console.log('[useRecentRides] fetchPassengerRides via RPC, limit:', limit);
   }
 
-  const rows = (data ?? []) as Array<{
-    status: string | null;
-    seats_reserved: number | null;
-    ride: RawRide | RawRide[] | null;
-  }>;
+  let rpcErrorMsg: string | null = null;
 
-  const rides = rows
-    .map(row => {
-      const ride = Array.isArray(row.ride) ? row.ride[0] : row.ride;
-      if (!ride) return null;
-      // En la vista del pasajero los asientos relevantes son los reservados
-      // en su booking (no los disponibles del ride completo).
-      return mapRawRide({
-        ...ride,
-        available_seats: row.seats_reserved ?? ride.available_seats,
+  try {
+    const { data, error: rpcError } = await supabase.rpc('get_my_passenger_rides', {
+      p_limit: limit,
+    });
+
+    if (__DEV__) {
+      const len = Array.isArray(data) ? data.length : 0;
+      console.log('[useRecentRides] passenger RPC raw:', { data, error: rpcError });
+      console.log('[useRecentRides] passenger RPC resumen:', {
+        filas: len,
+        error: rpcError?.message ?? null,
+        primeraFila: len > 0 ? (data as unknown[])[0] : null,
       });
-    })
-    .filter((r): r is RecentRide => r != null);
+    }
 
-  return { rides, error: null, notice: null };
+    if (!rpcError && Array.isArray(data) && data.length > 0) {
+      const rows = data as unknown[];
+      const mapped = mapRpcRowsToRecentRides(rows);
+      if (__DEV__) {
+        console.log('[useRecentRides] passenger RPC mapeados:', mapped.length, 'de', rows.length);
+      }
+      return {
+        rides: mapped,
+        error: null,
+        notice: null,
+      };
+    }
+
+    if (rpcError) {
+      rpcErrorMsg = rpcError.message;
+      if (
+        isBookingsSchemaMissingMessage(rpcError.message, rpcError.code) ||
+        /function .* does not exist|Could not find the function/i.test(
+          rpcError.message,
+        )
+      ) {
+        rpcErrorMsg = null;
+      }
+      console.warn('[useRecentRides] passenger RPC:', rpcError.message);
+    } else {
+      console.warn('[useRecentRides] passenger RPC empty, trying bookings fallback');
+    }
+  } catch (e: any) {
+    rpcErrorMsg = e?.message ?? 'Error al cargar viajes.';
+    console.error('[useRecentRides] fetchPassengerRides RPC EXCEPTION:', e);
+  }
+
+  const fallback = await fetchPassengerRidesFromTable(userId, limit);
+  if (fallback.rides.length > 0) {
+    return { rides: fallback.rides, error: null, notice: fallback.notice };
+  }
+  if (fallback.error) {
+    return { rides: [], error: fallback.error, notice: fallback.notice };
+  }
+  if (fallback.notice) {
+    return { rides: [], error: null, notice: fallback.notice };
+  }
+
+  return { rides: [], error: rpcErrorMsg, notice: null };
 }
 
 export function useRecentRides(
@@ -181,21 +406,25 @@ export function useRecentRides(
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  /** Invalida respuestas obsoletas cuando el efecto se re-ejecuta (focus, rol, etc.). */
+  const fetchVersionRef = useRef(0);
 
   const reload = useCallback(() => setReloadTick(t => t + 1), []);
 
   useEffect(() => {
-    let active = true;
+    console.log('[useRecentRides] useEffect triggered — role:', role, 'userId:', userId?.slice(0, 8));
 
     if (!role || !userId) {
+      fetchVersionRef.current += 1;
+      console.log('[useRecentRides] Skipped: role or userId is null');
       setRides([]);
       setLoading(false);
       setError(null);
       setNotice(null);
-      return () => {
-        active = false;
-      };
+      return;
     }
+
+    const requestVersion = ++fetchVersionRef.current;
 
     const run = async () => {
       try {
@@ -203,32 +432,77 @@ export function useRecentRides(
         setError(null);
         setNotice(null);
 
-        const result =
-          role === 'conductor'
-            ? { ...(await fetchDriverRides(userId, limit)), notice: null }
-            : await fetchPassengerRides(userId, limit);
+        // Asignación explícita (sin spread): evita que un payload no estándar deje `rides` fuera de `result`.
+        let result: { rides: RecentRide[]; error: string | null; notice: string | null };
+        if (role === 'conductor') {
+          const payload = await fetchDriverRides(userId, limit);
+          const ridesList = Array.isArray(payload?.rides) ? payload.rides : [];
+          if (__DEV__) {
+            console.log('[useRecentRides] payload conductor crudo:', {
+              tipo: typeof payload,
+              keys: payload && typeof payload === 'object' ? Object.keys(payload as object) : [],
+              ridesLen: ridesList.length,
+            });
+          }
+          result = {
+            rides: ridesList,
+            error: payload?.error ?? null,
+            notice: null,
+          };
+        } else {
+          result = await fetchPassengerRides(userId, limit);
+          if (!Array.isArray(result.rides)) {
+            result = { ...result, rides: [] };
+          }
+        }
 
-        if (!active) return;
+        if (__DEV__) {
+          console.log('[useRecentRides] post-fetch', {
+            requestVersion,
+            versionRef: fetchVersionRef.current,
+            role,
+            rama: role === 'conductor' ? 'conductor' : 'pasajero',
+            ridesRecibidos: result.rides?.length ?? 'sin rides',
+            error: result?.error ?? null,
+          });
+        }
+
+        if (requestVersion !== fetchVersionRef.current) {
+          if (__DEV__) {
+            console.log('[useRecentRides] respuesta descartada (versión obsoleta)');
+          }
+          return;
+        }
         // Defensivo: aunque las funciones internas siempre devuelven un
         // objeto, blindamos por si alguna mutación futura introduce un
         // null/undefined (caso "rides of null" que estamos rastreando).
-        setRides(Array.isArray(result?.rides) ? result.rides : []);
+        const nextRides = Array.isArray(result?.rides) ? result.rides : [];
+        setRides(nextRides);
         setError(result?.error ?? null);
         setNotice(result?.notice ?? null);
+        if (__DEV__) {
+          console.log('[useRecentRides] estado aplicado — viajes en UI:', nextRides.length);
+        }
       } catch (e: any) {
-        if (!active) return;
+        if (requestVersion !== fetchVersionRef.current) return;
         setRides([]);
         setError(e?.message ?? 'Error inesperado al cargar tus viajes.');
         setNotice(null);
       } finally {
-        if (active) setLoading(false);
+        if (requestVersion === fetchVersionRef.current) {
+          setLoading(false);
+        }
       }
     };
 
-    run().catch(() => undefined);
+    run().catch(() => {
+      if (requestVersion === fetchVersionRef.current) {
+        setLoading(false);
+      }
+    });
 
     return () => {
-      active = false;
+      fetchVersionRef.current += 1;
     };
   }, [role, userId, limit, reloadTick]);
 

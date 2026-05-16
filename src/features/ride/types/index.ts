@@ -1,7 +1,13 @@
 export type {
+  RideStatus,
   PublishRidePayload,
   DriverVehicle,
   PublishRideResult,
+} from './ride.types';
+export {
+  coerceRideStatus,
+  isTerminalRideStatus,
+  isActiveRideStatus,
 } from './ride.types';
 
 export type {

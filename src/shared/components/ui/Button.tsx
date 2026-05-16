@@ -58,10 +58,10 @@ export const Button: React.FC<ButtonProps> = ({
   const sizeConfig = SIZE_CONFIG[size];
 
   const getBackgroundColor = (): string => {
-    if (variant === 'primary') return isDisabled ? '#A0B4DE' : colors.primaryLight;
+    if (variant === 'primary') return isDisabled ? '#93C5FD' : colors.accent;
     if (variant === 'secondary') return isDisabled ? '#7B9BD0' : colors.primary;
-    if (variant === 'destructive') return isDisabled ? '#F4A5A5' : colors.status.error;
-    if (variant === 'ghost') return `${colors.primary}12`;
+    if (variant === 'destructive') return isDisabled ? '#FCA5A5' : colors.status.error;
+    if (variant === 'ghost') return `${colors.primary}08`;
     return 'transparent';
   };
 
@@ -127,7 +127,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radii.md,
+    borderRadius: radii.xl,
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: spacing.xs,

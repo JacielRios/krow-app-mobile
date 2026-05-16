@@ -9,9 +9,9 @@ interface UsePublishRideResult {
 
 /**
  * Publica un ride invocando la RPC `create_ride`. La RPC inserta atómicamente:
- *   - una fila en `rides` con status='scheduled' (default).
+ *   - una fila en `rides` con status='scheduled' (según RPC `create_ride`).
  *   - dos filas en `ride_stops`: origen (stop_order=1) y destino (stop_order=2).
- *   - una fila en `ride_status_history` con status='scheduled'.
+ *   - historia de estado si la RPC la registra (p. ej. `scheduled` en ride_status_history).
  *
  * La pantalla decide qué hacer con el resultado (navegar, mostrar error, etc.).
  */

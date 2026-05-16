@@ -5,6 +5,7 @@ import type {
   BookingStatus,
   RideHeader,
 } from '../types/booking.types';
+import { coerceRideStatus } from '../types/ride.types';
 
 interface RawPassenger {
   uuid: string;
@@ -68,7 +69,7 @@ const mapRide = (row: RawRideRow): RideHeader => ({
   departureTime: row.departure_time,
   availableSeats: row.available_seats,
   pricePerSeat: toNum(row.price_per_seat),
-  status: row.status,
+  status: coerceRideStatus(row.status),
   originAddress: row.origin_address,
   destinationAddress: row.destination_address,
 });

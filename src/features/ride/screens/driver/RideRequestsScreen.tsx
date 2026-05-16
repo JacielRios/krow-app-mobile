@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,16 +18,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import { colors } from '../../../../shared/theme/colors';
-import { radii, spacing, typography } from '../../../../shared/theme/tokens';
+import { radii, shadows, spacing, typography } from '../../../../shared/theme/tokens';
 import { Avatar } from '../../../../shared/components/ui/Avatar';
 import { Button } from '../../../../shared/components/ui/Button';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
 import {
-  usePendingBookings,
+  useRideRealtime,
+  useStartRide,
+  useCancelRide,
   useUpdateBookingStatus,
 } from '../../hooks';
 import type { BookingRequest } from '../../types/booking.types';
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
+import { activeRideStore } from '../../../../app/store/activeRideStore';
 
 type RideRequestsRouteProp = NativeStackScreenProps<
   MainStackParamList,
@@ -59,15 +62,26 @@ export const RideRequestsScreen: React.FC = () => {
   const { rideId } = route.params;
 
   const {
-    pending,
-    confirmed,
+    bookings,
     ride,
     loading,
     error,
+    realtimeStatus,
     reload,
-  } = usePendingBookings(rideId);
+  } = useRideRealtime(rideId);
+
+  const pending = useMemo(
+    () => bookings.filter(b => b.status === 'pending'),
+    [bookings],
+  );
+  const confirmed = useMemo(
+    () => bookings.filter(b => b.status === 'confirmed'),
+    [bookings],
+  );
 
   const { updateStatus } = useUpdateBookingStatus();
+  const { startRide, loading: starting } = useStartRide();
+  const { cancelRide, loading: cancellingRide } = useCancelRide();
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
 
   const handleConfirm = async (booking: BookingRequest) => {
@@ -82,8 +96,6 @@ export const RideRequestsScreen: React.FC = () => {
       Alert.alert('No se pudo confirmar', err ?? 'Inténtalo de nuevo.');
       return;
     }
-    // Realtime debería refrescar la lista, pero forzamos por si la suscripción
-    // no llegó aún (p.ej. sin conexión websocket).
     reload();
   };
 
@@ -103,7 +115,7 @@ export const RideRequestsScreen: React.FC = () => {
             setActionBookingId(booking.bookingId);
             const { success, error: err } = await updateStatus(
               booking.bookingId,
-              'cancelled',
+              'rejected',
             );
             setActionBookingId(null);
             if (!success) {
@@ -111,6 +123,64 @@ export const RideRequestsScreen: React.FC = () => {
               return;
             }
             reload();
+          },
+        },
+      ],
+    );
+  };
+
+  const canStart =
+    (ride?.status === 'open' || ride?.status === 'full') &&
+    confirmed.length > 0;
+
+  const handleStartRide = () => {
+    if (!ride || !canStart) return;
+    Alert.alert(
+      'Iniciar viaje',
+      'Una vez iniciado, las solicitudes pendientes se cancelarán automáticamente. ¿Continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Iniciar',
+          onPress: async () => {
+            const { success, error: err } = await startRide(ride.rideId);
+            if (!success) {
+              Alert.alert('No se pudo iniciar', err ?? 'Inténtalo de nuevo.');
+              return;
+            }
+            activeRideStore.setActiveRide({
+              rideId: ride.rideId,
+              role: 'conductor',
+              status: 'in_progress',
+            });
+            navigation.replace('DriverActiveRide', { rideId: ride.rideId });
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancelRide = () => {
+    if (!ride) return;
+    Alert.alert(
+      'Cancelar viaje',
+      'Si cancelas, todas las reservas activas serán canceladas y los pasajeros notificados. Esta acción no se puede deshacer.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, cancelar viaje',
+          style: 'destructive',
+          onPress: async () => {
+            const { success, error: err } = await cancelRide(
+              ride.rideId,
+              'driver_action',
+            );
+            if (!success) {
+              Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+              return;
+            }
+            activeRideStore.clear();
+            navigation.replace('Home');
           },
         },
       ],
@@ -187,6 +257,43 @@ export const RideRequestsScreen: React.FC = () => {
             </Text>
           </View>
         </View>
+      )}
+
+      {realtimeStatus === 'reconnecting' && (
+        <View style={styles.rtBanner}>
+          <ActivityIndicator size="small" color={colors.status.warning} />
+          <Text style={styles.rtBannerText}>
+            Reconectando en tiempo real…
+          </Text>
+        </View>
+      )}
+
+      {ride && canStart && (
+        <View style={styles.startCta}>
+          <Button
+            title={starting ? 'Iniciando…' : 'Iniciar viaje'}
+            onPress={handleStartRide}
+            loading={starting}
+            disabled={starting || cancellingRide}
+          />
+          <Text style={styles.startHint}>
+            Tienes {confirmed.length} pasajero
+            {confirmed.length === 1 ? '' : 's'} confirmado
+            {confirmed.length === 1 ? '' : 's'}.
+          </Text>
+        </View>
+      )}
+
+      {ride && (ride.status === 'open' || ride.status === 'full') && (
+        <TouchableOpacity
+          onPress={handleCancelRide}
+          disabled={cancellingRide}
+          style={styles.cancelRideBtn}
+        >
+          <Text style={styles.cancelRideText}>
+            {cancellingRide ? 'Cancelando viaje…' : 'Cancelar viaje'}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {showInitialLoader ? (
@@ -421,10 +528,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.sm,
+    borderRadius: radii.xl,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.lg,
+    ...shadows.sm,
   },
   metaRow: {
     flexDirection: 'row',
@@ -487,17 +595,17 @@ const styles = StyleSheet.create({
   },
   sectionCountBadge: {
     marginLeft: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
     borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    minWidth: 24,
+    backgroundColor: colors.status.infoLight,
+    minWidth: 26,
     alignItems: 'center',
   },
   sectionCountText: {
     fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary,
+    fontWeight: typography.weight.bold,
+    color: '#1D4ED8',
   },
   sectionEmpty: {
     fontSize: typography.size.sm,
@@ -505,12 +613,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   card: {
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    ...shadows.sm,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -539,15 +646,15 @@ const styles = StyleSheet.create({
   warningBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
-    borderRadius: radii.md,
-    padding: spacing.sm,
+    backgroundColor: colors.status.warningLight,
+    borderRadius: radii.lg,
+    padding: spacing.sm + 2,
     marginTop: spacing.sm,
   },
   warningText: {
     marginLeft: spacing.sm,
     fontSize: typography.size.sm,
-    color: '#E65100',
+    color: '#92400E',
     flex: 1,
   },
   actions: {
@@ -557,5 +664,41 @@ const styles = StyleSheet.create({
   },
   actionItem: {
     flex: 1,
+  },
+  rtBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    backgroundColor: '#FFF8E1',
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  rtBannerText: {
+    fontSize: typography.size.sm,
+    color: '#E65100',
+  },
+  startCta: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadows.md,
+  },
+  startHint: {
+    fontSize: typography.size.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  cancelRideBtn: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  cancelRideText: {
+    color: colors.status.error,
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
   },
 });

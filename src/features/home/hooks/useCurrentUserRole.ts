@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../services/supabase';
 import {
   getSessionLoginMode,
+  setSessionLoginMode,
   SessionLoginMode,
 } from '../../../app/sessionLoginMode';
 
@@ -34,11 +35,16 @@ function deriveDisplayName(
   return 'Usuario';
 }
 
-// TODO: la fuente de verdad del rol debería ser la presencia de un registro
-// en `driver_profiles` para `auth.uid()` (con `status='approved'`), no
-// `getSessionLoginMode()` en AsyncStorage. La spec del flujo de rides asume
-// que este hook ya consulta `driver_profiles`, pero hoy no lo hace.
-// Pendiente refactorizar para que `role` se derive de Supabase.
+/**
+ * Fuente de verdad del rol basada en `driver_profiles` en Supabase.
+ *
+ * - Si el usuario tiene un registro en `driver_profiles` con `status = 'approved'`
+ *   → `role = 'conductor'`
+ * - Sino → `role = 'pasajero'`
+ *
+ * AsyncStorage se usa como cache rápida para evitar flash al montar, pero
+ * Supabase siempre sobreescribe el valor.
+ */
 export function useCurrentUserRole(): UseCurrentUserRoleResult {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,10 +60,9 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
       setLoading(true);
       setError(null);
 
-      const [{ data: authData, error: authError }, role] = await Promise.all([
-        supabase.auth.getUser(),
-        getSessionLoginMode(),
-      ]);
+      // 1. Auth user
+      const { data: authData, error: authError } =
+        await supabase.auth.getUser();
 
       if (!active) return;
 
@@ -75,14 +80,37 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
         return;
       }
 
-      if (!role) {
-        // Sesión válida pero sin rol persistido (caso raro: AsyncStorage limpiado).
-        // El RootNavigator se encarga de redirigir; solo reportamos el inconsistente.
-        setUser(null);
-        setError('Sesión sin rol asignado. Vuelve a iniciar sesión.');
-        setLoading(false);
-        return;
+      // 2. Determinar rol consultando driver_profiles
+      let role: SessionLoginMode;
+
+      try {
+        const { data: driverProfile, error: dpError } = await supabase
+          .from('driver_profiles')
+          .select('driver_id, status')
+          .eq('user_id', authUser.id)
+          .maybeSingle();
+
+        if (!active) return;
+
+        if (dpError) {
+          // Si falla la consulta a driver_profiles, intentar fallback a AsyncStorage
+          const cachedRole = await getSessionLoginMode();
+          role = cachedRole ?? 'pasajero';
+        } else if (driverProfile && driverProfile.status === 'approved') {
+          role = 'conductor';
+        } else {
+          role = 'pasajero';
+        }
+      } catch {
+        // Offline / error de red: fallback a AsyncStorage
+        const cachedRole = await getSessionLoginMode();
+        role = cachedRole ?? 'pasajero';
       }
+
+      if (!active) return;
+
+      // 3. Sincronizar AsyncStorage con la fuente de verdad
+      await setSessionLoginMode(role).catch(() => {});
 
       setUser({
         userId: authUser.id,

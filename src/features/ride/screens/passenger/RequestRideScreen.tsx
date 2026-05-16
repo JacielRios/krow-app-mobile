@@ -178,10 +178,7 @@ export const RequestRideScreen: React.FC = () => {
       return next;
     });
     setSelectedRide(null);
-    Alert.alert(
-      'Solicitud enviada',
-      'Tu solicitud está pendiente de confirmación por el conductor.',
-    );
+    navigation.navigate('PassengerWaiting', { bookingId });
   };
 
   const isInitialLoading =

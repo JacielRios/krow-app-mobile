@@ -1,31 +1,73 @@
 export const colors = {
-  primary: '#002C6F', // Azul oscuro de KROW
-  primaryLight: '#4B7BDE', // Botones más claros
-  background: '#FFFFFF',
-  surface: '#F5F8FF', // Fondo de contenedores ligeros (como el selector)
+  // ── Brand ──────────────────────────────────────────────────────────────
+  primary: '#002C6F',        // Azul institucional KROW
+  primaryLight: '#4B7BDE',   // Botones primarios
+  primaryDark: '#001A4D',    // Gradientes / headers oscuros
+  accent: '#3B82F6',         // CTA vibrante (más luminoso)
+
+  // ── Surfaces ───────────────────────────────────────────────────────────
+  background: '#F7F8FC',     // Fondo general gris cálido
+  surface: '#FFFFFF',        // Cards y contenedores
+  surfaceElevated: '#FFFFFF',// Cards con sombra
+  surfaceDark: '#0A1929',    // Fondo oscuro tipo Uber
+
+  // ── Text ───────────────────────────────────────────────────────────────
   text: {
-    primary: '#002C6F',
-    secondary: '#555555',
+    primary: '#0F172A',      // Casi negro, alta legibilidad
+    secondary: '#64748B',    // Gris medio
+    tertiary: '#94A3B8',     // Gris claro para metadata
     inverse: '#FFFFFF',
-    placeholder: '#8CA5D3',
-    muted: '#9E9E9E',
+    placeholder: '#94A3B8',
+    muted: '#CBD5E1',
   },
+
+  // ── Borders ────────────────────────────────────────────────────────────
   border: {
-    default: '#D0D8F0',
+    default: '#E2E8F0',
     active: '#002C6F',
-    light: '#EEEEEE',
+    light: '#F1F5F9',
   },
+
+  // ── Status ─────────────────────────────────────────────────────────────
   status: {
-    error: '#E53935',
-    success: '#4CAF50',
-    warning: '#FFC107',
-    info: '#2196F3',
+    error: '#EF4444',
+    errorLight: '#FEF2F2',
+    success: '#22C55E',
+    successLight: '#F0FDF4',
+    warning: '#F59E0B',
+    warningLight: '#FFFBEB',
+    info: '#3B82F6',
+    infoLight: '#EFF6FF',
   },
-  error: '#E53935', // Mantener por retrocompatibilidad momentánea
+
+  // ── Legacy (retrocompatibilidad) ───────────────────────────────────────
+  error: '#EF4444',
+
+  // ── Map ────────────────────────────────────────────────────────────────
   map: {
-    background: '#EAEAEA',
-    route: '#2196F3',
+    background: '#E8EAED',
+    route: '#3B82F6',
     polyineOuter: '#FFFFFF',
-    marker: '#002C6F'
-  }
-};
+    marker: '#002C6F',
+  },
+
+  // ── Gradientes (para usar en StyleSheet como fallback) ────────────────
+  gradient: {
+    headerStart: '#001A4D',
+    headerEnd: '#002C6F',
+    heroStart: '#002C6F',
+    heroEnd: '#1E40AF',
+  },
+
+  // ── Avatares coloridos ─────────────────────────────────────────────────
+  avatarColors: [
+    '#3B82F6', // blue
+    '#8B5CF6', // purple
+    '#EC4899', // pink
+    '#F59E0B', // amber
+    '#22C55E', // green
+    '#06B6D4', // cyan
+    '#EF4444', // red
+    '#6366F1', // indigo
+  ],
+} as const;
