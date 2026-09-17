@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  Modal,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,14 +16,16 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../../shared/theme/tokens';
 import { Avatar } from '../../../../shared/components/ui/Avatar';
-import { Button } from '../../../../shared/components/ui/Button';
+import { AnimatedModal, Button, FeedbackState, Skeleton } from '../../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
-import { supabase } from '../../../../services/supabase';
+import { bookingApi } from '../../api/bookingApi';
 import { RideCard } from '../../components/RideCard';
 import { useRequestBooking, useSearchRides } from '../../hooks';
 import type { AvailableRide } from '../../types/rideSearch.types';
-import { RoutePreviewMap } from '../../../maps';
+import { PlacesAutocompleteInput, RoutePreviewMap } from '../../../maps';
+import type { PlacesAutocompleteValue } from '../../../maps';
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
+import { useTheme } from '../../../../shared/theme/ThemeProvider';
 
 type RequestRideNav = NativeStackNavigationProp<
   MainStackParamList,
@@ -59,6 +58,7 @@ interface ActiveBookingRow {
 }
 
 export const RequestRideScreen: React.FC = () => {
+  const { theme } = useTheme();
   const navigation = useNavigation<RequestRideNav>();
   const insets = useSafeAreaInsets();
 
@@ -77,30 +77,13 @@ export const RequestRideScreen: React.FC = () => {
   const [selectedRide, setSelectedRide] = useState<AvailableRide | null>(null);
   const [requestingRideId, setRequestingRideId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [origin, setOrigin] = useState<PlacesAutocompleteValue | null>(null);
+  const [destination, setDestination] = useState<PlacesAutocompleteValue | null>(null);
 
   const loadActiveBookings = useCallback(async () => {
     setBookingsLoading(true);
     try {
-      const authRes = await supabase.auth.getUser();
-      const userId = authRes?.data?.user?.id ?? null;
-
-      if (!userId) {
-        setRequestedRideIds(new Set());
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('ride_id, status')
-        .eq('user_id', userId)
-        .in('status', ['pending', 'confirmed']);
-
-      if (error || !data) {
-        // Si RLS o red fallan, no hay manera de saber qué ya solicitó el
-        // usuario; conservamos el set anterior en lugar de vaciarlo, para
-        // no presentar un botón "Solicitar" sobre un ride que ya tenía.
-        return;
-      }
+      const data = await bookingApi.activeRideIds();
 
       const ids = new Set(
         (data as ActiveBookingRow[])
@@ -117,12 +100,28 @@ export const RequestRideScreen: React.FC = () => {
 
   const loadAll = useCallback(async () => {
     try {
-      await Promise.all([search({ maxResults: 50 }), loadActiveBookings()]);
+      await Promise.all([
+        search({
+          maxResults: 50,
+          origin: origin?.location,
+          destination: destination?.location,
+          maxDistanceKm: 8,
+        }),
+        loadActiveBookings(),
+      ]);
     } catch {
       // Errores ya quedan reflejados en `searchError` y en el estado del hook
       // de bookings; este catch solo evita unhandled rejections.
     }
-  }, [search, loadActiveBookings]);
+  }, [search, loadActiveBookings, origin?.location, destination?.location]);
+
+  const handleSearch = () => {
+    if (!origin || !destination) {
+      Alert.alert('Ruta incompleta', 'Selecciona un origen y un destino para buscar coincidencias.');
+      return;
+    }
+    loadAll().catch(() => undefined);
+  };
 
   // Recarga cuando la pantalla recupera el foco (evita stale data al volver
   // desde otras pantallas o si se canceló una booking).
@@ -198,7 +197,7 @@ export const RequestRideScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.flex}>
+    <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.flex}
         contentContainerStyle={[
@@ -212,7 +211,7 @@ export const RequestRideScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.primary}
+            tintColor={theme.colors.primary}
           />
         }
       >
@@ -225,48 +224,32 @@ export const RequestRideScreen: React.FC = () => {
             <MaterialIcons
               name="arrow-back"
               size={24}
-              color={colors.text.primary}
+              color={theme.colors.textPrimary}
             />
           </TouchableOpacity>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Viajes disponibles</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Viajes disponibles</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
               Encuentra un viaje publicado por otro estudiante y solicita unirte.
             </Text>
           </View>
         </View>
 
+        <View style={[styles.searchPanel, { backgroundColor: theme.colors.surfaceRaised }]}> 
+          <PlacesAutocompleteInput label="¿Desde dónde sales?" value={origin} onChange={setOrigin} />
+          <PlacesAutocompleteInput label="¿A dónde vas?" value={destination} onChange={setDestination} bias={origin?.location} />
+          <Button title="Buscar coincidencias" onPress={handleSearch} loading={searchLoading} />
+        </View>
+
         {isInitialLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.centeredText}>Cargando viajes...</Text>
+          <View style={styles.centered} accessibilityLabel="Cargando viajes">
+            <Skeleton height={112} />
+            <Skeleton height={112} style={{ marginTop: spacing.md }} />
           </View>
         ) : searchError ? (
-          <View style={styles.centered}>
-            <MaterialIcons
-              name="error-outline"
-              size={32}
-              color={colors.status.error}
-            />
-            <Text style={styles.centeredErrorText}>{searchError}</Text>
-            <View style={styles.spacerLg} />
-            <Button title="Reintentar" onPress={loadAll} />
-          </View>
+          <FeedbackState kind="error" title="No pudimos cargar los viajes" description={searchError} actionLabel="Reintentar" onAction={loadAll} />
         ) : sortedRides.length === 0 ? (
-          <View style={styles.centered}>
-            <MaterialIcons
-              name="search-off"
-              size={48}
-              color={colors.text.placeholder}
-            />
-            <Text style={styles.centeredTitle}>
-              No hay viajes disponibles en este momento
-            </Text>
-            <Text style={styles.centeredText}>
-              Vuelve a intentarlo más tarde, o desliza hacia abajo para
-              actualizar.
-            </Text>
-          </View>
+          <FeedbackState title="No hay viajes disponibles en este momento" description="Vuelve a intentarlo más tarde, o desliza hacia abajo para actualizar." />
         ) : (
           sortedRides.map(ride => (
             <RideCard
@@ -306,22 +289,14 @@ const RideDetailModal: React.FC<{
   onRequest: () => void;
 }> = ({ ride, alreadyRequested, requesting, onClose, onRequest }) => {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
 
   return (
-    <Modal
+    <AnimatedModal
       visible={ride !== null}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      onDismissRequest={onClose}
+      sheetStyle={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}
     >
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable
-          style={[
-            styles.modalSheet,
-            { paddingBottom: insets.bottom + spacing.lg },
-          ]}
-          onPress={() => undefined}
-        >
           <View style={styles.modalHandle} />
           {ride && (
             <ScrollView
@@ -340,7 +315,7 @@ const RideDetailModal: React.FC<{
                       <MaterialIcons
                         name="star"
                         size={14}
-                        color={colors.status.warning}
+                        color={theme.colors.status.warning}
                       />
                       <Text style={styles.ratingText}>
                         {ride.driverRating.toFixed(1)}
@@ -365,7 +340,7 @@ const RideDetailModal: React.FC<{
                   <MaterialIcons
                     name="trip-origin"
                     size={16}
-                    color={colors.primary}
+                  color={theme.colors.primary}
                   />
                   <Text style={styles.modalRouteText}>
                     {ride.originAddress ?? 'Origen sin dirección'}
@@ -433,9 +408,7 @@ const RideDetailModal: React.FC<{
               <Button title="Cerrar" variant="outline" onPress={onClose} />
             </ScrollView>
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </AnimatedModal>
   );
 };
 
@@ -443,20 +416,26 @@ const DetailItem: React.FC<{
   iconName: string;
   label: string;
   value: string;
-}> = ({ iconName, label, value }) => (
-  <View style={styles.detailItem}>
-    <MaterialIcons name={iconName} size={18} color={colors.primary} />
+}> = ({ iconName, label, value }) => {
+  const { theme } = useTheme();
+  return <View style={styles.detailItem}>
+    <MaterialIcons name={iconName} size={18} color={theme.colors.primary} />
     <View style={styles.detailItemText}>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
     </View>
-  </View>
-);
+  </View>;
+};
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  searchPanel: {
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
   container: {
     paddingHorizontal: spacing.lg,

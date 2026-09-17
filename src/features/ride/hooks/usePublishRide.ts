@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../../../services/supabase';
+import { rideApi } from '../api/rideApi';
 import type { PublishRidePayload, PublishRideResult } from '../types';
 
 interface UsePublishRideResult {
@@ -23,15 +23,10 @@ export function usePublishRide(): UsePublishRideResult {
   ): Promise<PublishRideResult> {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('create_ride', {
-        p_payload: payload,
-      });
-
-      if (error) {
-        return { rideId: null, error: error.message };
-      }
-
-      return { rideId: data as string, error: null };
+      const data = await rideApi.create(payload);
+      return { rideId: data.rideId, error: null };
+    } catch (error: any) {
+      return { rideId: null, error: error?.message ?? 'No se pudo publicar el viaje' };
     } finally {
       setLoading(false);
     }

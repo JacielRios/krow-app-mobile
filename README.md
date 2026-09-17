@@ -40,7 +40,8 @@ La idea es simple:
 # 🛠️ Tecnologías utilizadas
 
 * **Frontend:** React Native
-* **Backend:** Supabase
+* **Backend:** API NestJS de KROW
+* **Infraestructura:** Supabase Auth + PostgreSQL
 * Base de datos relacional (PostgreSQL)
 * Integración con APIs de mapas
 
@@ -77,6 +78,11 @@ Asegúrate de tener configurado:
 
 * Entorno de desarrollo para React Native
 * Variables de entorno de Supabase
+* `KROW_API_URL` apuntando al backend NestJS
+
+La app usa Supabase directamente solo para mantener la sesión y para las
+suscripciones Realtime que aún están en migración. Las mutaciones de viajes y
+reservas, el matching y las APIs REST de Google Maps pasan por KROW API.
 
 ---
 

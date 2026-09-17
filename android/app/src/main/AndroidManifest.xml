@@ -14,8 +14,8 @@
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
 
-      <!-- Google Maps API key inyectada vía react-native-config (.env: GOOGLE_MAPS_API_KEY).
-           dotenv.gradle expone cada variable del .env como string resource. -->
+      <!-- Llave exclusiva del Android Maps SDK para renderizar el mapa.
+           Places, geocoding y rutas se consumen mediante KROW API. -->
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="@string/GOOGLE_MAPS_API_KEY" />

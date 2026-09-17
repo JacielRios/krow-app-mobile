@@ -1,6 +1,7 @@
 export const colors = {
   primary: '#002C6F', // Azul oscuro de KROW
   primaryLight: '#4B7BDE', // Botones más claros
+  primarySoft: '#002C6F1A', // Tinte primario (~10% alpha) para banners/highlights sutiles
   background: '#FFFFFF',
   surface: '#F5F8FF', // Fondo de contenedores ligeros (como el selector)
   text: {

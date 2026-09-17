@@ -1,17 +1,19 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { StatusBadge, BadgeStatus } from '../../../shared/components/ui';
 import { SessionLoginMode } from '../../../app/sessionLoginMode';
 import { RecentRide, RecentRideStatus } from '../hooks/useRecentRides';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { Skeleton } from '../../../shared/components/ui-v2';
 
 interface Props {
   rides: RecentRide[];
@@ -24,6 +26,7 @@ interface Props {
 
 const STATUS_TO_BADGE: Record<RecentRideStatus, BadgeStatus> = {
   scheduled: 'pending',
+  full: 'full',
   in_progress: 'in_progress',
   completed: 'completed',
   cancelled: 'cancelled',
@@ -48,11 +51,17 @@ const formatPrice = (price: number | null): string => {
 const RideRow: React.FC<{
   ride: RecentRide;
   onPress?: () => void;
-}> = ({ ride }) => {
+  index: number;
+}> = ({ ride, index }) => {
+  const { theme, motionEnabled } = useTheme();
   return (
-    <View style={styles.row}>
+    <Animated.View
+      entering={motionEnabled && index < 8 ? FadeInDown.duration(200).delay(index * 35) : undefined}
+      layout={motionEnabled ? LinearTransition.duration(200) : undefined}
+      style={[styles.row, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+    >
       <View style={styles.rowHeader}>
-        <Text style={styles.rowDate}>{formatDate(ride.departureTime)}</Text>
+        <Text style={[styles.rowDate, { color: theme.colors.textPrimary }]}>{formatDate(ride.departureTime)}</Text>
         <StatusBadge status={STATUS_TO_BADGE[ride.status]} size="sm" />
       </View>
 
@@ -60,10 +69,10 @@ const RideRow: React.FC<{
         <MaterialIcons
           name="trip-origin"
           size={14}
-          color={colors.primary}
+          color={theme.colors.primary}
           style={styles.routeIcon}
         />
-        <Text style={styles.routeText} numberOfLines={1}>
+        <Text style={[styles.routeText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
           {ride.originLabel}
         </Text>
       </View>
@@ -74,7 +83,7 @@ const RideRow: React.FC<{
           color={colors.status.error}
           style={styles.routeIcon}
         />
-        <Text style={styles.routeText} numberOfLines={1}>
+        <Text style={[styles.routeText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
           {ride.destinationLabel}
         </Text>
       </View>
@@ -84,13 +93,13 @@ const RideRow: React.FC<{
           <MaterialIcons
             name="event-seat"
             size={14}
-            color={colors.text.secondary}
+            color={theme.colors.textSecondary}
           />
-          <Text style={styles.metaText}>{ride.seats} asientos</Text>
+          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{ride.seats} asientos</Text>
         </View>
-        <Text style={styles.priceText}>{formatPrice(ride.pricePerSeat)}</Text>
+        <Text style={[styles.priceText, { color: theme.colors.primary }]}>{formatPrice(ride.pricePerSeat)}</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -102,11 +111,13 @@ export const RecentRidesTable: React.FC<Props> = ({
   role,
   onPressItem,
 }) => {
+  const { theme } = useTheme();
   if (loading) {
     return (
-      <View style={[styles.stateContainer, styles.loadingContainer]}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={styles.stateText}>Cargando viajes...</Text>
+      <View accessibilityLabel="Cargando viajes" style={[styles.stateContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <Skeleton height={18} width="42%" />
+        <Skeleton height={14} style={{ marginTop: spacing.md }} />
+        <Skeleton height={14} width="78%" style={{ marginTop: spacing.sm }} />
       </View>
     );
   }
@@ -145,8 +156,8 @@ export const RecentRidesTable: React.FC<Props> = ({
     <FlatList
       data={rides}
       keyExtractor={item => item.rideId}
-      renderItem={({ item }) => (
-        <RideRow ride={item} onPress={() => onPressItem?.(item)} />
+      renderItem={({ item, index }) => (
+        <RideRow ride={item} index={index} onPress={() => onPressItem?.(item)} />
       )}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       scrollEnabled={false}

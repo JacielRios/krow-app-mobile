@@ -1,4 +1,5 @@
 export type {
+  RideStatus,
   PublishRidePayload,
   DriverVehicle,
   PublishRideResult,

@@ -1,3 +1,5 @@
+import type { RideStatus } from './ride.types';
+
 /**
  * Ride disponible para reservar, devuelto por `useSearchRides`.
  * Incluye datos derivados del conductor y vehículo para que el componente de
@@ -31,7 +33,7 @@ export interface AvailableRide {
   departureTime: string; // ISO 8601
   availableSeats: number;
   pricePerSeat: number;
-  status: string;
+  status: RideStatus;
 }
 
 export interface SearchRidesParams {
@@ -42,6 +44,6 @@ export interface SearchRidesParams {
   maxDistanceKm?: number;
   /** Tolerancia temporal en minutos para precandidatos. Default 60. */
   maxTimeWindowMin?: number;
-  /** Tope superior de filas leídas de Supabase. Default 50. */
+  /** Tope superior de resultados solicitados a KROW API. Default 50. */
   fetchLimit?: number;
 }

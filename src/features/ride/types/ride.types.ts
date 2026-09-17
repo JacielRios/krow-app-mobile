@@ -1,3 +1,18 @@
+/**
+ * Estados posibles de un ride en la BD `rides.status`.
+ * - scheduled: publicado, aceptando reservas.
+ * - full: alcanzó capacidad (no admite más bookings).
+ * - in_progress: el conductor inició el viaje.
+ * - completed: viaje finalizado.
+ * - cancelled: cancelado por el conductor o el sistema.
+ */
+export type RideStatus =
+  | 'scheduled'
+  | 'full'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
 export interface PublishRidePayload {
   vehicle_id: string;
   origin_lat: number;

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { View, StyleSheet, Animated, Image } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 
 export default function SplashScreen({ navigation }: any) {
@@ -25,7 +25,7 @@ export default function SplashScreen({ navigation }: any) {
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation, opacityValue, scaleValue]);
 
   return (
     <View style={styles.container}>

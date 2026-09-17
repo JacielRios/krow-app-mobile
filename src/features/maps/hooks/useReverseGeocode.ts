@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { reverseGeocode, LatLng } from '../../../services/googleMaps';
+import { reverseGeocode, LatLng } from '../api/mapsApi';
 
 interface UseReverseGeocodeResult {
   loading: boolean;

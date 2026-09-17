@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../../../services/supabase';
+import { bookingApi } from '../api/bookingApi';
 import type {
   BookingMutableStatus,
   UpdateBookingStatusResult,
@@ -30,16 +30,10 @@ export function useUpdateBookingStatus(): UseUpdateBookingStatusResult {
   ): Promise<UpdateBookingStatusResult> {
     setLoading(true);
     try {
-      const { error } = await supabase.rpc('update_booking_status', {
-        p_booking_id: bookingId,
-        p_new_status: newStatus,
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
+      await bookingApi.updateStatus(bookingId, newStatus);
       return { success: true, error: null };
+    } catch (error: any) {
+      return { success: false, error: error?.message ?? 'No se pudo actualizar la reserva' };
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../shared/theme/colors';
-import { decodePolyline, LatLng } from '../../../services/googleMaps';
+import { decodePolyline, LatLng } from '../api/mapsApi';
 
 export interface RoutePreviewMapProps {
   origin: LatLng | null;

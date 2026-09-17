@@ -4,7 +4,7 @@ import {
   generateSessionToken,
   PlaceSuggestion,
   LatLng,
-} from '../../../services/googleMaps';
+} from '../api/mapsApi';
 
 export interface UsePlacesAutocompleteOptions {
   debounceMs?: number;

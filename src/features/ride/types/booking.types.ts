@@ -1,8 +1,16 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+import type { RideStatus } from './ride.types';
+
+export type BookingStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'rejected'
+  | 'in_progress'
+  | 'completed';
 
 export type BookingMutableStatus = Extract<
   BookingStatus,
-  'confirmed' | 'cancelled'
+  'confirmed' | 'cancelled' | 'rejected'
 >;
 
 /**
@@ -44,7 +52,12 @@ export interface BookingRequest {
 }
 
 /**
- * Cabecera del ride para la pantalla de solicitudes.
+ * Cabecera del ride para las pantallas de solicitudes y viaje activo.
+ *
+ * Los campos `originLat`/`originLng`/`destinationLat`/`destinationLng` y
+ * `routePolyline` son opcionales: los hooks que alimentan el mapa
+ * (p.ej. `useActiveRideData`) los llenan; los hooks que sólo necesitan el
+ * encabezado (p.ej. `useRideScheduled` para el driver) pueden omitirlos.
  */
 export interface RideHeader {
   rideId: string;
@@ -52,7 +65,12 @@ export interface RideHeader {
   departureTime: string;
   availableSeats: number;
   pricePerSeat: number;
-  status: string;
+  status: RideStatus;
   originAddress: string | null;
   destinationAddress: string | null;
+  originLat?: number | null;
+  originLng?: number | null;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
+  routePolyline?: string | null;
 }

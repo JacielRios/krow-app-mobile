@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeProvider';
+import type { AppTheme } from '../../theme/themes';
 
 export type AlertType = 'error' | 'success' | 'warning' | 'info';
 
@@ -22,17 +24,17 @@ interface CustomAlertProps {
   confirmText?: string;
 }
 
-const getAlertConfig = (type: AlertType) => {
+const getAlertConfig = (type: AlertType, theme: AppTheme) => {
   switch (type) {
     case 'error':
-      return { icon: 'error-outline', color: colors.status.error };
+      return { icon: 'error-outline', color: theme.colors.status.error };
     case 'success':
-      return { icon: 'check-circle-outline', color: colors.status.success };
+      return { icon: 'check-circle-outline', color: theme.colors.status.success };
     case 'warning':
-      return { icon: 'warning-amber', color: colors.status.warning };
+      return { icon: 'warning-amber', color: theme.colors.status.warning };
     case 'info':
     default:
-      return { icon: 'info-outline', color: colors.status.info };
+      return { icon: 'info-outline', color: theme.colors.status.info };
   }
 };
 
@@ -44,6 +46,7 @@ export function CustomAlert({
   onClose,
   confirmText = 'Entendido',
 }: CustomAlertProps) {
+  const { theme, motionEnabled } = useTheme();
   const scaleValue = useRef(new Animated.Value(0)).current;
   const opacityValue = useRef(new Animated.Value(0)).current;
 
@@ -58,7 +61,7 @@ export function CustomAlert({
         }),
         Animated.timing(opacityValue, {
           toValue: 1,
-          duration: 200,
+          duration: motionEnabled ? 200 : 0,
           useNativeDriver: true,
         }),
       ]).start();
@@ -66,28 +69,29 @@ export function CustomAlert({
       Animated.parallel([
         Animated.timing(scaleValue, {
           toValue: 0.8,
-          duration: 150,
+          duration: motionEnabled ? 150 : 0,
           useNativeDriver: true,
         }),
         Animated.timing(opacityValue, {
           toValue: 0,
-          duration: 150,
+          duration: motionEnabled ? 150 : 0,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [visible, scaleValue, opacityValue]);
+  }, [motionEnabled, visible, scaleValue, opacityValue]);
 
   if (!visible) return null;
 
-  const config = getAlertConfig(type);
+  const config = getAlertConfig(type, theme);
 
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: theme.colors.backdrop }]}>
         <Animated.View
           style={[
             styles.alertContainer,
+            { backgroundColor: theme.colors.surfaceRaised },
             {
               transform: [{ scale: scaleValue }],
               opacity: opacityValue,
@@ -97,14 +101,14 @@ export function CustomAlert({
           <View style={[styles.iconContainer, { backgroundColor: config.color + '1A' }]}>
             <Icon name={config.icon} size={40} color={config.color} />
           </View>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
+          <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{message}</Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: config.color }]}
             onPress={onClose}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>{confirmText}</Text>
+            <Text style={[styles.buttonText, { color: theme.colors.textInverse }]}>{confirmText}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

@@ -14,22 +14,73 @@ import { setSkipSplashOnNextAuthMount } from '../../../app/authEntryPreference';
 import { clearSessionLoginMode } from '../../../app/sessionLoginMode';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
-import { Button } from '../../../shared/components/ui/Button';
+import { Button, Card, Skeleton, Surface } from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
-import { supabase } from '../../../services/supabase';
+import { IconContainer } from '../../../shared/components/ui/IconButton';
+import { sessionAdapter } from '../../../core/auth/sessionAdapter';
+import { bookingApi } from '../../ride/api/bookingApi';
 import { useCurrentUserRole } from '../hooks/useCurrentUserRole';
 import { useRecentRides } from '../hooks/useRecentRides';
+import { useActiveRide, ActiveRideInfo } from '../hooks/useActiveRide';
 import { RecentRidesTable } from '../components/RecentRidesTable';
+import type { MainStackParamList } from '../../../app/navigation/MainNavigator';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+
+type BannerTarget = {
+  [K in keyof MainStackParamList]: { name: K; params: MainStackParamList[K] };
+}[keyof MainStackParamList];
+
+interface BannerConfig {
+  iconName: string;
+  text: string;
+  target: BannerTarget;
+}
+
+function getBannerConfig(activeRide: ActiveRideInfo): BannerConfig {
+  const { role, status, rideId } = activeRide;
+  const inProgress = status === 'in_progress';
+
+  if (role === 'driver') {
+    if (inProgress) {
+      return {
+        iconName: 'navigation',
+        text: 'Viaje en curso · Continuar',
+        target: { name: 'DriverActiveRide', params: { rideId } },
+      };
+    }
+    return {
+      iconName: 'campaign',
+      text: 'Tienes un viaje publicado · Ver solicitudes',
+      target: { name: 'RideScheduled', params: { rideId } },
+    };
+  }
+
+  if (inProgress) {
+    return {
+      iconName: 'directions-car',
+      text: 'Tu viaje está en camino · Ver estado',
+      target: { name: 'PassengerActiveRide', params: { rideId } },
+    };
+  }
+  return {
+    iconName: 'pending-actions',
+    text: 'Tienes una reserva pendiente · Ver detalles',
+    target: { name: 'RideScheduled', params: { rideId } },
+  };
+}
 
 const RECENT_RIDES_LIMIT = 5;
 
 export const HomeScreen = () => {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [signingOut, setSigningOut] = useState(false);
 
   const { user, loading: userLoading, error: userError, reload: reloadUser } =
     useCurrentUserRole();
+
+  const { activeRide } = useActiveRide();
 
   const {
     rides,
@@ -42,72 +93,30 @@ export const HomeScreen = () => {
   });
 
   // Contador agregado de solicitudes pendientes sobre TODOS los rides del
-  // conductor. Se queda como una micro-query inline porque `usePendingBookings`
-  // ahora opera por `ride_id` (lo usan las pantallas dedicadas).
+  // conductor. Se mantiene como una micro-query inline porque las pantallas
+  // dedicadas (`RideScheduledScreen`) ya operan por `ride_id` específico.
   // RLS `bookings_select_parties` ya restringe la visibilidad al conductor.
-  const driverUserId = user?.role === 'conductor' ? user.userId : null;
+  // El `driver_profiles.driver_id` viene resuelto desde `useCurrentUserRole`,
+  // por eso este efecto arranca directo en el query de `rides` sin re-leer
+  // `driver_profiles`.
+  const driverProfileId =
+    user?.role === 'conductor' ? user.driverId : null;
   const [pendingCount, setPendingCount] = useState(0);
   const [pendingTick, setPendingTick] = useState(0);
   const reloadPending = useCallback(() => setPendingTick(t => t + 1), []);
 
   useEffect(() => {
     let active = true;
-    if (!driverUserId) {
+    if (!driverProfileId) {
       setPendingCount(0);
       return;
     }
 
     (async () => {
       try {
-        // 1) driver_profile del usuario actual
-        const { data: driverRow, error: driverError } = await supabase
-          .from('driver_profiles')
-          .select('driver_id')
-          .eq('user_id', driverUserId)
-          .maybeSingle();
-
+        const { count } = await bookingApi.pendingCount();
         if (!active) return;
-        if (driverError || !driverRow?.driver_id) {
-          setPendingCount(0);
-          return;
-        }
-
-        // 2) Rides publicados por este conductor.
-        // Hacemos dos queries independientes en lugar de un join embebido para
-        // evitar la combinación frágil de `ride.driver_id` filter + head:true.
-        const { data: ridesData, error: ridesError } = await supabase
-          .from('rides')
-          .select('ride_id')
-          .eq('driver_id', driverRow.driver_id);
-
-        if (!active) return;
-        if (ridesError) {
-          setPendingCount(0);
-          return;
-        }
-
-        const rideIds = (ridesData ?? [])
-          .map(r => r?.ride_id)
-          .filter((id): id is string => typeof id === 'string');
-
-        if (rideIds.length === 0) {
-          setPendingCount(0);
-          return;
-        }
-
-        // 3) Conteo de bookings pendientes sobre esos rides.
-        const { count, error: countError } = await supabase
-          .from('bookings')
-          .select('booking_id', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .in('ride_id', rideIds);
-
-        if (!active) return;
-        if (countError) {
-          setPendingCount(0);
-          return;
-        }
-        setPendingCount(count ?? 0);
+        setPendingCount(count);
       } catch {
         // Cualquier error inesperado: degradar a 0, nunca crashear el Home.
         if (active) setPendingCount(0);
@@ -117,7 +126,7 @@ export const HomeScreen = () => {
     return () => {
       active = false;
     };
-  }, [driverUserId, pendingTick]);
+  }, [driverProfileId, pendingTick]);
 
   useFocusEffect(
     useCallback(() => {
@@ -130,7 +139,7 @@ export const HomeScreen = () => {
   const handleSignOut = async () => {
     setSigningOut(true);
     setSkipSplashOnNextAuthMount(true);
-    const { error } = await supabase.auth.signOut();
+    const { error } = await sessionAdapter.signOut();
     if (!error) {
       await clearSessionLoginMode();
     } else {
@@ -149,17 +158,26 @@ export const HomeScreen = () => {
     }
   };
 
+  const handleBannerPress = useCallback(() => {
+    if (!activeRide) return;
+    const cfg = getBannerConfig(activeRide);
+    navigation.navigate(cfg.target.name, cfg.target.params as never);
+  }, [activeRide, navigation]);
+
+  const bannerConfig = activeRide ? getBannerConfig(activeRide) : null;
+
   if (userLoading && !user) {
     return (
-      <View style={[styles.fallback, { paddingTop: insets.top }]}>
-        <Text style={styles.fallbackText}>Cargando…</Text>
+      <View style={[styles.fallback, { paddingTop: insets.top, backgroundColor: theme.colors.background }]} accessibilityLabel="Cargando inicio">
+        <Skeleton width="50%" height={28} />
+        <Skeleton height={120} style={{ marginTop: spacing.lg }} />
       </View>
     );
   }
 
   if (userError && !user) {
     return (
-      <View style={[styles.fallback, { paddingTop: insets.top }]}>
+      <View style={[styles.fallback, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
         <MaterialIcons
           name="error-outline"
           size={32}
@@ -188,115 +206,178 @@ export const HomeScreen = () => {
   const roleLabel = isPassenger ? 'Pasajero' : 'Conductor';
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[
-        styles.container,
-        {
-          paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.xl,
-        },
-      ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={ridesLoading}
-          onRefresh={reloadRides}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      <View style={styles.headerRow}>
-        <View style={styles.headerTextWrap}>
-          <Text style={styles.greeting}>Hola,</Text>
-          <Text style={styles.userName}>{user.displayName}</Text>
-          <View style={styles.badgeWrap}>
-            <StatusBadge
-              tone={isPassenger ? 'info' : 'primary'}
-              label={roleLabel}
-              size="sm"
-            />
+    <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
+      <View
+        style={[
+          styles.headerWrap,
+          { paddingTop: insets.top + spacing.lg, backgroundColor: theme.colors.background },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextWrap}>
+            <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Hola,</Text>
+            <Text style={[styles.userName, { color: theme.colors.textPrimary }]}>{user.displayName}</Text>
+            <View style={styles.badgeWrap}>
+              <StatusBadge
+                tone={isPassenger ? 'info' : 'primary'}
+                label={roleLabel}
+                size="sm"
+              />
+            </View>
           </View>
-        </View>
-        <Button
-          title="Salir"
-          variant="ghost"
-          size="sm"
-          fullWidth={false}
-          onPress={handleSignOut}
-          loading={signingOut}
-          contentStyle={styles.signOutContent}
-        />
-      </View>
-
-      <View style={styles.ctaCard}>
-        <View style={styles.ctaIconWrap}>
-          <MaterialIcons
-            name={primaryActionIcon}
-            size={28}
-            color={colors.primary}
+          <Button
+            title="Salir"
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+            onPress={handleSignOut}
+            loading={signingOut}
+            contentStyle={styles.signOutContent}
           />
         </View>
-        <Text style={styles.ctaTitle}>
-          {isPassenger
-            ? '¿Necesitas trasladarte?'
-            : '¿Vas a salir y tienes lugares?'}
-        </Text>
-        <Text style={styles.ctaSubtitle}>
-          {isPassenger
-            ? 'Encuentra estudiantes que vayan en tu misma dirección y comparte el viaje.'
-            : 'Publica tu viaje y deja que otros estudiantes reserven asientos.'}
-        </Text>
-        <Button title={primaryActionTitle} onPress={handlePrimaryAction} />
+
+        {bannerConfig && (
+          <Card
+            variant="filled"
+            radius="lg"
+            padding="md"
+            onPress={handleBannerPress}
+            style={styles.banner}
+            contentStyle={styles.bannerRow}
+          >
+            <IconContainer size="sm" style={styles.bannerIcon}>
+              <MaterialIcons
+                name={bannerConfig.iconName}
+                size={20}
+                color={theme.colors.primary}
+              />
+            </IconContainer>
+            <Text style={[styles.bannerText, { color: theme.colors.primary }]} numberOfLines={2}>
+              {bannerConfig.text}
+            </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={22}
+              color={theme.colors.primary}
+            />
+          </Card>
+        )}
       </View>
 
-      {!isPassenger && pendingCount > 0 && (
-        <View style={styles.requestsCard}>
-          <View style={styles.requestsIconWrap}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
+          },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={ridesLoading}
+            onRefresh={reloadRides}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        <Surface elevation={1} radius={radii.xl} style={styles.ctaCard} contentStyle={{ padding: spacing.lg }}>
+          <View style={styles.ctaIconWrap}>
             <MaterialIcons
-              name="mark-email-unread"
-              size={24}
-              color={colors.primary}
+              name={primaryActionIcon}
+              size={28}
+              color={theme.colors.primary}
             />
           </View>
-          <View style={styles.requestsTextWrap}>
-            <Text style={styles.requestsTitle}>
-              Solicitudes pendientes
-            </Text>
-            <Text style={styles.requestsSubtitle}>
-              {`${pendingCount} pasajero${
-                pendingCount === 1 ? '' : 's'
-              } esperando respuesta en tus viajes publicados`}
-            </Text>
-          </View>
-          <View style={styles.requestsBadge}>
-            <Text style={styles.requestsBadgeText}>{pendingCount}</Text>
-          </View>
-        </View>
-      )}
+          <Text style={[styles.ctaTitle, { color: theme.colors.textPrimary }]}>
+            {isPassenger
+              ? '¿Necesitas trasladarte?'
+              : '¿Vas a salir y tienes lugares?'}
+          </Text>
+          <Text style={[styles.ctaSubtitle, { color: theme.colors.textSecondary }]}>
+            {isPassenger
+              ? 'Encuentra estudiantes que vayan en tu misma dirección y comparte el viaje.'
+              : 'Publica tu viaje y deja que otros estudiantes reserven asientos.'}
+          </Text>
+          <Button title={primaryActionTitle} onPress={handlePrimaryAction} />
+        </Surface>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Viajes recientes</Text>
-          <Text style={styles.sectionHint}>Últimos {RECENT_RIDES_LIMIT}</Text>
+        {!isPassenger && pendingCount > 0 && (
+          <View style={styles.requestsCard}>
+            <View style={styles.requestsIconWrap}>
+              <MaterialIcons
+                name="mark-email-unread"
+                size={24}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.requestsTextWrap}>
+              <Text style={styles.requestsTitle}>
+                Solicitudes pendientes
+              </Text>
+              <Text style={styles.requestsSubtitle}>
+                {`${pendingCount} pasajero${
+                  pendingCount === 1 ? '' : 's'
+                } esperando respuesta en tus viajes publicados`}
+              </Text>
+            </View>
+            <View style={styles.requestsBadge}>
+              <Text style={styles.requestsBadgeText}>{pendingCount}</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Viajes recientes</Text>
+            <Text style={[styles.sectionHint, { color: theme.colors.textMuted }]}>Últimos {RECENT_RIDES_LIMIT}</Text>
+          </View>
+          <RecentRidesTable
+            rides={rides}
+            loading={ridesLoading}
+            error={ridesError}
+            notice={ridesNotice}
+            role={user.role}
+          />
         </View>
-        <RecentRidesTable
-          rides={rides}
-          loading={ridesLoading}
-          error={ridesError}
-          notice={ridesNotice}
-          role={user.role}
-        />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerWrap: {
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background,
+  },
+  banner: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primarySoft,
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bannerIcon: {
+    backgroundColor: '#FFFFFF',
+    marginRight: spacing.md,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary,
+    marginRight: spacing.sm,
+  },
   scroll: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  container: {
+  scrollContent: {
     paddingHorizontal: spacing.lg,
   },
   fallback: {
@@ -325,7 +406,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
   },
   headerTextWrap: {
     flex: 1,
@@ -347,11 +427,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   ctaCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
     marginBottom: spacing.xl,
   },
   ctaIconWrap: {

@@ -1,312 +1,370 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, PanResponder } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../../shared/theme/colors';
-import { MapPlaceholder } from '../../components';
+
 import { Button } from '../../../../shared/components/ui/Button';
+import { colors } from '../../../../shared/theme/colors';
+import { radii, spacing, typography } from '../../../../shared/theme/tokens';
+import { rideApi } from '../../api/rideApi';
+import { RoutePreviewMap } from '../../../maps';
+import { PassengerStopCard } from '../../components';
+import { useActiveRideData } from '../../hooks';
+import type {
+  ActivePassenger,
+  ActiveRideData,
+} from '../../hooks/useActiveRideData';
+import type { RideHeader } from '../../types/booking.types';
+import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
 
-// Dummy data for passengers
-const passengers = [
-  { id: '1', name: 'Ana S.', stop: 'Av. Universidad 123', status: 'En viaje', fare: '$45.00' },
-  { id: '2', name: 'Luis M.', stop: 'Facultad de Derecho', status: 'En viaje', fare: '$50.00' },
-];
+type DriverActiveRideRouteProp = NativeStackScreenProps<
+  MainStackParamList,
+  'DriverActiveRide'
+>['route'];
+type DriverActiveRideNav = NativeStackNavigationProp<
+  MainStackParamList,
+  'DriverActiveRide'
+>;
 
-export const DriverActiveRideScreen = ({ navigation }: any) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const formatTime = (iso: string): string => {
+  const d = new Date(iso);
+  return d.toLocaleString('es-MX', {
+    timeZone: 'America/Mexico_City',
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy < -50) {
-          setIsExpanded(true);
-        } else if (gestureState.dy > 50) {
-          setIsExpanded(false);
-        }
-      },
-    })
-  ).current;
+export const DriverActiveRideScreen: React.FC = () => {
+  const navigation = useNavigation<DriverActiveRideNav>();
+  const route = useRoute<DriverActiveRideRouteProp>();
+  const insets = useSafeAreaInsets();
+
+  const { rideId } = route.params;
+
+  const { data, loading, error, reload } = useActiveRideData(rideId);
+
+  const driverData = useMemo<
+    Extract<ActiveRideData, { role: 'conductor' }> | null
+  >(() => {
+    if (!data) return null;
+    return data.role === 'conductor' ? data : null;
+  }, [data]);
+
+  const showInitialLoader = loading && !data;
+  const allArrived =
+    driverData != null &&
+    driverData.passengers.length > 0 &&
+    driverData.passengers.every(p => p.bookingStatus === 'completed');
 
   return (
-    <MapPlaceholder>
-      {/* Route & Cancel Buttons Floating on Map */}
-      <View style={styles.floatingTopActions}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        
-        {/* Chat Button Floating */}
-        <TouchableOpacity
-          style={styles.chatButtonFloating}
-          onPress={() => { /* TODO: Navigate to chat screen */ }}
-        >
-          <MaterialIcons name="chat" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.flex}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: insets.top + spacing.md,
+            paddingBottom:
+              insets.bottom + spacing.xl + (allArrived ? FOOTER_HEIGHT : 0),
+          },
+        ]}
+      >
+        <ScreenHeader
+          ride={driverData?.ride ?? null}
+          onBack={() => navigation.goBack()}
+        />
 
-      {/* Ride Info Bottom Sheet */}
-      <Animated.View style={[styles.bottomSheet, isExpanded && styles.bottomSheetExpanded]}>
-        <View style={styles.dragHandler} {...panResponder.panHandlers}>
-          <View style={styles.dragIndicator} />
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-        {/* Destination Header */}
-        <View style={styles.header}>
-          <Text style={styles.destinationLabel}>Destino Final</Text>
-          <Text style={styles.destinationValue}>Campus Central</Text>
-          <View style={styles.headerDetailsContainer}>
-            <Text style={styles.etaText}>Estimado: 14:45</Text>
-            <Text style={styles.fareText}>Total: $95.00 MXN</Text>
+        {showInitialLoader ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.centeredText}>Cargando…</Text>
           </View>
-        </View>
+        ) : error ? (
+          <View style={styles.centered}>
+            <MaterialIcons
+              name="error-outline"
+              size={32}
+              color={colors.status.error}
+            />
+            <Text style={styles.centeredErrorText}>{error}</Text>
+            <View style={styles.retryWrap}>
+              <Button title="Reintentar" onPress={reload} />
+            </View>
+          </View>
+        ) : driverData ? (
+          <DriverContent data={driverData} reload={reload} />
+        ) : null}
+      </ScrollView>
 
-        <View style={styles.divider} />
-
-        {/* Passengers List */}
-        <View style={styles.passengersSection}>
-          <Text style={styles.sectionTitle}>Pasajeros y paradas ({passengers.length})</Text>
-          <ScrollView style={styles.passengersList}>
-            {passengers.map((p, index) => (
-              <View key={p.id} style={styles.passengerItem}>
-                <View style={styles.passengerHeader}>
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarInitial}>{p.name.charAt(0)}</Text>
-                  </View>
-                  <View style={styles.passengerInfo}>
-                    <Text style={styles.passengerName}>{p.name}</Text>
-                    <View style={styles.passengerMetaRow}>
-                      <Text style={styles.passengerStatus}>{p.status}</Text>
-                      <Text style={styles.passengerFare}>{p.fare}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.stopActionBtn}>
-                    <Text style={styles.stopActionText}>Dejar aquí</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.stopRow}>
-                  <MaterialIcons name="location-pin" size={16} color={colors.status.info} />
-                  <Text style={styles.stopAddress}>{p.stop}</Text>
-                </View>
-
-                {index < passengers.length - 1 && <View style={styles.itemDivider} />}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
+      {allArrived && driverData && (
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: insets.bottom + spacing.md },
+          ]}
+        >
           <Button
-            title="Finalizar Viaje completo"
-            onPress={() => navigation.navigate('DriverFinishedRide')}
+            title="Finalizar viaje"
+            onPress={() =>
+              navigation.replace('DriverFinishedRide', {
+                rideId: driverData.ride.rideId,
+              })
+            }
           />
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>Cancelar Viaje</Text>
-          </TouchableOpacity>
         </View>
-
-        </ScrollView>
-      </Animated.View>
-    </MapPlaceholder>
+      )}
+    </View>
   );
 };
 
+// =====================================================================
+// Header
+// =====================================================================
+
+const ScreenHeader: React.FC<{
+  ride: RideHeader | null;
+  onBack: () => void;
+}> = ({ ride, onBack }) => (
+  <View style={styles.header}>
+    <TouchableOpacity
+      onPress={onBack}
+      style={styles.backBtn}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <MaterialIcons
+        name="arrow-back"
+        size={24}
+        color={colors.text.primary}
+      />
+    </TouchableOpacity>
+    <View style={styles.headerText}>
+      <Text style={styles.title}>Viaje en curso</Text>
+      {ride && (
+        <Text style={styles.subtitle} numberOfLines={2}>
+          {(ride.originAddress ?? 'Origen') +
+            ' → ' +
+            (ride.destinationAddress ?? 'Destino')}
+        </Text>
+      )}
+      {ride && (
+        <View style={styles.headerMetaRow}>
+          <MaterialIcons
+            name="schedule"
+            size={14}
+            color={colors.text.secondary}
+          />
+          <Text style={styles.headerMetaText}>
+            Sale {formatTime(ride.departureTime)}
+          </Text>
+        </View>
+      )}
+    </View>
+  </View>
+);
+
+// =====================================================================
+// Contenido principal del conductor
+// =====================================================================
+
+const DriverContent: React.FC<{
+  data: Extract<ActiveRideData, { role: 'conductor' }>;
+  reload: () => void;
+}> = ({ data, reload }) => {
+  const { ride, passengers } = data;
+  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
+
+  const handleComplete = async (passenger: ActivePassenger) => {
+    if (actionBookingId !== null) return;
+    setActionBookingId(passenger.bookingId);
+    try {
+      await rideApi.completeStop(ride.rideId, passenger.bookingId);
+      // El hook actualiza periódicamente; pedimos una recarga inmediata para
+      // reflejar la acción sin esperar al siguiente intervalo.
+      reload();
+    } catch (e: any) {
+      Alert.alert(
+        'No se pudo completar la parada',
+        e?.message ?? 'Inténtalo de nuevo.',
+      );
+    } finally {
+      setActionBookingId(null);
+    }
+  };
+
+  const visibleOnMap = passengers.filter(
+    p => p.bookingStatus !== 'completed',
+  );
+
+  const origin =
+    ride.originLat != null && ride.originLng != null
+      ? { lat: ride.originLat, lng: ride.originLng }
+      : null;
+  const destination =
+    ride.destinationLat != null && ride.destinationLng != null
+      ? { lat: ride.destinationLat, lng: ride.destinationLng }
+      : null;
+
+  const extraMarkers = visibleOnMap.map(p => ({
+    id: p.bookingId,
+    point: { lat: p.dropoffLat, lng: p.dropoffLng },
+    color: colors.status.info,
+    iconName: 'place',
+  }));
+
+  return (
+    <>
+      <View style={styles.mapWrap}>
+        <RoutePreviewMap
+          origin={origin}
+          destination={destination}
+          encodedPolyline={ride.routePolyline ?? null}
+          extraMarkers={extraMarkers}
+          height={220}
+        />
+      </View>
+
+      <Text style={styles.sectionTitle}>
+        Pasajeros ({passengers.length})
+      </Text>
+
+      {passengers.length === 0 ? (
+        <View style={styles.centered}>
+          <MaterialIcons
+            name="inbox"
+            size={32}
+            color={colors.text.placeholder}
+          />
+          <Text style={styles.centeredText}>
+            No hay pasajeros en este viaje.
+          </Text>
+        </View>
+      ) : (
+        passengers.map(p => (
+          <PassengerStopCard
+            key={p.bookingId}
+            passenger={p}
+            busy={actionBookingId === p.bookingId}
+            anyActionBusy={actionBookingId !== null}
+            onComplete={() => handleComplete(p)}
+          />
+        ))
+      )}
+    </>
+  );
+};
+
+// =====================================================================
+// Estilos
+// =====================================================================
+
+const FOOTER_HEIGHT = 88;
+
 const styles = StyleSheet.create({
-  floatingTopActions: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  iconButton: {
+  flex: { flex: 1, backgroundColor: colors.background },
+  scroll: {
+    flex: 1,
     backgroundColor: colors.background,
-    padding: 10,
-    borderRadius: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
-  chatButtonFloating: {
-    backgroundColor: colors.primary,
-    padding: 12,
-    borderRadius: 25,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  bottomSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    maxHeight: '40%',
-  },
-  bottomSheetExpanded: {
-    maxHeight: '80%',
-  },
-  dragHandler: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  dragIndicator: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.border.default,
-    borderRadius: 2,
+  container: {
+    paddingHorizontal: spacing.lg,
+    flexGrow: 1,
   },
   header: {
-    alignItems: 'center',
-  },
-  destinationLabel: {
-    fontSize: 12,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-  },
-  destinationValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginVertical: 4,
-  },
-  headerDetailsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    gap: 16,
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
   },
-  etaText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primaryLight,
-  },
-  fareText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginVertical: 16,
-  },
-  passengersSection: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 12,
-  },
-  passengersList: {
-    marginBottom: 16,
-  },
-  passengerItem: {
-    paddingVertical: 12,
-  },
-  passengerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatarPlaceholder: {
+  backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
   },
-  avatarInitial: {
-    color: colors.text.inverse,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  passengerInfo: {
+  headerText: {
     flex: 1,
-    marginLeft: 12,
   },
-  passengerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  title: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
     color: colors.text.primary,
   },
-  passengerMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  subtitle: {
+    fontSize: typography.size.sm,
+    color: colors.text.secondary,
     marginTop: 2,
-    paddingRight: 10,
   },
-  passengerStatus: {
-    fontSize: 12,
-    color: colors.status.success,
-  },
-  passengerFare: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: colors.text.secondary,
-  },
-  stopActionBtn: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  stopActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  stopRow: {
+  headerMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 52, // Align with text
+    marginTop: spacing.xs,
   },
-  stopAddress: {
-    fontSize: 14,
+  headerMetaText: {
+    marginLeft: spacing.xs,
+    fontSize: typography.size.sm,
     color: colors.text.secondary,
-    marginLeft: 6,
   },
-  itemDivider: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginTop: 12,
-    marginLeft: 52,
+  mapWrap: {
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
   },
-  actionsContainer: {
-    marginTop: 10,
-    gap: 12,
+  sectionTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
-  cancelButton: {
-    paddingVertical: 12,
+  centered: {
+    paddingVertical: spacing.xl,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelButtonText: {
+  centeredText: {
+    marginTop: spacing.sm,
+    fontSize: typography.size.md,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+    lineHeight: 22,
+  },
+  centeredErrorText: {
+    marginTop: spacing.sm,
+    fontSize: typography.size.md,
     color: colors.status.error,
-    fontWeight: 'bold',
-    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryWrap: {
+    marginTop: spacing.md,
+    width: '60%',
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
 });

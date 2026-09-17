@@ -3,7 +3,7 @@ import {
   getDirections,
   DirectionsResult,
   LatLng,
-} from '../../../services/googleMaps';
+} from '../api/mapsApi';
 
 interface UseDirectionsOptions {
   /** Si true, recalcula automáticamente cuando origin/destination cambian. */

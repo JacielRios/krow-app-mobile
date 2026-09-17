@@ -1,15 +1,36 @@
-import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../../services/supabase';
-import {
-  getSessionLoginMode,
-  SessionLoginMode,
-} from '../../../app/sessionLoginMode';
+import { useCallback, useEffect, useState } from 'react';
+import { sessionAdapter } from '../../../core/auth/sessionAdapter';
+import { userApi } from '../../auth/api/userApi';
+import { SessionLoginMode } from '../../../app/sessionLoginMode';
+
+// BREAKING: sessionLoginMode.ts ya no determina el rol. La fuente de verdad
+// ahora es la presencia de un registro en `driver_profiles` para
+// `auth.uid()`. El módulo `app/sessionLoginMode.ts` queda como deuda técnica
+// (`LoginScreen` aún escribe ahí, pero ningún hook lee ese valor para
+// decidir el rol). Cuando se limpie esa deuda, eliminar también
+// `setSessionLoginMode`/`getSessionLoginMode`/`clearSessionLoginMode`.
 
 export interface CurrentUser {
   userId: string;
   email: string | null;
   displayName: string;
+  /**
+   * Rol del usuario en sesión.
+   * - 'conductor': existe `driver_profiles` para su `auth.uid()`.
+   * - 'pasajero': no existe registro en `driver_profiles`.
+   *
+   * Se mantiene el tipo `SessionLoginMode` (`'conductor' | 'pasajero'`) por
+   * compatibilidad con consumidores históricos (`HomeScreen`,
+   * `useRecentRides`, `RecentRidesTable`). El nuevo flujo de rides usa
+   * 'driver'/'passenger' (ver `useActiveRide`).
+   */
   role: SessionLoginMode;
+  /**
+   * `driver_profiles.driver_id` cuando `role === 'conductor'`. `null` para
+   * pasajeros. Se expone como campo aditivo para que otros hooks (p.ej.
+   * `useActiveRide`) no tengan que repetir la query a `driver_profiles`.
+   */
+  driverId: string | null;
 }
 
 export interface UseCurrentUserRoleResult {
@@ -19,26 +40,14 @@ export interface UseCurrentUserRoleResult {
   reload: () => void;
 }
 
-function deriveDisplayName(
-  email: string | null | undefined,
-  metadata: Record<string, any> | undefined,
-): string {
-  const fromMetadata =
-    metadata?.full_name ?? metadata?.name ?? metadata?.first_name;
-  if (typeof fromMetadata === 'string' && fromMetadata.trim().length > 0) {
-    return fromMetadata.trim();
-  }
+function deriveDisplayName(email: string | null | undefined, fullName?: string | null): string {
+  if (fullName?.trim()) return fullName.trim();
   if (email && email.includes('@')) {
     return email.split('@')[0];
   }
   return 'Usuario';
 }
 
-// TODO: la fuente de verdad del rol debería ser la presencia de un registro
-// en `driver_profiles` para `auth.uid()` (con `status='approved'`), no
-// `getSessionLoginMode()` en AsyncStorage. La spec del flujo de rides asume
-// que este hook ya consulta `driver_profiles`, pero hoy no lo hace.
-// Pendiente refactorizar para que `role` se derive de Supabase.
 export function useCurrentUserRole(): UseCurrentUserRoleResult {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,59 +63,35 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
       setLoading(true);
       setError(null);
 
-      const [{ data: authData, error: authError }, role] = await Promise.all([
-        supabase.auth.getUser(),
-        getSessionLoginMode(),
-      ]);
-
+      const profile = await userApi.me();
       if (!active) return;
-
-      if (authError) {
-        setUser(null);
-        setError(authError.message);
-        setLoading(false);
-        return;
-      }
-
-      const authUser = authData?.user;
-      if (!authUser) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      if (!role) {
-        // Sesión válida pero sin rol persistido (caso raro: AsyncStorage limpiado).
-        // El RootNavigator se encarga de redirigir; solo reportamos el inconsistente.
-        setUser(null);
-        setError('Sesión sin rol asignado. Vuelve a iniciar sesión.');
-        setLoading(false);
-        return;
-      }
+      const role: SessionLoginMode = profile.role;
 
       setUser({
-        userId: authUser.id,
-        email: authUser.email ?? null,
-        displayName: deriveDisplayName(
-          authUser.email,
-          authUser.user_metadata as Record<string, any> | undefined,
-        ),
+        userId: profile.userId,
+        email: profile.email,
+        displayName: deriveDisplayName(profile.email, profile.fullName),
         role,
+        driverId: profile.driverProfile?.driverId ?? null,
       });
       setLoading(false);
     };
 
-    load();
+    load().catch((reason: any) => {
+      if (active) {
+        setUser(null);
+        setError(reason?.message ?? 'No se pudo cargar el perfil');
+        setLoading(false);
+      }
+    });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      if (active) load();
+    const unsubscribe = sessionAdapter.onAuthStateChange(() => {
+      if (active) load().catch(() => undefined);
     });
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, [reloadTick]);
 

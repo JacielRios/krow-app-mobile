@@ -5,10 +5,10 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { Avatar } from '../../../shared/components/ui/Avatar';
-import { Button } from '../../../shared/components/ui/Button';
-import { Card } from '../../../shared/components/ui/Card';
+import { Button, Card } from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
 import type { AvailableRide } from '../types/rideSearch.types';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 interface RideCardProps {
   ride: AvailableRide;
@@ -49,6 +49,7 @@ export const RideCard: React.FC<RideCardProps> = ({
   onPress,
   onRequest,
 }) => {
+  const { theme } = useTheme();
   const driverName = ride.driverName ?? 'Conductor';
   const seatsLabel =
     ride.availableSeats === 1
@@ -57,7 +58,7 @@ export const RideCard: React.FC<RideCardProps> = ({
 
   return (
     <Card
-      variant="outlined"
+      variant="elevated"
       padding="md"
       radius="lg"
       onPress={onPress}
@@ -66,7 +67,7 @@ export const RideCard: React.FC<RideCardProps> = ({
       <View style={styles.headerRow}>
         <Avatar name={driverName} size="md" />
         <View style={styles.headerText}>
-          <Text style={styles.driverName} numberOfLines={1}>
+          <Text style={[styles.driverName, { color: theme.colors.textPrimary }]} numberOfLines={1}>
             {driverName}
           </Text>
           {ride.driverRating != null && (
@@ -74,9 +75,9 @@ export const RideCard: React.FC<RideCardProps> = ({
               <MaterialIcons
                 name="star"
                 size={14}
-                color={colors.status.warning}
+                color={theme.colors.status.warning}
               />
-              <Text style={styles.ratingText}>
+              <Text style={[styles.ratingText, { color: theme.colors.textSecondary }]}>
                 {ride.driverRating.toFixed(1)}
               </Text>
             </View>
@@ -85,19 +86,19 @@ export const RideCard: React.FC<RideCardProps> = ({
         <StatusBadge tone="info" label="Programado" size="sm" />
       </View>
 
-      <View style={styles.routeBlock}>
+      <View style={[styles.routeBlock, { backgroundColor: theme.colors.surfaceOverlay }]}>
         <View style={styles.routeRow}>
           <MaterialIcons
             name="trip-origin"
             size={14}
-            color={colors.primary}
+            color={theme.colors.primary}
             style={styles.routeIcon}
           />
-          <Text style={styles.routeText} numberOfLines={1}>
+          <Text style={[styles.routeText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
             {ride.originAddress ?? 'Origen sin dirección'}
           </Text>
         </View>
-        <View style={styles.routeConnector} />
+        <View style={[styles.routeConnector, { backgroundColor: theme.colors.border }]} />
         <View style={styles.routeRow}>
           <MaterialIcons
             name="place"
@@ -105,7 +106,7 @@ export const RideCard: React.FC<RideCardProps> = ({
             color={colors.status.error}
             style={styles.routeIcon}
           />
-          <Text style={styles.routeText} numberOfLines={1}>
+          <Text style={[styles.routeText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
             {ride.destinationAddress ?? 'Destino sin dirección'}
           </Text>
         </View>
@@ -116,9 +117,9 @@ export const RideCard: React.FC<RideCardProps> = ({
           <MaterialIcons
             name="schedule"
             size={14}
-            color={colors.text.secondary}
+            color={theme.colors.textSecondary}
           />
-          <Text style={styles.metaText} numberOfLines={1}>
+          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
             {formatDepartureTime(ride.departureTime)}
           </Text>
         </View>
@@ -126,16 +127,16 @@ export const RideCard: React.FC<RideCardProps> = ({
           <MaterialIcons
             name="event-seat"
             size={14}
-            color={colors.text.secondary}
+            color={theme.colors.textSecondary}
           />
-          <Text style={styles.metaText}>{seatsLabel}</Text>
+          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{seatsLabel}</Text>
         </View>
       </View>
 
       <View style={styles.footer}>
         <View style={styles.priceWrap}>
-          <Text style={styles.price}>{formatPriceMxn(ride.pricePerSeat)}</Text>
-          <Text style={styles.priceUnit}>/ asiento</Text>
+          <Text style={[styles.price, { color: theme.colors.primary }]}>{formatPriceMxn(ride.pricePerSeat)}</Text>
+          <Text style={[styles.priceUnit, { color: theme.colors.textSecondary }]}>/ asiento</Text>
         </View>
         <View style={styles.actionWrap}>
           <Button

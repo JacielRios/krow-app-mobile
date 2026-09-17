@@ -19,11 +19,14 @@ import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAler
 import { setConductorLoginGateBlocking } from '../../../app/conductorLoginGate';
 import { setSessionLoginMode } from '../../../app/sessionLoginMode';
 import { colors } from '../../../shared/theme/colors';
-import { supabase } from '../../../services/supabase';
+import { sessionAdapter } from '../../../core/auth/sessionAdapter';
+import { userApi } from '../api/userApi';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 type UserType = 'pasajero' | 'conductor';
 
 export default function LoginScreen({ navigation }: any) {
+  const { theme, motionEnabled } = useTheme();
   const [userType, setUserType] = useState<UserType>('pasajero');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,13 +45,18 @@ export default function LoginScreen({ navigation }: any) {
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const nextValue = userType === 'pasajero' ? 0 : slideWidth;
+    if (!motionEnabled) {
+      slideAnim.setValue(nextValue);
+      return;
+    }
     Animated.spring(slideAnim, {
-      toValue: userType === 'pasajero' ? 0 : slideWidth,
+      toValue: nextValue,
       useNativeDriver: true,
       bounciness: 4,
       speed: 12,
     }).start();
-  }, [userType, slideWidth]);
+  }, [motionEnabled, slideAnim, userType, slideWidth]);
 
   const showAlert = (title: string, message: string, type: AlertType = 'error') => {
     setAlertConfig({ visible: true, title, message, type });
@@ -70,10 +78,7 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
 
     try {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: normalizeEmail(email),
-        password,
-      });
+      const { data: signInData, error: signInError } = await sessionAdapter.signIn(normalizeEmail(email), password);
 
       if (signInError) {
         if (isConductor) {
@@ -87,7 +92,7 @@ export default function LoginScreen({ navigation }: any) {
         try {
           const userId = signInData.session?.user?.id;
           if (!userId) {
-            await supabase.auth.signOut();
+            await sessionAdapter.signOut();
             showAlert(
               'Sesión incompleta',
               'No se pudo verificar tu cuenta. Vuelve a intentar o confirma tu correo si aplica.',
@@ -96,20 +101,9 @@ export default function LoginScreen({ navigation }: any) {
             return;
           }
 
-          const { data: driverRows, error: driverError } = await supabase
-            .from('driver_profiles')
-            .select('driver_id')
-            .eq('user_id', userId)
-            .limit(1);
-
-          if (driverError) {
-            await supabase.auth.signOut();
-            showAlert('Error al verificar conductor', driverError.message, 'error');
-            return;
-          }
-
-          if (!driverRows?.length) {
-            await supabase.auth.signOut();
+          const profile = await userApi.me();
+          if (profile.role !== 'conductor') {
+            await sessionAdapter.signOut();
             showAlert(
               'Sin permisos de conductor',
               'Tu cuenta no tiene perfil de conductor autorizado. Si crees que es un error, contacta a administración.',
@@ -119,6 +113,10 @@ export default function LoginScreen({ navigation }: any) {
           }
 
           await setSessionLoginMode('conductor');
+        } catch (reason: any) {
+          await sessionAdapter.signOut();
+          showAlert('Error al verificar conductor', reason?.message ?? 'No se pudo verificar tu perfil.', 'error');
+          return;
         } finally {
           setConductorLoginGateBlocking(false);
         }
@@ -131,7 +129,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -144,15 +142,15 @@ export default function LoginScreen({ navigation }: any) {
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Bienvenido a Krow</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Bienvenido a Krow</Text>
           </View>
 
           <View style={styles.content}>
-            <View style={styles.typeSelectorContainer}>
+            <View style={[styles.typeSelectorContainer, { backgroundColor: theme.colors.surfaceOverlay }]}>
               <Animated.View
                 style={[
                   styles.activeSliderIndicator,
-                  { width: slideWidth, transform: [{ translateX: slideAnim }] }
+                  { width: slideWidth, transform: [{ translateX: slideAnim }], backgroundColor: theme.colors.primary }
                 ]}
               />
               <TouchableOpacity
@@ -160,7 +158,7 @@ export default function LoginScreen({ navigation }: any) {
                 onPress={() => setUserType('pasajero')}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeButtonText, userType === 'pasajero' && styles.textActive]}>Pasajero</Text>
+                <Text style={[styles.typeButtonText, { color: theme.colors.textSecondary }, userType === 'pasajero' && { color: theme.colors.textInverse }]}>Pasajero</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -168,7 +166,7 @@ export default function LoginScreen({ navigation }: any) {
                 onPress={() => setUserType('conductor')}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeButtonText, userType === 'conductor' && styles.textActive]}>Conductor</Text>
+                <Text style={[styles.typeButtonText, { color: theme.colors.textSecondary }, userType === 'conductor' && { color: theme.colors.textInverse }]}>Conductor</Text>
               </TouchableOpacity>
             </View>
 
@@ -179,7 +177,7 @@ export default function LoginScreen({ navigation }: any) {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                icon={<Icon name="email" size={24} color={colors.text.secondary} />}
+                icon={<Icon name="email" size={24} color={theme.colors.textSecondary} />}
               />
 
               <Input
@@ -187,7 +185,7 @@ export default function LoginScreen({ navigation }: any) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                icon={<Icon name="lock" size={24} color={colors.text.secondary} />}
+                icon={<Icon name="lock" size={24} color={theme.colors.textSecondary} />}
               />
 
               <Button
@@ -198,15 +196,15 @@ export default function LoginScreen({ navigation }: any) {
               />
 
               <TouchableOpacity style={styles.forgotPasswordContainer}>
-                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>¿Olvidaste tu contraseña?</Text>
               </TouchableOpacity>
 
               {userType === 'pasajero' && (
                 <>
                   <View style={styles.dividerContainer}>
-                    <View style={styles.divider} />
-                    <Text style={styles.dividerText}>O</Text>
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                    <Text style={[styles.dividerText, { color: theme.colors.textSecondary }]}>O</Text>
+                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
                   </View>
 
                   <Button

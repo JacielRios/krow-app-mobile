@@ -11,7 +11,7 @@ import { Input } from '../../../shared/components/ui/Input';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { usePlacesAutocomplete } from '../hooks/usePlacesAutocomplete';
-import { getPlaceDetails, LatLng } from '../../../services/googleMaps';
+import { getPlaceDetails, LatLng } from '../api/mapsApi';
 
 export interface PlacesAutocompleteValue {
   address: string;

@@ -7,7 +7,9 @@ import { Button } from '../../../shared/components/ui/Button';
 import { Dropdown } from '../../../shared/components/ui/Dropdown';
 import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAlert';
 import { colors } from '../../../shared/theme/colors';
-import { supabase } from '../../../services/supabase';
+import { sessionAdapter } from '../../../core/auth/sessionAdapter';
+import { userApi } from '../api/userApi';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 const CARRERAS = [
   'Ing Sistemas Computacionales',
@@ -22,6 +24,7 @@ const CARRERAS = [
 const SEMESTRES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export default function RegisterScreen({ navigation }: any) {
+  const { theme } = useTheme();
   const [formData, setFormData] = useState({
     nombre: '',
     numeroControl: '',
@@ -93,17 +96,11 @@ export default function RegisterScreen({ navigation }: any) {
 
     setLoading(true);
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: nombre.trim(),
-          institutional_id: numeroControl.trim(),
-          academic_program: carrera,
-          academic_period: semestre,
-        },
-      },
+    const { data: signUpData, error: signUpError } = await sessionAdapter.signUp(email, password, {
+      full_name: nombre.trim(),
+      institutional_id: numeroControl.trim(),
+      academic_program: carrera,
+      academic_period: semestre,
     });
 
     if (signUpError || !signUpData.user) {
@@ -114,35 +111,31 @@ export default function RegisterScreen({ navigation }: any) {
 
     const periodValue = Number.parseInt(semestre, 10);
 
-    const { error: profileError } = await supabase.from('users').upsert(
-      {
-        uuid: signUpData.user.id,
-        full_name: nombre.trim(),
-        email_address: email,
-        institutional_id: numeroControl.trim(),
-        academic_program: carrera,
-        academic_period: Number.isNaN(periodValue) ? null : periodValue,
-        is_active: true,
-      },
-      {
-        onConflict: 'uuid',
-      },
-    );
+    let profileError: Error | null = null;
+    if (signUpData.session) {
+      try {
+        await userApi.upsertProfile({
+        fullName: nombre.trim(),
+        institutionalId: numeroControl.trim(),
+        academicProgram: carrera,
+        academicPeriod: Number.isNaN(periodValue) ? null : periodValue,
+        });
+      } catch (reason: any) {
+        profileError = reason instanceof Error ? reason : new Error('No se pudo guardar el perfil');
+      }
+    }
 
     setLoading(false);
 
     if (profileError) {
-      console.error('Profile insert error:', {
+      console.warn('Profile insert warning:', {
         message: profileError.message,
-        code: profileError.code,
-        details: profileError.details,
-        hint: profileError.hint,
         hasSessionAfterSignUp: Boolean(signUpData.session),
       });
 
       showAlert(
         'Cuenta creada con advertencia',
-        `Se creó la cuenta de acceso, pero no se guardó el perfil.\n\nError: ${profileError.message}${profileError.code ? ` (${profileError.code})` : ''}`,
+        `Se creó la cuenta de acceso, pero no se guardó el perfil.\n\nError: ${profileError.message}`,
         'warning'
       );
       return;
@@ -157,7 +150,7 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -165,7 +158,7 @@ export default function RegisterScreen({ navigation }: any) {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           <View style={styles.header}>
-            <Text style={styles.title}>Crear Cuenta</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Crear Cuenta</Text>
           </View>
 
           <View style={styles.formContainer}>
@@ -173,7 +166,7 @@ export default function RegisterScreen({ navigation }: any) {
               placeholder="Nombre completo" 
               value={formData.nombre}
               onChangeText={(text) => handleChange('nombre', text)}
-              icon={<Icon name="person" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="person" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Input 
@@ -181,7 +174,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={formData.numeroControl}
               onChangeText={(text) => handleChange('numeroControl', text)}
               keyboardType="numeric"
-              icon={<Icon name="badge" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="badge" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Input 
@@ -190,7 +183,7 @@ export default function RegisterScreen({ navigation }: any) {
               onChangeText={(text) => handleChange('correo', text)}
               keyboardType="email-address"
               autoCapitalize="none"
-              icon={<Icon name="email" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="email" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Dropdown 
@@ -198,7 +191,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={formData.carrera}
               options={CARRERAS}
               onSelect={(text) => handleChange('carrera', text)}
-              icon={<Icon name="school" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="school" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Dropdown 
@@ -206,7 +199,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={formData.semestre}
               options={SEMESTRES}
               onSelect={(text) => handleChange('semestre', text)}
-              icon={<Icon name="format-list-numbered" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="format-list-numbered" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Input 
@@ -214,7 +207,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={formData.password}
               onChangeText={(text) => handleChange('password', text)}
               secureTextEntry
-              icon={<Icon name="lock" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="lock" size={24} color={theme.colors.textSecondary} />}
             />
             
             <Input 
@@ -222,7 +215,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={formData.confirmPassword}
               onChangeText={(text) => handleChange('confirmPassword', text)}
               secureTextEntry
-              icon={<Icon name="lock-outline" size={24} color={colors.text.secondary} />}
+              icon={<Icon name="lock-outline" size={24} color={theme.colors.textSecondary} />}
             />
 
             <Button 
@@ -233,9 +226,9 @@ export default function RegisterScreen({ navigation }: any) {
             />
 
             <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>¿Ya tienes una cuenta? </Text>
+              <Text style={[styles.loginText, { color: theme.colors.textSecondary }]}>¿Ya tienes una cuenta? </Text>
               <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text style={styles.loginLink}>Iniciar sesión</Text>
+                <Text style={[styles.loginLink, { color: theme.colors.primary }]}>Iniciar sesión</Text>
               </TouchableOpacity>
             </View>
           </View>

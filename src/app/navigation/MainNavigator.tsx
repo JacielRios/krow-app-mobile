@@ -9,39 +9,49 @@ import {
   DriverActiveRideScreen,
   DriverFinishedRideScreen,
   PublishRideScreen,
-  RideRequestsScreen,
+  RideScheduledScreen,
 } from '../../features/ride';
+import { useTheme } from '../../shared/theme/ThemeProvider';
 
 export type MainStackParamList = {
   Home: undefined;
   // Passenger
   RequestRide: undefined;
-  PassengerActiveRide: { rideId: string } | undefined;
-  PassengerFinishedRide: { rideId: string } | undefined;
+  PassengerActiveRide: { rideId: string };
+  PassengerFinishedRide: { rideId: string };
   // Driver
   PublishRide: undefined;
-  RideRequests: { rideId: string };
-  DriverActiveRide: { rideId: string } | undefined;
-  DriverFinishedRide: { rideId: string } | undefined;
+  // Shared (driver + passenger)
+  RideScheduled: { rideId: string };
+  DriverActiveRide: { rideId: string };
+  DriverFinishedRide: { rideId: string };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 export default function MainNavigator() {
+  const { theme } = useTheme();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'default',
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+      initialRouteName="Home"
+    >
       <Stack.Screen name="Home" component={HomeScreen} />
 
       {/* Passenger Flow */}
       <Stack.Screen name="RequestRide" component={RequestRideScreen} />
       <Stack.Screen name="PassengerActiveRide" component={PassengerActiveRideScreen} />
-      <Stack.Screen name="PassengerFinishedRide" component={PassengerFinishedRideScreen} />
+      <Stack.Screen name="PassengerFinishedRide" component={PassengerFinishedRideScreen} options={{ animation: 'fade' }} />
 
       {/* Driver Flow */}
       <Stack.Screen name="PublishRide" component={PublishRideScreen} />
-      <Stack.Screen name="RideRequests" component={RideRequestsScreen} />
+      <Stack.Screen name="RideScheduled" component={RideScheduledScreen} />
       <Stack.Screen name="DriverActiveRide" component={DriverActiveRideScreen} />
-      <Stack.Screen name="DriverFinishedRide" component={DriverFinishedRideScreen} />
+      <Stack.Screen name="DriverFinishedRide" component={DriverFinishedRideScreen} options={{ animation: 'fade' }} />
     </Stack.Navigator>
   );
 }

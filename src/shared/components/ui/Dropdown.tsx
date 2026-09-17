@@ -9,6 +9,8 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeProvider';
+import { createShadow } from '../../theme/elevation';
 
 interface DropdownProps {
   label?: string;
@@ -29,6 +31,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   error,
   icon,
 }) => {
+  const { theme } = useTheme();
   const [visible, setVisible] = useState(false);
 
   const toggleDropdown = () => setVisible(!visible);
@@ -40,38 +43,38 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text>}
       
       <TouchableOpacity
-        style={[styles.inputContainer, error ? styles.inputError : null]}
+        style={[styles.inputContainer, { backgroundColor: theme.colors.surfaceRaised, borderColor: error ? theme.colors.status.error : theme.colors.border }]}
         onPress={toggleDropdown}
         activeOpacity={0.8}
       >
         {icon && <View style={styles.iconContainer}>{icon}</View>}
-        <Text style={[styles.input, !value && styles.placeholder]}>
+        <Text style={[styles.input, { color: value ? theme.colors.textPrimary : theme.colors.textMuted }]}>
           {value || placeholder}
         </Text>
       </TouchableOpacity>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={[styles.errorText, { color: theme.colors.status.error }]}>{error}</Text>}
 
       <Modal visible={visible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { backgroundColor: theme.colors.backdrop }]}>
             <TouchableWithoutFeedback>
-              <View style={styles.dropdownContainer}>
+              <View style={[styles.dropdownContainer, { backgroundColor: theme.colors.surfaceRaised }, createShadow(3, theme.colors.shadow)]}>
                 <FlatList
                   data={options}
                   keyExtractor={(item, index) => index.toString()}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={styles.optionItem}
+                      style={[styles.optionItem, { borderBottomColor: theme.colors.border }]}
                       onPress={() => handleSelect(item)}
                     >
                       <Text
                         style={[
                           styles.optionText,
-                          value === item && styles.optionTextSelected,
+                          { color: value === item ? theme.colors.primary : theme.colors.textPrimary },
                         ]}
                       >
                         {item}

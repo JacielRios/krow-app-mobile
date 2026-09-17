@@ -33,6 +33,24 @@ export const typography = {
   },
 } as const;
 
+export const motion = {
+  duration: {
+    instant: 0,
+    fast: 120,
+    normal: 200,
+    slow: 320,
+  },
+  spring: {
+    press: { damping: 18, stiffness: 280, mass: 0.7 },
+    enter: { damping: 20, stiffness: 190 },
+  },
+} as const;
+
+export const touchTarget = {
+  minimum: 44,
+  comfortable: 48,
+} as const;
+
 export const shadows = {
   sm: {
     shadowColor: '#000',

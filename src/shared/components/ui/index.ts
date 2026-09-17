@@ -29,3 +29,6 @@ export type { SectionHeaderProps } from './SectionHeader';
 
 export { CustomAlert } from './CustomAlert';
 export type { AlertType } from './CustomAlert';
+
+export { RideCancelledModal } from './RideCancelledModal';
+export type { RideCancelledModalProps } from './RideCancelledModal';

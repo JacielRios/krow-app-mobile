@@ -168,7 +168,7 @@ export const PublishRideScreen: React.FC = () => {
       return;
     }
 
-    navigation.replace('RideRequests', { rideId });
+    navigation.replace('RideScheduled', { rideId });
   };
 
   const handleRpcError = (message: string) => {

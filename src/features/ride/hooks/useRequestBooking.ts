@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../../../services/supabase';
+import { bookingApi } from '../api/bookingApi';
 import type {
   RequestBookingPayload,
   RequestBookingResult,
@@ -35,15 +35,10 @@ export function useRequestBooking(): UseRequestBookingResult {
   ): Promise<RequestBookingResult> {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('request_booking', {
-        p_payload: payload,
-      });
-
-      if (error) {
-        return { bookingId: null, error: error.message };
-      }
-
-      return { bookingId: data as string, error: null };
+      const data = await bookingApi.request(payload.ride_id, payload.seats_reserved ?? 1);
+      return { bookingId: data.bookingId, error: null };
+    } catch (error: any) {
+      return { bookingId: null, error: error?.message ?? 'No se pudo solicitar el viaje' };
     } finally {
       setLoading(false);
     }

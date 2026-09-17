@@ -5,6 +5,7 @@ import { consumeSkipSplashOnNextAuthMount } from '../../../app/authEntryPreferen
 import SplashScreen from '../Screens/SplashScreen';
 import LoginScreen from '../Screens/LoginScreen';
 import RegisterScreen from '../Screens/RegisterScreen';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export type AuthStackParamList = {
   Splash: undefined;
@@ -15,6 +16,7 @@ export type AuthStackParamList = {
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthNavigator() {
+  const { theme } = useTheme();
   const skipSplash = consumeSkipSplashOnNextAuthMount();
 
   return (
@@ -22,6 +24,8 @@ export default function AuthNavigator() {
       initialRouteName={skipSplash ? 'Login' : 'Splash'}
       screenOptions={{
         headerShown: false,
+        animation: 'fade',
+        contentStyle: { backgroundColor: theme.colors.background },
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -37,7 +41,7 @@ export default function AuthNavigator() {
           headerShown: true,
           headerTitle: '',
           headerTransparent: true,
-          headerTintColor: '#002C6F', // Back button color matching theme
+          headerTintColor: theme.colors.primary,
         }}
       />
     </Stack.Navigator>
