@@ -14,13 +14,13 @@ export type BookingMutableStatus = Extract<
 >;
 
 /**
- * Payload de la RPC `request_booking`. La RPC resuelve los stops del ride
- * (stop_order = 1 origen, stop_order = 2 destino) automáticamente, por lo que
- * el cliente solo necesita declarar a qué viaje se une y cuántos asientos.
+ * Reserva con paradas explícitas validadas por el backend.
  */
 export interface RequestBookingPayload {
   ride_id: string;
   seats_reserved?: number;
+  pickup_stop_id: string;
+  dropoff_stop_id: string;
 }
 
 export interface RequestBookingResult {

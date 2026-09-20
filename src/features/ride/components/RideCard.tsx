@@ -112,6 +112,20 @@ export const RideCard: React.FC<RideCardProps> = ({
         </View>
       </View>
 
+      <View
+        style={[
+          styles.matchBlock,
+          { backgroundColor: theme.colors.primarySoft },
+        ]}
+      >
+        <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
+          Sube en {ride.bestPickupStop.name} · {ride.match.pickupDistanceMeters} m
+        </Text>
+        <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
+          Baja en {ride.bestDropoffStop.name} · {ride.match.dropoffDistanceMeters} m
+        </Text>
+      </View>
+
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
           <MaterialIcons
@@ -206,6 +220,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border.default,
     marginLeft: 6,
     marginVertical: 2,
+  },
+  matchBlock: {
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  matchText: {
+    fontSize: typography.size.sm,
+    lineHeight: 18,
   },
   metaRow: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getDirections,
   DirectionsResult,
@@ -30,8 +30,13 @@ export function useDirections(
 ): UseDirectionsResult {
   const { autoFetch = true, departureTime } = options;
   const [directions, setDirections] = useState<DirectionsResult | null>(null);
+  const [resultKey, setResultKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const currentKey = origin && destination
+    ? `${origin.lat},${origin.lng}|${destination.lat},${destination.lng}|${departureTime?.toISOString() ?? ''}`
+    : null;
 
   const fetchDirections = useCallback(async (): Promise<
     DirectionsResult | null
@@ -40,34 +45,51 @@ export function useDirections(
 
     setLoading(true);
     setError(null);
+    const currentRequest = ++requestId.current;
     try {
       const result = await getDirections(origin, destination, {
         departureTime: departureTime ?? undefined,
       });
-      setDirections(result);
+      if (currentRequest === requestId.current) {
+        setDirections(result);
+        setResultKey(currentKey);
+      }
       return result;
     } catch (err: any) {
-      setError(err?.message ?? 'Error al obtener la ruta');
-      setDirections(null);
+      if (currentRequest === requestId.current) {
+        setError(err?.message ?? 'Error al obtener la ruta');
+        setDirections(null);
+        setResultKey(null);
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, departureTime]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentKey, origin?.lat, origin?.lng, destination?.lat, destination?.lng, departureTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!autoFetch) return;
     if (!origin || !destination) {
+      requestId.current += 1;
       setDirections(null);
+      setResultKey(null);
       return;
     }
     fetchDirections();
   }, [autoFetch, origin?.lat, origin?.lng, destination?.lat, destination?.lng, fetchDirections]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
+    requestId.current += 1;
     setDirections(null);
+    setResultKey(null);
     setError(null);
   };
 
-  return { directions, loading, error, fetch: fetchDirections, reset };
+  return {
+    directions: currentKey && resultKey === currentKey ? directions : null,
+    loading,
+    error: currentKey && resultKey === currentKey ? error : null,
+    fetch: fetchDirections,
+    reset,
+  };
 }

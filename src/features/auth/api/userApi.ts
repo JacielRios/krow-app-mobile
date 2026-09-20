@@ -7,6 +7,7 @@ export interface CurrentUserResponse {
   profilePhoto: string | null;
   rating: number | null;
   role: 'conductor' | 'pasajero';
+  canPublishRides: boolean;
   driverProfile: { driverId: string; status: string | null; rating: number | null } | null;
 }
 

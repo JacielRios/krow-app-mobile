@@ -81,6 +81,9 @@ android {
     namespace "com.krownmobileapp"
     defaultConfig {
         applicationId "com.krownmobileapp"
+        // La clave del SDK nativo se inyecta al compilar, fuera de
+        // react-native-config y del bundle JavaScript.
+        resValue "string", "google_maps_android_sdk_key", System.getenv("KROW_ANDROID_MAPS_API_KEY") ?: ""
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { rideApi } from '../api/rideApi';
 import type { AvailableRide } from '../types/rideSearch.types';
 
@@ -7,13 +7,13 @@ export interface UseSearchRidesResult {
   loading: boolean;
   error: string | null;
   /** Lanza una búsqueda nueva. Usa esto desde un onPress, no desde un effect. */
-  search: (options?: SearchOptions) => Promise<AvailableRide[]>;
+  search: (options: SearchOptions) => Promise<AvailableRide[]>;
   reset: () => void;
 }
 
 export interface SearchOptions {
-  origin?: { lat: number; lng: number };
-  destination?: { lat: number; lng: number };
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
   maxDistanceKm?: number;
   maxResults?: number;
   fromTime?: Date | null;
@@ -28,29 +28,35 @@ export function useSearchRides(): UseSearchRidesResult {
   const [rides, setRides] = useState<AvailableRide[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   const search = useCallback(
-    async (options?: SearchOptions): Promise<AvailableRide[]> => {
+    async (options: SearchOptions): Promise<AvailableRide[]> => {
+      const currentRequest = ++requestId.current;
       setLoading(true);
       setError(null);
       try {
         const mapped = await rideApi.search(options);
-        setRides(mapped);
+        if (currentRequest === requestId.current) setRides(mapped);
         return mapped;
       } catch (e: any) {
-        setError(e?.message ?? 'Error inesperado al buscar viajes.');
-        setRides([]);
+        if (currentRequest === requestId.current) {
+          setError(e?.message ?? 'Error inesperado al buscar viajes.');
+          setRides([]);
+        }
         return [];
       } finally {
-        setLoading(false);
+        if (currentRequest === requestId.current) setLoading(false);
       }
     },
     [],
   );
 
   const reset = useCallback(() => {
+    requestId.current += 1;
     setRides([]);
     setError(null);
+    setLoading(false);
   }, []);
 
   return { rides, loading, error, search, reset };

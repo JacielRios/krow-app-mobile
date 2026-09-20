@@ -16,6 +16,7 @@ export interface AvailableRide {
     model: string | null;
     licensePlate: string | null;
     color: string | null;
+    capacity: number;
   } | null;
   origin: {
     lat: number;
@@ -34,6 +35,27 @@ export interface AvailableRide {
   availableSeats: number;
   pricePerSeat: number;
   status: RideStatus;
+  routeDistanceMeters: number | null;
+  routeDurationSeconds: number | null;
+  bestPickupStop: StopOption;
+  bestDropoffStop: StopOption;
+  match: {
+    pickupDistanceMeters: number;
+    dropoffDistanceMeters: number;
+  };
+}
+
+export interface StopOption {
+  stopId: string;
+  name: string;
+  address: string;
+  location: { lat: number; lng: number };
+  distanceMeters: number;
+}
+
+export interface StopPair {
+  pickup: StopOption;
+  dropoff: StopOption;
 }
 
 export interface SearchRidesParams {

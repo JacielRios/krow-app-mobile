@@ -13,12 +13,7 @@ interface UseRequestBookingResult {
 }
 
 /**
- * Hook que invoca la RPC `request_booking`.
- *
- * La RPC resuelve internamente los `stop_id` de pickup y dropoff a partir de
- * los `ride_stops` ya creados al publicar el ride (stop_order = 1 origen,
- * stop_order = 2 destino). Por eso el cliente solo necesita pasar `ride_id` y
- * (opcionalmente) `seats_reserved`.
+ * Hook que solicita una reserva con subida y bajada explícitas.
  *
  * Además, la RPC valida server-side:
  *   - que el ride exista, esté 'scheduled' y no haya partido.
@@ -35,7 +30,12 @@ export function useRequestBooking(): UseRequestBookingResult {
   ): Promise<RequestBookingResult> {
     setLoading(true);
     try {
-      const data = await bookingApi.request(payload.ride_id, payload.seats_reserved ?? 1);
+      const data = await bookingApi.request(
+        payload.ride_id,
+        payload.pickup_stop_id,
+        payload.dropoff_stop_id,
+        payload.seats_reserved ?? 1,
+      );
       return { bookingId: data.bookingId, error: null };
     } catch (error: any) {
       return { bookingId: null, error: error?.message ?? 'No se pudo solicitar el viaje' };

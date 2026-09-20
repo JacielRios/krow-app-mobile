@@ -16,7 +16,11 @@ export interface RoutePreviewMapProps {
     point: LatLng;
     color?: string;
     iconName?: string;
+    selected?: boolean;
+    accessibilityLabel?: string;
+    onPress?: () => void;
   }>;
+  interactive?: boolean;
   style?: ViewStyle;
   height?: number;
 }
@@ -53,6 +57,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
   destination,
   encodedPolyline,
   extraMarkers,
+  interactive = false,
   style,
   height = 220,
 }) => {
@@ -99,7 +104,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         initialRegion={region}
         showsCompass={false}
         toolbarEnabled={false}
-        pointerEvents="none"
+        pointerEvents={interactive ? 'auto' : 'none'}
       >
         {origin && (
           <Marker coordinate={toCoord(origin)} anchor={{ x: 0.5, y: 0.5 }}>
@@ -135,11 +140,17 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
             key={m.id}
             coordinate={toCoord(m.point)}
             anchor={{ x: 0.5, y: 0.5 }}
+            onPress={m.onPress}
+            accessibilityLabel={m.accessibilityLabel}
           >
             <View
               style={[
                 styles.pin,
-                { backgroundColor: m.color ?? colors.status.success },
+                {
+                  backgroundColor: m.color ?? colors.status.success,
+                  borderColor: m.selected ? colors.primary : colors.background,
+                  transform: [{ scale: m.selected ? 1.15 : 1 }],
+                },
               ]}
             >
               <MaterialIcons

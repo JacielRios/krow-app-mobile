@@ -154,6 +154,13 @@ export const HomeScreen = () => {
     if (user.role === 'pasajero') {
       navigation.navigate('RequestRide');
     } else {
+      if (!user.canPublishRides) {
+        Alert.alert(
+          'Perfil pendiente',
+          'Tu perfil de conductor debe estar aprobado antes de publicar viajes.',
+        );
+        return;
+      }
       navigation.navigate('PublishRide');
     }
   };
@@ -299,8 +306,50 @@ export const HomeScreen = () => {
               ? 'Encuentra estudiantes que vayan en tu misma dirección y comparte el viaje.'
               : 'Publica tu viaje y deja que otros estudiantes reserven asientos.'}
           </Text>
-          <Button title={primaryActionTitle} onPress={handlePrimaryAction} />
+          <Button
+            title={
+              !isPassenger && !user.canPublishRides
+                ? 'Aprobación pendiente'
+                : primaryActionTitle
+            }
+            onPress={handlePrimaryAction}
+            disabled={!isPassenger && !user.canPublishRides}
+          />
+          {!isPassenger && !user.canPublishRides && (
+            <Text style={[styles.approvalHint, { color: theme.colors.textSecondary }]}>
+              Administración debe aprobar tu perfil antes de que puedas publicar.
+            </Text>
+          )}
         </Surface>
+
+        {!isPassenger && (
+          <View style={styles.driverTools}>
+            <Button
+              title="Mis viajes"
+              variant="outline"
+              leftIcon={
+                <MaterialIcons
+                  name="commute"
+                  size={20}
+                  color={theme.colors.primary}
+                />
+              }
+              onPress={() => navigation.navigate('DriverTrips')}
+            />
+            <Button
+              title="Rutas frecuentes"
+              variant="outline"
+              leftIcon={
+                <MaterialIcons
+                  name="route"
+                  size={20}
+                  color={theme.colors.primary}
+                />
+              }
+              onPress={() => navigation.navigate('FavoriteRoutes')}
+            />
+          </View>
+        )}
 
         {!isPassenger && pendingCount > 0 && (
           <View style={styles.requestsCard}>
@@ -449,6 +498,17 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 20,
     marginBottom: spacing.md,
+  },
+  approvalHint: {
+    marginTop: spacing.sm,
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  driverTools: {
+    gap: spacing.sm,
+    marginTop: -spacing.md,
+    marginBottom: spacing.xl,
   },
   requestsCard: {
     flexDirection: 'row',

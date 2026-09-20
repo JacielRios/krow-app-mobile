@@ -31,6 +31,8 @@ export interface CurrentUser {
    * `useActiveRide`) no tengan que repetir la query a `driver_profiles`.
    */
   driverId: string | null;
+  driverStatus: string | null;
+  canPublishRides: boolean;
 }
 
 export interface UseCurrentUserRoleResult {
@@ -73,6 +75,8 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
         displayName: deriveDisplayName(profile.email, profile.fullName),
         role,
         driverId: profile.driverProfile?.driverId ?? null,
+        driverStatus: profile.driverProfile?.status ?? null,
+        canPublishRides: profile.canPublishRides,
       });
       setLoading(false);
     };

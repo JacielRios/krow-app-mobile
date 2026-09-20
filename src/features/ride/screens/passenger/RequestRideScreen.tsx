@@ -19,9 +19,10 @@ import { Avatar } from '../../../../shared/components/ui/Avatar';
 import { AnimatedModal, Button, FeedbackState, Skeleton } from '../../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
 import { bookingApi } from '../../api/bookingApi';
+import { rideApi } from '../../api/rideApi';
 import { RideCard } from '../../components/RideCard';
 import { useRequestBooking, useSearchRides } from '../../hooks';
-import type { AvailableRide } from '../../types/rideSearch.types';
+import type { AvailableRide, StopPair } from '../../types/rideSearch.types';
 import { PlacesAutocompleteInput, RoutePreviewMap } from '../../../maps';
 import type { PlacesAutocompleteValue } from '../../../maps';
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
@@ -67,6 +68,7 @@ export const RequestRideScreen: React.FC = () => {
     loading: searchLoading,
     error: searchError,
     search,
+    reset,
   } = useSearchRides();
   const { requestBooking, loading: requesting } = useRequestBooking();
 
@@ -79,6 +81,11 @@ export const RequestRideScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [origin, setOrigin] = useState<PlacesAutocompleteValue | null>(null);
   const [destination, setDestination] = useState<PlacesAutocompleteValue | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [stopPairs, setStopPairs] = useState<StopPair[]>([]);
+  const [selectedPairIndex, setSelectedPairIndex] = useState(0);
+  const [stopOptionsLoading, setStopOptionsLoading] = useState(false);
+  const [stopOptionsError, setStopOptionsError] = useState<string | null>(null);
 
   const loadActiveBookings = useCallback(async () => {
     setBookingsLoading(true);
@@ -98,37 +105,42 @@ export const RequestRideScreen: React.FC = () => {
     }
   }, []);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (forceSearch = false) => {
     try {
+      const searchPromise =
+        origin && destination && (hasSearched || forceSearch)
+          ? search({
+              maxResults: 50,
+              origin: origin.location,
+              destination: destination.location,
+              maxDistanceKm: 0.5,
+            })
+          : Promise.resolve([]);
       await Promise.all([
-        search({
-          maxResults: 50,
-          origin: origin?.location,
-          destination: destination?.location,
-          maxDistanceKm: 8,
-        }),
+        searchPromise,
         loadActiveBookings(),
       ]);
     } catch {
       // Errores ya quedan reflejados en `searchError` y en el estado del hook
       // de bookings; este catch solo evita unhandled rejections.
     }
-  }, [search, loadActiveBookings, origin?.location, destination?.location]);
+  }, [search, loadActiveBookings, origin, destination, hasSearched]);
 
   const handleSearch = () => {
     if (!origin || !destination) {
       Alert.alert('Ruta incompleta', 'Selecciona un origen y un destino para buscar coincidencias.');
       return;
     }
-    loadAll().catch(() => undefined);
+    setHasSearched(true);
+    loadAll(true).catch(() => undefined);
   };
 
-  // Recarga cuando la pantalla recupera el foco (evita stale data al volver
-  // desde otras pantallas o si se canceló una booking).
+  // Al recuperar el foco actualizamos reservas propias. La búsqueda se ejecuta
+  // solo al pulsar el botón o al refrescar, evitando peticiones duplicadas.
   useFocusEffect(
     useCallback(() => {
-      loadAll().catch(() => undefined);
-    }, [loadAll]),
+      loadActiveBookings().catch(() => undefined);
+    }, [loadActiveBookings]),
   );
 
   useEffect(() => {
@@ -144,6 +156,38 @@ export const RequestRideScreen: React.FC = () => {
     }
   }, [rides, selectedRide]);
 
+  useEffect(() => {
+    let active = true;
+    if (!selectedRide || !origin || !destination) {
+      setStopPairs([]);
+      setSelectedPairIndex(0);
+      setStopOptionsError(null);
+      return;
+    }
+    setStopOptionsLoading(true);
+    setStopOptionsError(null);
+    rideApi
+      .stopOptions(selectedRide.rideId, origin.location, destination.location)
+      .then(result => {
+        if (!active) return;
+        setStopPairs(result.pairs);
+        setSelectedPairIndex(0);
+      })
+      .catch(reason => {
+        if (!active) return;
+        setStopPairs([]);
+        setStopOptionsError(
+          reason?.message ?? 'No pudimos obtener las paradas permitidas.',
+        );
+      })
+      .finally(() => {
+        if (active) setStopOptionsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [destination, origin, selectedRide]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -153,13 +197,22 @@ export const RequestRideScreen: React.FC = () => {
     }
   };
 
-  const handleRequest = async (ride: AvailableRide) => {
+  const handleRequest = async (ride: AvailableRide, pair: StopPair | undefined) => {
     if (requestedRideIds.has(ride.rideId)) return;
+    if (!pair) {
+      Alert.alert(
+        'Selecciona tus paradas',
+        'Elige un par válido de subida y bajada antes de solicitar.',
+      );
+      return;
+    }
 
     setRequestingRideId(ride.rideId);
     const { bookingId, error } = await requestBooking({
       ride_id: ride.rideId,
       seats_reserved: 1,
+      pickup_stop_id: pair.pickup.stopId,
+      dropoff_stop_id: pair.dropoff.stopId,
     });
     setRequestingRideId(null);
 
@@ -236,8 +289,27 @@ export const RequestRideScreen: React.FC = () => {
         </View>
 
         <View style={[styles.searchPanel, { backgroundColor: theme.colors.surfaceRaised }]}> 
-          <PlacesAutocompleteInput label="¿Desde dónde sales?" value={origin} onChange={setOrigin} />
-          <PlacesAutocompleteInput label="¿A dónde vas?" value={destination} onChange={setDestination} bias={origin?.location} />
+          <PlacesAutocompleteInput
+            label="¿Desde dónde sales?"
+            value={origin}
+            onChange={value => {
+              setOrigin(value);
+              setSelectedRide(null);
+              setHasSearched(false);
+              reset();
+            }}
+          />
+          <PlacesAutocompleteInput
+            label="¿A dónde vas?"
+            value={destination}
+            onChange={value => {
+              setDestination(value);
+              setSelectedRide(null);
+              setHasSearched(false);
+              reset();
+            }}
+            bias={origin?.location}
+          />
           <Button title="Buscar coincidencias" onPress={handleSearch} loading={searchLoading} />
         </View>
 
@@ -248,8 +320,10 @@ export const RequestRideScreen: React.FC = () => {
           </View>
         ) : searchError ? (
           <FeedbackState kind="error" title="No pudimos cargar los viajes" description={searchError} actionLabel="Reintentar" onAction={loadAll} />
+        ) : !hasSearched ? (
+          <FeedbackState title="Indica tu recorrido" description="KROW buscará viajes con una parada de subida y otra posterior a menos de 500 m." />
         ) : sortedRides.length === 0 ? (
-          <FeedbackState title="No hay viajes disponibles en este momento" description="Vuelve a intentarlo más tarde, o desliza hacia abajo para actualizar." />
+          <FeedbackState title="No encontramos viajes compatibles" description="No hay un viaje con paradas válidas cerca de ambos puntos. Prueba con ubicaciones cercanas." />
         ) : (
           sortedRides.map(ride => (
             <RideCard
@@ -258,7 +332,7 @@ export const RequestRideScreen: React.FC = () => {
               alreadyRequested={requestedRideIds.has(ride.rideId)}
               requesting={requestingRideId === ride.rideId}
               onPress={() => setSelectedRide(ride)}
-              onRequest={() => handleRequest(ride)}
+              onRequest={() => setSelectedRide(ride)}
             />
           ))
         )}
@@ -274,8 +348,16 @@ export const RequestRideScreen: React.FC = () => {
             ? true
             : requesting
         }
+        stopPairs={stopPairs}
+        selectedPairIndex={selectedPairIndex}
+        onSelectPair={setSelectedPairIndex}
+        stopOptionsLoading={stopOptionsLoading}
+        stopOptionsError={stopOptionsError}
         onClose={() => setSelectedRide(null)}
-        onRequest={() => selectedRide && handleRequest(selectedRide)}
+        onRequest={() =>
+          selectedRide &&
+          handleRequest(selectedRide, stopPairs[selectedPairIndex])
+        }
       />
     </View>
   );
@@ -285,9 +367,25 @@ const RideDetailModal: React.FC<{
   ride: AvailableRide | null;
   alreadyRequested: boolean;
   requesting: boolean;
+  stopPairs: StopPair[];
+  selectedPairIndex: number;
+  onSelectPair: (index: number) => void;
+  stopOptionsLoading: boolean;
+  stopOptionsError: string | null;
   onClose: () => void;
   onRequest: () => void;
-}> = ({ ride, alreadyRequested, requesting, onClose, onRequest }) => {
+}> = ({
+  ride,
+  alreadyRequested,
+  requesting,
+  stopPairs,
+  selectedPairIndex,
+  onSelectPair,
+  stopOptionsLoading,
+  stopOptionsError,
+  onClose,
+  onRequest,
+}) => {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
@@ -332,6 +430,24 @@ const RideDetailModal: React.FC<{
                   destination={ride.destination}
                   encodedPolyline={ride.routePolyline}
                   height={200}
+                  extraMarkers={
+                    stopPairs[selectedPairIndex]
+                      ? [
+                          {
+                            id: 'pickup',
+                            point: stopPairs[selectedPairIndex].pickup.location,
+                            color: theme.colors.status.success,
+                            iconName: 'login',
+                          },
+                          {
+                            id: 'dropoff',
+                            point: stopPairs[selectedPairIndex].dropoff.location,
+                            color: theme.colors.status.error,
+                            iconName: 'logout',
+                          },
+                        ]
+                      : undefined
+                  }
                 />
               </View>
 
@@ -391,6 +507,67 @@ const RideDetailModal: React.FC<{
                 )}
               </View>
 
+              <Text style={[styles.stopOptionsTitle, { color: theme.colors.textPrimary }]}>
+                Elige dónde subir y bajar
+              </Text>
+              <Text style={[styles.stopOptionsHint, { color: theme.colors.textSecondary }]}>
+                Solo se muestran pares del catálogo KROW, ordenados sobre la ruta.
+              </Text>
+              {stopOptionsLoading ? (
+                <Skeleton height={84} style={styles.stopOptionSkeleton} />
+              ) : stopOptionsError ? (
+                <FeedbackState
+                  kind="error"
+                  title="No pudimos cargar las paradas"
+                  description={stopOptionsError}
+                />
+              ) : stopPairs.length === 0 ? (
+                <FeedbackState
+                  title="No hay un par válido"
+                  description="Este viaje ya no tiene paradas compatibles con tu búsqueda."
+                />
+              ) : (
+                stopPairs.map((pair, index) => {
+                  const selected = index === selectedPairIndex;
+                  return (
+                    <TouchableOpacity
+                      key={`${pair.pickup.stopId}-${pair.dropoff.stopId}`}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      onPress={() => onSelectPair(index)}
+                      style={[
+                        styles.stopOption,
+                        {
+                          borderColor: selected
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                          backgroundColor: selected
+                            ? theme.colors.primarySoft
+                            : theme.colors.surfaceRaised,
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={selected ? 'radio-button-checked' : 'radio-button-unchecked'}
+                        size={22}
+                        color={selected ? theme.colors.primary : theme.colors.textMuted}
+                      />
+                      <View style={styles.stopOptionCopy}>
+                        <Text style={[styles.stopOptionName, { color: theme.colors.textPrimary }]}>
+                          Subida: {pair.pickup.name}
+                        </Text>
+                        <Text style={[styles.stopOptionName, { color: theme.colors.textPrimary }]}>
+                          Bajada: {pair.dropoff.name}
+                        </Text>
+                        <Text style={[styles.stopOptionDistance, { color: theme.colors.textSecondary }]}>
+                          A {pair.pickup.distanceMeters} m del origen · {pair.dropoff.distanceMeters} m del destino
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
               <Button
                 title={
                   alreadyRequested
@@ -400,7 +577,12 @@ const RideDetailModal: React.FC<{
                     : 'Solicitar unirse'
                 }
                 onPress={onRequest}
-                disabled={alreadyRequested || requesting}
+                disabled={
+                  alreadyRequested ||
+                  requesting ||
+                  stopOptionsLoading ||
+                  stopPairs.length === 0
+                }
                 loading={requesting}
                 variant={alreadyRequested ? 'ghost' : 'primary'}
                 style={styles.modalCta}
@@ -593,5 +775,40 @@ const styles = StyleSheet.create({
   },
   modalCta: {
     marginTop: spacing.sm,
+  },
+  stopOptionsTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+  },
+  stopOptionsHint: {
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  stopOptionSkeleton: {
+    marginBottom: spacing.md,
+  },
+  stopOption: {
+    minHeight: 84,
+    borderWidth: 1.5,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  stopOptionCopy: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  stopOptionName: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    marginBottom: 2,
+  },
+  stopOptionDistance: {
+    fontSize: typography.size.sm,
+    marginTop: spacing.xs,
   },
 });

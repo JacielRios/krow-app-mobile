@@ -19,3 +19,6 @@ export type {
   ConductorInfo,
   VehicleInfo,
 } from './useRideScheduled';
+export { useFavoriteRoutes } from './useFavoriteRoutes';
+export { useDriverTrips } from './useDriverTrips';
+export { useRideDetail } from './useRideDetail';

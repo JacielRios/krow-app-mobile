@@ -2,6 +2,11 @@ export type {
   RideStatus,
   PublishRidePayload,
   DriverVehicle,
+  DriverRideListItem,
+  FavoriteRoute,
+  RideDetail,
+  RideStop,
+  RouteEndpoint,
   PublishRideResult,
 } from './ride.types';
 
@@ -18,4 +23,6 @@ export type {
 export type {
   AvailableRide,
   SearchRidesParams,
+  StopOption,
+  StopPair,
 } from './rideSearch.types';

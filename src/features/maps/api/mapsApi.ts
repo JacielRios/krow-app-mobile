@@ -9,6 +9,17 @@ export interface DirectionsResult {
   distanceMeters: number;
   durationSeconds: number;
   bounds: { northeast: LatLng; southwest: LatLng };
+  compatibleStops: TransportStop[];
+}
+export interface TransportStop {
+  stopId: string;
+  externalId: string;
+  name: string;
+  address: string | null;
+  municipality: string | null;
+  location: LatLng;
+  distanceFromRouteMeters: number;
+  routeFraction: number;
 }
 
 export async function searchPlaces(
@@ -38,7 +49,7 @@ export function getDirections(
   destination: LatLng,
   options: { departureTime?: Date; mode?: 'driving' | 'walking' | 'bicycling' | 'transit'; language?: string } = {},
 ): Promise<DirectionsResult | null> {
-  return apiRequest('/maps/route-preview', {
+  return apiRequest('/routes/preview', {
     method: 'POST',
     body: JSON.stringify({ origin, destination, departureTime: options.departureTime?.toISOString() }),
   });

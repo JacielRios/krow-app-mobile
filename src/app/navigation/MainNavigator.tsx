@@ -8,6 +8,8 @@ import {
   RequestRideScreen,
   DriverActiveRideScreen,
   DriverFinishedRideScreen,
+  DriverTripsScreen,
+  FavoriteRoutesScreen,
   PublishRideScreen,
   RideScheduledScreen,
 } from '../../features/ride';
@@ -20,7 +22,15 @@ export type MainStackParamList = {
   PassengerActiveRide: { rideId: string };
   PassengerFinishedRide: { rideId: string };
   // Driver
-  PublishRide: undefined;
+  PublishRide:
+    | {
+        favoriteRouteId?: string;
+        editRideId?: string;
+        favoriteOnly?: boolean;
+      }
+    | undefined;
+  FavoriteRoutes: undefined;
+  DriverTrips: undefined;
   // Shared (driver + passenger)
   RideScheduled: { rideId: string };
   DriverActiveRide: { rideId: string };
@@ -49,6 +59,8 @@ export default function MainNavigator() {
 
       {/* Driver Flow */}
       <Stack.Screen name="PublishRide" component={PublishRideScreen} />
+      <Stack.Screen name="FavoriteRoutes" component={FavoriteRoutesScreen} />
+      <Stack.Screen name="DriverTrips" component={DriverTripsScreen} />
       <Stack.Screen name="RideScheduled" component={RideScheduledScreen} />
       <Stack.Screen name="DriverActiveRide" component={DriverActiveRideScreen} />
       <Stack.Screen name="DriverFinishedRide" component={DriverFinishedRideScreen} options={{ animation: 'fade' }} />

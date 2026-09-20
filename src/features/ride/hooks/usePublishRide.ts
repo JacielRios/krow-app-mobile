@@ -8,10 +8,9 @@ interface UsePublishRideResult {
 }
 
 /**
- * Publica un ride invocando la RPC `create_ride`. La RPC inserta atómicamente:
- *   - una fila en `rides` con status='scheduled' (default).
- *   - dos filas en `ride_stops`: origen (stop_order=1) y destino (stop_order=2).
- *   - una fila en `ride_status_history` con status='scheduled'.
+ * Publica un viaje mediante KROW API. El backend recalcula la ruta y la RPC
+ * `create_ride_v2` inserta atómicamente el viaje, sus paradas de catálogo y el
+ * primer registro de historial.
  *
  * La pantalla decide qué hacer con el resultado (navegar, mostrar error, etc.).
  */
