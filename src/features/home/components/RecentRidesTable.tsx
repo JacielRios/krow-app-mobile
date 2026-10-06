@@ -1,3 +1,4 @@
+import { depth, glass } from '../../../shared/theme/materials';
 import React from 'react';
 import {
   FlatList,
@@ -58,7 +59,7 @@ const RideRow: React.FC<{
     <Animated.View
       entering={motionEnabled && index < 8 ? FadeInDown.duration(200).delay(index * 35) : undefined}
       layout={motionEnabled ? LinearTransition.duration(200) : undefined}
-      style={[styles.row, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}
+      style={[styles.row, glass(theme), depth(theme, 1), { borderRadius: 24 }]}
     >
       <View style={styles.rowHeader}>
         <Text style={[styles.rowDate, { color: theme.colors.textPrimary }]}>{formatDate(ride.departureTime)}</Text>

@@ -1,3 +1,5 @@
+import { AmbientBackground } from '../../../shared/components/ui-v2';
+import { depth, glass } from '../../../shared/theme/materials';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -123,6 +125,9 @@ export default function LoginScreen({ navigation }: any) {
       } else {
         await setSessionLoginMode('pasajero');
       }
+    } catch (reason: unknown) {
+      if (isConductor) setConductorLoginGateBlocking(false);
+      showAlert('No pudimos iniciar sesión', reason instanceof Error ? reason.message : 'Revisa tu conexión y vuelve a intentar.', 'error');
     } finally {
       setLoading(false);
     }
@@ -130,6 +135,7 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <AmbientBackground />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -142,11 +148,11 @@ export default function LoginScreen({ navigation }: any) {
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Bienvenido a Krow</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Muévete con KROW</Text>
           </View>
 
           <View style={styles.content}>
-            <View style={[styles.typeSelectorContainer, { backgroundColor: theme.colors.surfaceOverlay }]}>
+            <View style={[styles.typeSelectorContainer, { backgroundColor: theme.colors.surfaceOverlay }, depth(theme, 1)]}>
               <Animated.View
                 style={[
                   styles.activeSliderIndicator,
@@ -170,7 +176,7 @@ export default function LoginScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.formContainer}>
+            <View style={[styles.formContainer, glass(theme), depth(theme, 2), { borderRadius: 28, padding: 20 }]}>
               <Input
                 placeholder="Correo Institucional"
                 value={email}
@@ -239,7 +245,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    height: 250,
+    minHeight: 210,
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomLeftRadius: 30,
@@ -247,8 +253,8 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   logoImage: {
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
   },
   content: {
     flex: 1,

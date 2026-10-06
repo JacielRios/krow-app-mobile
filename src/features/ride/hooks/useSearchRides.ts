@@ -15,6 +15,8 @@ export interface SearchOptions {
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   maxDistanceKm?: number;
+  pickupTransportStopId?: string;
+  dropoffTransportStopId?: string;
   maxResults?: number;
   fromTime?: Date | null;
   toTime?: Date | null;

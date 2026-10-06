@@ -1,3 +1,4 @@
+import { AmbientBackground } from '../../../../shared/components/ui-v2';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -61,6 +62,7 @@ export const DriverTripsScreen: React.FC = () => {
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
+      <AmbientBackground />
       <ScrollView
         contentContainerStyle={[
           styles.container,

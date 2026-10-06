@@ -1,3 +1,4 @@
+import { AmbientBackground } from '../../../../shared/components/ui-v2';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -42,6 +43,7 @@ export const FavoriteRoutesScreen: React.FC = () => {
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
+      <AmbientBackground />
       <ScrollView
         contentContainerStyle={[
           styles.container,

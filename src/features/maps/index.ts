@@ -1,5 +1,6 @@
 export {
   PlacesAutocompleteInput,
+  PlacePicker,
   RoutePreviewMap,
 } from './components';
 export type {

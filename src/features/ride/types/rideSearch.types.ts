@@ -58,6 +58,34 @@ export interface StopPair {
   dropoff: StopOption;
 }
 
+export type PassengerStopRole = 'pickup' | 'dropoff';
+export type TransportStopType = 'general' | 'official_boarding_zone';
+
+export interface PassengerStopCandidate {
+  role: PassengerStopRole;
+  stopId: string;
+  externalId: string;
+  name: string;
+  address: string | null;
+  municipality: string | null;
+  stopType: TransportStopType;
+  location: { lat: number; lng: number };
+  distanceMeters: number;
+  enabled: boolean;
+  rideCount: number;
+}
+
+export interface PassengerStopCandidates {
+  radiusMeters: number;
+  pickupStops: PassengerStopCandidate[];
+  dropoffStops: PassengerStopCandidate[];
+  pairs: Array<{
+    pickupStopId: string;
+    dropoffStopId: string;
+    rideCount: number;
+  }>;
+}
+
 export interface SearchRidesParams {
   myOrigin: { lat: number; lng: number };
   myDestination: { lat: number; lng: number };

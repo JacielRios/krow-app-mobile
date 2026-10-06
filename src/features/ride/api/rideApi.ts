@@ -1,5 +1,8 @@
 import { apiRequest } from '../../../core/api/apiClient';
-import type { AvailableRide } from '../types/rideSearch.types';
+import type {
+  AvailableRide,
+  PassengerStopCandidates,
+} from '../types/rideSearch.types';
 import type {
   DriverRideListItem,
   PublishRidePayload,
@@ -114,6 +117,8 @@ export const rideApi = {
     destination: { lat: number; lng: number };
     maxResults?: number;
     maxDistanceKm?: number;
+    pickupTransportStopId?: string;
+    dropoffTransportStopId?: string;
     fromTime?: Date | null;
     toTime?: Date | null;
   }): Promise<AvailableRide[]> {
@@ -123,13 +128,23 @@ export const rideApi = {
         origin: options.origin,
         destination: options.destination,
         maxResults: options.maxResults,
-        maxDistanceMeters: 500,
+        maxDistanceMeters: 1000,
+        pickupTransportStopId: options.pickupTransportStopId,
+        dropoffTransportStopId: options.dropoffTransportStopId,
         fromTime: options.fromTime?.toISOString(),
         toTime: options.toTime?.toISOString(),
       }),
     });
     return data.map(fromApi);
   },
+  stopCandidates: (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+  ) =>
+    apiRequest<PassengerStopCandidates>('/rides/stops/candidates', {
+      method: 'POST',
+      body: JSON.stringify({ origin, destination, maxDistanceMeters: 1000 }),
+    }),
   recent: (limit = 5) =>
     apiRequest<RecentRideApiView[]>(`/rides/mine/recent?limit=${limit}`),
   active: () => apiRequest<ActiveRideApiView | null>('/rides/mine/active'),
@@ -166,7 +181,7 @@ export const rideApi = {
   ) =>
     apiRequest<{ pairs: StopPair[] }>(`/rides/${rideId}/stop-options`, {
       method: 'POST',
-      body: JSON.stringify({ origin, destination, maxDistanceMeters: 500 }),
+      body: JSON.stringify({ origin, destination, maxDistanceMeters: 1000 }),
     }),
   scheduledView: (rideId: string) =>
     apiRequest<ScheduledRideApiView>(`/rides/${rideId}/scheduled-view`),

@@ -1,9 +1,21 @@
 /** Adaptador móvil de KROW Maps API; no llama directamente a Google REST. */
 import { apiQuery, apiRequest } from '../../../core/api/apiClient';
 
-export interface LatLng { lat: number; lng: number }
-export interface PlaceSuggestion { placeId: string; description: string; mainText: string; secondaryText: string }
-export interface PlaceDetail { placeId: string; formattedAddress: string; location: LatLng }
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+export interface PlaceSuggestion {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+}
+export interface PlaceDetail {
+  placeId: string;
+  formattedAddress: string;
+  location: LatLng;
+}
 export interface DirectionsResult {
   encodedPolyline: string;
   distanceMeters: number;
@@ -24,39 +36,110 @@ export interface TransportStop {
 
 export async function searchPlaces(
   query: string,
-  options: { sessionToken?: string; language?: string; components?: string; location?: LatLng; radiusMeters?: number } = {},
+  options: {
+    sessionToken?: string;
+    language?: string;
+    components?: string;
+    location?: LatLng;
+    radiusMeters?: number;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<PlaceSuggestion[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const params = apiQuery({ query: trimmed, sessionToken: options.sessionToken });
-  return apiRequest(`/maps/places/autocomplete?${params}`);
+  const params = apiQuery({
+    query: trimmed,
+    sessionToken: options.sessionToken,
+  });
+  const results = await apiRequest<PlaceSuggestion[]>(
+    `/maps/places/autocomplete?${params}`,
+    {
+      signal: options.signal,
+    },
+  );
+  if (
+    !Array.isArray(results) ||
+    results.some(
+      place =>
+        !place ||
+        typeof place.placeId !== 'string' ||
+        !place.placeId ||
+        typeof place.description !== 'string' ||
+        typeof place.mainText !== 'string' ||
+        typeof place.secondaryText !== 'string',
+    )
+  ) {
+    throw new Error(
+      'No pudimos leer las direcciones. Intenta buscar de nuevo.',
+    );
+  }
+  return results;
 }
 
 export async function getPlaceDetails(
   placeId: string,
-  options: { sessionToken?: string; language?: string } = {},
+  options: {
+    sessionToken?: string;
+    language?: string;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<PlaceDetail> {
   const query = apiQuery({ sessionToken: options.sessionToken });
-  return apiRequest(`/maps/places/${encodeURIComponent(placeId)}${query ? `?${query}` : ''}`);
+  const result = await apiRequest<PlaceDetail>(
+    `/maps/places/${encodeURIComponent(placeId)}${query ? `?${query}` : ''}`,
+    { signal: options.signal },
+  );
+  if (!result?.placeId || !isValidPoint(result.location)) {
+    throw new Error(
+      'No pudimos obtener la ubicación de este lugar. Prueba otra dirección.',
+    );
+  }
+  return result;
 }
 
-export function reverseGeocode(point: LatLng): Promise<{ formattedAddress: string; placeId: string | null } | null> {
-  return apiRequest('/maps/reverse-geocode', { method: 'POST', body: JSON.stringify({ point }) });
+export const isValidPoint = (
+  point: LatLng | null | undefined,
+): point is LatLng =>
+  !!point &&
+  Number.isFinite(point.lat) &&
+  Number.isFinite(point.lng) &&
+  Math.abs(point.lat) <= 90 &&
+  Math.abs(point.lng) <= 180;
+
+export function reverseGeocode(
+  point: LatLng,
+  options: { signal?: AbortSignal } = {},
+): Promise<{ formattedAddress: string; placeId: string | null } | null> {
+  return apiRequest('/maps/reverse-geocode', {
+    method: 'POST',
+    body: JSON.stringify({ point }),
+    signal: options.signal,
+  });
 }
 
 export function getDirections(
   origin: LatLng,
   destination: LatLng,
-  options: { departureTime?: Date; mode?: 'driving' | 'walking' | 'bicycling' | 'transit'; language?: string } = {},
+  options: {
+    departureTime?: Date;
+    mode?: 'driving' | 'walking' | 'bicycling' | 'transit';
+    language?: string;
+  } = {},
 ): Promise<DirectionsResult | null> {
   return apiRequest('/routes/preview', {
     method: 'POST',
-    body: JSON.stringify({ origin, destination, departureTime: options.departureTime?.toISOString() }),
+    body: JSON.stringify({
+      origin,
+      destination,
+      departureTime: options.departureTime?.toISOString(),
+    }),
   });
 }
 
 /* eslint-disable no-bitwise */
-export function decodePolyline(encoded: string): Array<{ latitude: number; longitude: number }> {
+export function decodePolyline(
+  encoded: string,
+): Array<{ latitude: number; longitude: number }> {
   const points: Array<{ latitude: number; longitude: number }> = [];
   let index = 0;
   let lat = 0;

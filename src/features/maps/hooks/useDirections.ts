@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  getDirections,
-  DirectionsResult,
-  LatLng,
-} from '../api/mapsApi';
+import { getDirections, DirectionsResult, LatLng } from '../api/mapsApi';
 
 interface UseDirectionsOptions {
   /** Si true, recalcula automáticamente cuando origin/destination cambian. */
@@ -34,55 +30,84 @@ export function useDirections(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
-  const currentKey = origin && destination
-    ? `${origin.lat},${origin.lng}|${destination.lat},${destination.lng}|${departureTime?.toISOString() ?? ''}`
-    : null;
+  const originLat = origin?.lat;
+  const originLng = origin?.lng;
+  const destinationLat = destination?.lat;
+  const destinationLng = destination?.lng;
+  const currentKey =
+    origin && destination
+      ? `${origin.lat},${origin.lng}|${destination.lat},${destination.lng}|${
+          departureTime?.toISOString() ?? ''
+        }`
+      : null;
 
-  const fetchDirections = useCallback(async (): Promise<
-    DirectionsResult | null
-  > => {
-    if (!origin || !destination) return null;
+  const fetchDirections =
+    useCallback(async (): Promise<DirectionsResult | null> => {
+      if (
+        originLat == null ||
+        originLng == null ||
+        destinationLat == null ||
+        destinationLng == null
+      )
+        return null;
 
-    setLoading(true);
-    setError(null);
-    const currentRequest = ++requestId.current;
-    try {
-      const result = await getDirections(origin, destination, {
-        departureTime: departureTime ?? undefined,
-      });
-      if (currentRequest === requestId.current) {
-        setDirections(result);
-        setResultKey(currentKey);
+      setLoading(true);
+      setError(null);
+      const currentRequest = ++requestId.current;
+      try {
+        const result = await getDirections(
+          { lat: originLat, lng: originLng },
+          { lat: destinationLat, lng: destinationLng },
+          {
+            departureTime: departureTime ?? undefined,
+          },
+        );
+        if (currentRequest === requestId.current) {
+          setDirections(result);
+          setResultKey(currentKey);
+        }
+        return result;
+      } catch (err: any) {
+        if (currentRequest === requestId.current) {
+          setError(err?.message ?? 'Error al obtener la ruta');
+          setDirections(null);
+          setResultKey(currentKey);
+        }
+        return null;
+      } finally {
+        if (currentRequest === requestId.current) setLoading(false);
       }
-      return result;
-    } catch (err: any) {
-      if (currentRequest === requestId.current) {
-        setError(err?.message ?? 'Error al obtener la ruta');
-        setDirections(null);
-        setResultKey(null);
-      }
-      return null;
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
-  }, [currentKey, origin?.lat, origin?.lng, destination?.lat, destination?.lng, departureTime]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [
+      currentKey,
+      originLat,
+      originLng,
+      destinationLat,
+      destinationLng,
+      departureTime,
+    ]);
 
   useEffect(() => {
     if (!autoFetch) return;
-    if (!origin || !destination) {
+    if (!currentKey) {
       requestId.current += 1;
       setDirections(null);
       setResultKey(null);
+      setLoading(false);
+      setError(null);
       return;
     }
     fetchDirections();
-  }, [autoFetch, origin?.lat, origin?.lng, destination?.lat, destination?.lng, fetchDirections]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      requestId.current += 1;
+    };
+  }, [autoFetch, currentKey, fetchDirections]);
 
   const reset = () => {
     requestId.current += 1;
     setDirections(null);
     setResultKey(null);
     setError(null);
+    setLoading(false);
   };
 
   return {

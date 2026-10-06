@@ -84,6 +84,25 @@ La app usa Supabase directamente solo para mantener la sesión y para las
 suscripciones Realtime que aún están en migración. Las mutaciones de viajes y
 reservas, el matching y las APIs REST de Google Maps pasan por KROW API.
 
+## Mapas y ubicación nativa
+
+La integración de viajes v2 añade navegación Mapbox nativa. Consulta
+[implementación y validaciones locales](docs/native-runtime-validation.md) para
+las capacidades, requisitos offline y comprobaciones pendientes de iOS.
+
+El pasajero solicita ubicación mientras usa la app y puede escribir el origen
+si rechaza el permiso. Android recibe `KROW_ANDROID_MAPS_API_KEY` durante la
+compilación desde el entorno o desde `android/local.properties` (archivo local
+ignorado por Git). La clave debe tener habilitado Maps SDK for Android y permitir
+el paquete `com.krownmobileapp` con el SHA-1 del certificado usado para firmar.
+Después de cambiarla hay que recompilar e instalar Android; reiniciar Metro no basta.
+Solo la variante debug admite la antigua `GOOGLE_MAPS_API_KEY` del `.env` móvil
+cuando no hay clave nativa explícita. Release exige la clave Android propia y falla
+si no está configurada. No distribuir la clave REST del backend como clave nativa.
+Para iOS, instala los pods y pasa
+`KROW_IOS_MAPS_API_KEY=<clave restringida al bundle>` a `xcodebuild` o defínela
+como build setting del esquema; ambos sistemas renderizan Google Maps.
+
 ---
 
 # 🤝 Contribución

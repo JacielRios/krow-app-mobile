@@ -1,18 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Animated,
   Pressable,
   PressableProps,
   StyleProp,
   View,
   ViewStyle,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { createShadow, ElevationLevel } from '../../theme/elevation';
+import { ElevationLevel } from '../../theme/elevation';
+import { depth } from '../../theme/materials';
 import { useTheme } from '../../theme/ThemeProvider';
 
 const AnimatedPressableBase = Animated.createAnimatedComponent(Pressable);
@@ -42,50 +38,72 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   accessibilityRole = 'button',
   ...props
 }) => {
-  const pressed = useSharedValue(0);
+  const pressed = useRef(new Animated.Value(0)).current;
   const { theme, motionEnabled } = useTheme();
   const resolvedRadius = radius ?? theme.radii.lg;
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const animate = motionEnabled && feedback !== 'none';
-    return {
-      opacity:
-        animate && feedback === 'opacity'
-          ? withTiming(pressed.value ? 0.82 : 1, {
-              duration: theme.motion.duration.fast,
-            })
-          : 1,
-      transform: [
-        {
-          scale:
-            animate && feedback === 'scale'
-              ? withSpring(
-                  pressed.value ? pressedScale : 1,
-                  theme.motion.spring.press,
-                )
-              : 1,
-        },
-      ],
-    };
-  });
+  useEffect(() => {
+    pressed.stopAnimation();
+    pressed.setValue(0);
+    return () => pressed.stopAnimation();
+  }, [pressed, motionEnabled, feedback]);
+  const animatePress = (value: number) => {
+    pressed.stopAnimation();
+    if (!motionEnabled || feedback === 'none') {
+      pressed.setValue(0);
+      return;
+    }
+    Animated.spring(pressed, {
+      toValue: value,
+      ...theme.motion.spring.press,
+      useNativeDriver: true,
+      isInteraction: false,
+    }).start();
+  };
+  const animatedStyle = {
+    opacity:
+      feedback === 'opacity'
+        ? pressed.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0.82],
+            extrapolate: 'clamp',
+          })
+        : 1,
+    transform: [
+      {
+        scale:
+          feedback === 'scale'
+            ? pressed.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, pressedScale],
+                extrapolate: 'clamp',
+              })
+            : 1,
+      },
+    ],
+  };
 
   return (
     <AnimatedPressableBase
       {...props}
+      collapsable={false}
       disabled={disabled}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ disabled: Boolean(disabled) }}
+      accessibilityState={{
+        ...props.accessibilityState,
+        disabled: Boolean(disabled),
+      }}
       onPressIn={event => {
-        pressed.value = 1;
+        animatePress(1);
         onPressIn?.(event);
       }}
       onPressOut={event => {
-        pressed.value = 0;
+        animatePress(0);
         onPressOut?.(event);
       }}
       style={[
         { borderRadius: resolvedRadius },
-        createShadow(elevation, theme.colors.shadow),
+        depth(theme, elevation),
         animatedStyle,
         style,
       ]}

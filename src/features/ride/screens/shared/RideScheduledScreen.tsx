@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import Config from 'react-native-config';
+import { runtimeApi } from '../../../ride-runtime/runtimeApi';
+import { nativeNavigation } from '../../../ride-runtime/nativeNavigation';
 import {
   ActivityIndicator,
   Alert,
@@ -141,6 +144,12 @@ export const RideScheduledScreen: React.FC = () => {
 
         {data?.ride && data.role === 'conductor' && (
           <RideMetaCard ride={data.ride} />
+        )}
+        {Config.KROW_RUNTIME_ENABLED === 'true' && nativeNavigation.available && data?.role === 'conductor' && (
+          <Button title="Preparar navegación del viaje" onPress={() => {
+            void runtimeApi.enroll(rideId).then(() => navigation.replace('RuntimeRide', { rideId }))
+              .catch(cause => Alert.alert('No se pudo preparar', cause instanceof Error ? cause.message : 'Intenta de nuevo'));
+          }} />
         )}
 
         {showInitialLoader ? (

@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  TouchableWithoutFeedback,
   ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../shared/theme/colors';
+import { AnimatedPressable } from '../../../shared/components/ui-v2';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { glass } from '../../../shared/theme/materials';
 import type { DriverVehicle } from '../types';
 
 interface VehiclePickerProps {
@@ -21,205 +20,101 @@ interface VehiclePickerProps {
   loading?: boolean;
   error?: string;
 }
-
-function vehicleLabel(v: DriverVehicle): string {
-  return `${v.brand} ${v.model} ${v.car_year} · ${v.license_plate}`;
-}
-
-export const VehiclePicker: React.FC<VehiclePickerProps> = ({
-  label,
+export const VehiclePicker = ({
+  label = 'Tu vehículo',
   vehicles,
   selectedId,
   onSelect,
-  loading = false,
+  loading,
   error,
-}) => {
-  const [visible, setVisible] = useState(false);
-
-  const selected = vehicles.find(v => v.vehicle_id === selectedId);
-  const displayValue = selected ? vehicleLabel(selected) : null;
-
+}: VehiclePickerProps) => {
+  const { theme } = useTheme();
   return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-
-      <TouchableOpacity
-        style={[styles.inputContainer, error ? styles.inputError : null]}
-        onPress={() => !loading && setVisible(true)}
-        activeOpacity={0.8}
-        accessibilityLabel={label ?? 'Seleccionar vehículo'}
-      >
-        <MaterialIcons
-          name="directions-car"
-          size={20}
-          color={colors.text.muted}
-          style={styles.icon}
-        />
-        {loading ? (
-          <ActivityIndicator size="small" color={colors.primary} style={styles.flex} />
-        ) : (
-          <Text
-            style={[styles.valueText, !displayValue && styles.placeholder]}
-            numberOfLines={1}
-          >
-            {displayValue ?? 'Selecciona tu vehículo'}
-          </Text>
-        )}
-        <MaterialIcons
-          name="keyboard-arrow-down"
-          size={20}
-          color={colors.text.muted}
-        />
-      </TouchableOpacity>
-
-      {error && <Text style={styles.errorText}>{error}</Text>}
-
-      <Modal visible={visible} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View style={styles.overlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.sheet}>
-                <Text style={styles.sheetTitle}>Selecciona tu vehículo</Text>
-                {vehicles.length === 0 ? (
-                  <Text style={styles.emptyText}>No tienes vehículos activos registrados.</Text>
-                ) : (
-                  <FlatList
-                    data={vehicles}
-                    keyExtractor={item => item.vehicle_id}
-                    renderItem={({ item }) => {
-                      const isSelected = item.vehicle_id === selectedId;
-                      return (
-                        <TouchableOpacity
-                          style={[
-                            styles.optionItem,
-                            isSelected && styles.optionItemSelected,
-                          ]}
-                          onPress={() => {
-                            onSelect(item.vehicle_id);
-                            setVisible(false);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.optionText,
-                              isSelected && styles.optionTextSelected,
-                            ]}
-                          >
-                            {vehicleLabel(item)}
-                          </Text>
-                          {isSelected && (
-                            <MaterialIcons
-                              name="check"
-                              size={18}
-                              color={colors.primary}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    }}
+    <View style={styles.wrap}>
+      <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+        {label}
+      </Text>
+      {loading ? (
+        <ActivityIndicator color={theme.colors.primary} />
+      ) : vehicles.length === 0 ? (
+        <Text style={{ color: theme.colors.textSecondary }}>
+          No tienes vehículos activos registrados.
+        </Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
+          {vehicles.map(vehicle => {
+            const selected = vehicle.vehicle_id === selectedId;
+            return (
+              <AnimatedPressable
+                key={vehicle.vehicle_id}
+                elevation={selected ? 2 : 1}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${vehicle.brand} ${vehicle.model}, ${vehicle.license_plate}`}
+                onPress={() => onSelect(vehicle.vehicle_id)}
+                contentStyle={[
+                  styles.card,
+                  glass(theme),
+                  selected && {
+                    borderColor: theme.colors.primary,
+                    backgroundColor: theme.colors.primarySoft,
+                  },
+                ]}
+              >
+                <View style={styles.top}>
+                  <MaterialIcons
+                    name="directions-car"
+                    size={40}
+                    color={theme.colors.primary}
                   />
-                )}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+                  <MaterialIcons
+                    name={selected ? 'check-circle' : 'radio-button-unchecked'}
+                    size={22}
+                    color={
+                      selected ? theme.colors.primary : theme.colors.textMuted
+                    }
+                  />
+                </View>
+                <Text
+                  style={[styles.name, { color: theme.colors.textPrimary }]}
+                >
+                  {vehicle.brand} {vehicle.model}
+                </Text>
+                <Text style={{ color: theme.colors.textSecondary }}>
+                  {vehicle.car_year} · {vehicle.license_plate}
+                </Text>
+                <Text style={{ color: theme.colors.primary }}>
+                  {Math.max(0, vehicle.capacity - 1)} lugares para compartir
+                </Text>
+              </AnimatedPressable>
+            );
+          })}
+        </ScrollView>
+      )}
+      {error && (
+        <Text
+          accessibilityRole="alert"
+          style={{ color: theme.colors.status.error }}
+        >
+          {error}
+        </Text>
+      )}
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  label: {
-    color: colors.text.secondary,
-    marginBottom: 6,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  inputContainer: {
+  wrap: { marginBottom: 20 },
+  label: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  rail: { padding: 8, gap: 14 },
+  card: { width: 230, minHeight: 160, padding: 18, gap: 8 },
+  top: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border.default,
-    borderRadius: 8,
-    backgroundColor: colors.background,
-    minHeight: 50,
-    paddingHorizontal: 12,
-  },
-  inputError: {
-    borderColor: colors.status.error,
-  },
-  icon: {
-    marginRight: 8,
-  },
-  flex: {
-    flex: 1,
-  },
-  valueText: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  placeholder: {
-    color: colors.text.placeholder,
-  },
-  errorText: {
-    color: colors.status.error,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sheet: {
-    width: '85%',
-    maxHeight: '60%',
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  emptyText: {
-    padding: 16,
-    color: colors.text.muted,
-    fontSize: 14,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
+    alignItems: 'center',
   },
-  optionItemSelected: {
-    backgroundColor: colors.surface,
-  },
-  optionText: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.text.primary,
-  },
-  optionTextSelected: {
-    fontWeight: '600',
-    color: colors.primary,
-  },
+  name: { fontSize: 17, fontWeight: '700' },
 });

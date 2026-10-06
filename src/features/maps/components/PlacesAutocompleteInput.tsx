@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -8,8 +9,9 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Input } from '../../../shared/components/ui/Input';
-import { colors } from '../../../shared/theme/colors';
-import { radii, spacing, typography } from '../../../shared/theme/tokens';
+import { spacing, typography } from '../../../shared/theme/tokens';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { depth } from '../../../shared/theme/materials';
 import { usePlacesAutocomplete } from '../hooks/usePlacesAutocomplete';
 import { getPlaceDetails, LatLng } from '../api/mapsApi';
 
@@ -31,6 +33,7 @@ interface Props {
   icon?: React.ReactNode;
   /** Si false, los resultados no se cierran automáticamente al elegir. */
   closeOnSelect?: boolean;
+  autoFocus?: boolean;
 }
 
 /**
@@ -57,7 +60,9 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
   bias,
   icon,
   closeOnSelect = true,
+  autoFocus = false,
 }) => {
+  const { theme } = useTheme();
   const {
     query,
     setQuery,
@@ -67,18 +72,44 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
     sessionToken,
     consumeSession,
     reset,
+    retry,
   } = usePlacesAutocomplete({ bias });
 
   const [resolving, setResolving] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const selection = useRef(0);
+  const activeDetails = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      selection.current += 1;
+      activeDetails.current?.abort();
+    },
+    [],
+  );
+  const cancelSelection = () => {
+    selection.current += 1;
+    activeDetails.current?.abort();
+    setResolving(false);
+    setDetailError(null);
+  };
 
   // Si hay un valor seleccionado, mostrarlo; si no, lo que el usuario escribe.
   const displayValue = value && !focused ? value.address : query;
 
   const handleSelect = async (placeId: string, fallbackLabel: string) => {
+    cancelSelection();
+    const id = selection.current;
+    const controller = new AbortController();
+    activeDetails.current = controller;
+    setFocused(true);
     setResolving(true);
     try {
-      const details = await getPlaceDetails(placeId, { sessionToken });
+      const details = await getPlaceDetails(placeId, {
+        sessionToken,
+        signal: controller.signal,
+      });
+      if (id !== selection.current || controller.signal.aborted) return;
       const next: PlacesAutocompleteValue = {
         address: details.formattedAddress || fallbackLabel,
         location: details.location,
@@ -87,21 +118,29 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
       consumeSession();
       onChange(next);
       setQuery('');
-      if (closeOnSelect) setFocused(false);
+      if (closeOnSelect) {
+        setFocused(false);
+        Keyboard.dismiss();
+      }
     } catch {
-      onChange(null);
+      if (id === selection.current && !controller.signal.aborted) {
+        setDetailError(
+          'No pudimos cargar este lugar. Tócalo de nuevo para reintentar.',
+        );
+      }
     } finally {
-      setResolving(false);
+      if (id === selection.current) setResolving(false);
     }
   };
 
   const handleClear = () => {
+    cancelSelection();
     onChange(null);
     reset();
   };
 
-  const showSuggestions =
-    focused && (suggestions.length > 0 || loading || searchError);
+  // Keep results tappable when the keyboard loses focus during a scroll or tap.
+  const showSuggestions = !value && query.trim().length >= 2;
 
   return (
     <View style={styles.wrap}>
@@ -110,28 +149,39 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
         placeholder={placeholder}
         value={displayValue}
         onChangeText={text => {
+          cancelSelection();
           if (value) {
             // El usuario empezó a editar un valor seleccionado: lo invalidamos
             onChange(null);
           }
           setQuery(text);
         }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          // Pequeño delay para permitir que el tap a una sugerencia se procese
-          setTimeout(() => setFocused(false), 150);
+        onFocus={() => {
+          if (value) setQuery(value.address);
+          setFocused(true);
         }}
-        error={error ?? searchError ?? undefined}
+        onBlur={() => setFocused(false)}
+        autoFocus={autoFocus}
+        returnKeyType="search"
+        onSubmitEditing={() => Keyboard.dismiss()}
+        maxLength={200}
+        error={error ?? detailError ?? searchError ?? undefined}
         icon={icon}
         rightElement={
           resolving || loading ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : value ? (
-            <Pressable onPress={handleClear} hitSlop={8}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : value || query ? (
+            <Pressable
+              onPress={handleClear}
+              hitSlop={8}
+              style={styles.clear}
+              accessibilityRole="button"
+              accessibilityLabel="Borrar dirección"
+            >
               <MaterialIcons
                 name="close"
                 size={20}
-                color={colors.text.muted}
+                color={theme.colors.textSecondary}
               />
             </Pressable>
           ) : undefined
@@ -141,41 +191,92 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
       />
 
       {showSuggestions && (
-        <View style={styles.suggestions}>
+        <View
+          style={[
+            styles.suggestions,
+            depth(theme, 1),
+            {
+              backgroundColor: theme.colors.surfaceRaised,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.md,
+            },
+          ]}
+        >
           {loading && suggestions.length === 0 && (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.loadingText}>Buscando...</Text>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text
+                style={[
+                  styles.loadingText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                Buscando lugares…
+              </Text>
             </View>
           )}
           {searchError && (
-            <Text style={styles.errorText}>{searchError}</Text>
+            <Pressable onPress={retry} accessibilityRole="button">
+              <Text style={[styles.errorText, { color: theme.colors.primary }]}>
+                Reintentar búsqueda
+              </Text>
+            </Pressable>
+          )}
+          {!loading && !searchError && suggestions.length === 0 && (
+            <Text style={[styles.empty, { color: theme.colors.textSecondary }]}>
+              Sin resultados. Prueba con la calle y la ciudad.
+            </Text>
           )}
           {suggestions.map(s => (
             <Pressable
               key={s.placeId}
+              accessibilityRole="button"
+              accessibilityLabel={s.description}
+              disabled={resolving}
               onPress={() => handleSelect(s.placeId, s.description)}
               style={({ pressed }) => [
                 styles.suggestionRow,
-                pressed && styles.suggestionPressed,
+                {
+                  backgroundColor: pressed
+                    ? theme.colors.primarySoft
+                    : 'transparent',
+                  opacity: resolving ? 0.6 : 1,
+                },
               ]}
             >
               <MaterialIcons
                 name="place"
                 size={18}
-                color={colors.text.secondary}
+                color={theme.colors.primary}
                 style={styles.suggestionIcon}
               />
               <View style={styles.suggestionTextWrap}>
-                <Text style={styles.suggestionMain} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.suggestionMain,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                  numberOfLines={2}
+                >
                   {s.mainText}
                 </Text>
                 {!!s.secondaryText && (
-                  <Text style={styles.suggestionSecondary} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.suggestionSecondary,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                    numberOfLines={2}
+                  >
                     {s.secondaryText}
                   </Text>
                 )}
               </View>
+              <MaterialIcons
+                name="north-west"
+                size={18}
+                color={theme.colors.textMuted}
+              />
             </Pressable>
           ))}
         </View>
@@ -190,13 +291,11 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   suggestions: {
-    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radii.md,
     marginTop: -spacing.sm,
     paddingVertical: spacing.xs,
     marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   loadingRow: {
     flexDirection: 'row',
@@ -207,22 +306,21 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: spacing.sm,
     fontSize: typography.size.sm,
-    color: colors.text.secondary,
   },
   errorText: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typography.size.sm,
-    color: colors.status.error,
+    minHeight: 48,
+    textAlignVertical: 'center',
   },
   suggestionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  suggestionPressed: {
-    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    minHeight: 64,
+    gap: 8,
   },
   suggestionIcon: {
     marginRight: spacing.sm,
@@ -232,11 +330,17 @@ const styles = StyleSheet.create({
   },
   suggestionMain: {
     fontSize: typography.size.md,
-    color: colors.text.primary,
+    fontWeight: '600',
   },
   suggestionSecondary: {
     marginTop: 2,
     fontSize: typography.size.sm,
-    color: colors.text.secondary,
   },
+  clear: {
+    minWidth: 32,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: { padding: 16, fontSize: 14, lineHeight: 21 },
 });

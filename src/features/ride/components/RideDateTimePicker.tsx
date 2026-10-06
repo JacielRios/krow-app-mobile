@@ -1,3 +1,5 @@
+import { Button, Surface } from '../../../shared/components/ui-v2';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import React, { useState } from 'react';
 import {
   View,
@@ -7,10 +9,9 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker, {
-  DateTimePickerEvent,
+  DateTimePickerChangeEvent,
 } from '@react-native-community/datetimepicker';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../shared/theme/colors';
 
 interface RideDateTimePickerProps {
   label?: string;
@@ -43,28 +44,33 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
   error,
   minimumDate,
 }) => {
+  const { theme } = useTheme();
   // Controla qué picker mostrar en Android: 'date' | 'time' | null
   const [androidStep, setAndroidStep] = useState<'date' | 'time' | null>(null);
   // En iOS usamos un toggle para mostrar/ocultar el picker inline
   const [showIOS, setShowIOS] = useState(false);
+  const [quickChoice, setQuickChoice] = useState<{
+    minutes: number;
+    time: number;
+  } | null>(null);
 
   // Fecha de trabajo interna para el flujo de dos pasos en Android
   const [tempDate, setTempDate] = useState<Date>(value ?? new Date());
 
-  const handleAndroidDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
-    if (!selected) {
-      // El usuario canceló
-      setAndroidStep(null);
-      return;
-    }
+  const handleAndroidDateChange = (
+    _event: DateTimePickerChangeEvent,
+    selected: Date,
+  ) => {
     setTempDate(selected);
     // Primer paso terminado: pedir la hora
     setAndroidStep('time');
   };
 
-  const handleAndroidTimeChange = (_event: DateTimePickerEvent, selected?: Date) => {
+  const handleAndroidTimeChange = (
+    _event: DateTimePickerChangeEvent,
+    selected: Date,
+  ) => {
     setAndroidStep(null);
-    if (!selected) return;
 
     // Combinar la fecha del paso 1 con la hora del paso 2
     const combined = new Date(
@@ -77,19 +83,77 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
     onChange(combined);
   };
 
-  const handleIOSChange = (_event: DateTimePickerEvent, selected?: Date) => {
-    if (selected) onChange(selected);
+  const handleIOSChange = (
+    _event: DateTimePickerChangeEvent,
+    selected: Date,
+  ) => {
+    onChange(selected);
   };
 
   const placeholder = 'Selecciona fecha y hora';
 
   return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+    <Surface style={styles.container} contentStyle={{ padding: 18 }}>
+      {label && (
+        <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+          {label}
+        </Text>
+      )}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        {[30, 60, 120].map(minutes => (
+          <Button
+            key={minutes}
+            title={
+              minutes === 30
+                ? 'En 30 min'
+                : minutes === 60
+                ? 'En 1 hora'
+                : 'En 2 horas'
+            }
+            variant={
+              quickChoice?.minutes === minutes &&
+              value?.getTime() === quickChoice.time
+                ? 'primary'
+                : 'ghost'
+            }
+            accessibilityState={{
+              selected:
+                quickChoice?.minutes === minutes &&
+                value?.getTime() === quickChoice.time,
+            }}
+            disabled={
+              Date.now() + minutes * 60000 < (minimumDate?.getTime() ?? 0)
+            }
+            size="sm"
+            fullWidth={false}
+            onPress={() => {
+              const date = new Date(Date.now() + minutes * 60000);
+              setQuickChoice({ minutes, time: date.getTime() });
+              onChange(date);
+            }}
+          />
+        ))}
+      </View>
 
       <TouchableOpacity
-        style={[styles.inputContainer, error ? styles.inputError : null]}
+        style={[
+          styles.inputContainer,
+          {
+            backgroundColor: theme.colors.surfaceOverlay,
+            borderColor: theme.colors.border,
+            borderRadius: 18,
+          },
+          error ? { borderColor: theme.colors.status.error } : null,
+        ]}
         onPress={() => {
+          setQuickChoice(null);
           if (Platform.OS === 'android') {
             setTempDate(value ?? new Date());
             setAndroidStep('date');
@@ -98,36 +162,55 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           }
         }}
         activeOpacity={0.8}
-        accessibilityLabel={label ?? 'Selector de fecha y hora'}
+        accessibilityRole="button"
+        accessibilityLabel={`${label ?? 'Fecha y hora'}. ${
+          value ? formatDateTime(value) : placeholder
+        }`}
       >
         <MaterialIcons
           name="schedule"
           size={20}
-          color={colors.text.muted}
+          color={theme.colors.primary}
           style={styles.icon}
         />
-        <Text style={[styles.valueText, !value && styles.placeholder]}>
+        <Text style={[styles.valueText, { color: theme.colors.textPrimary }]}>
           {value ? formatDateTime(value) : placeholder}
         </Text>
         <MaterialIcons
           name={showIOS ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={20}
-          color={colors.text.muted}
+          color={theme.colors.textSecondary}
         />
       </TouchableOpacity>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && (
+        <Text
+          accessibilityRole="alert"
+          style={[styles.errorText, { color: theme.colors.status.error }]}
+        >
+          {error}
+        </Text>
+      )}
 
       {/* Picker iOS: se muestra inline bajo el botón */}
       {Platform.OS === 'ios' && showIOS && (
-        <View style={styles.iosPickerWrapper}>
+        <View
+          style={[
+            styles.iosPickerWrapper,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
           <DateTimePicker
             value={value ?? new Date()}
             mode="datetime"
             display="spinner"
             minimumDate={minimumDate}
-            onChange={handleIOSChange}
+            onValueChange={handleIOSChange}
             locale="es-MX"
+            themeVariant={theme.dark ? 'dark' : 'light'}
           />
         </View>
       )}
@@ -139,7 +222,8 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           mode="date"
           display="default"
           minimumDate={minimumDate}
-          onChange={handleAndroidDateChange}
+          onValueChange={handleAndroidDateChange}
+          onDismiss={() => setAndroidStep(null)}
         />
       )}
 
@@ -149,11 +233,12 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           value={tempDate}
           mode="time"
           display="default"
-          onChange={handleAndroidTimeChange}
+          onValueChange={handleAndroidTimeChange}
+          onDismiss={() => setAndroidStep(null)}
           is24Hour={false}
         />
       )}
-    </View>
+    </Surface>
   );
 };
 
@@ -163,7 +248,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    color: colors.text.secondary,
     marginBottom: 6,
     fontSize: 14,
     fontWeight: '500',
@@ -172,14 +256,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.border.default,
     borderRadius: 8,
-    backgroundColor: colors.background,
     minHeight: 50,
     paddingHorizontal: 12,
-  },
-  inputError: {
-    borderColor: colors.status.error,
   },
   icon: {
     marginRight: 8,
@@ -187,22 +266,15 @@ const styles = StyleSheet.create({
   valueText: {
     flex: 1,
     fontSize: 16,
-    color: colors.text.primary,
-  },
-  placeholder: {
-    color: colors.text.placeholder,
   },
   errorText: {
-    color: colors.status.error,
     fontSize: 12,
     marginTop: 4,
   },
   iosPickerWrapper: {
     marginTop: 4,
     borderWidth: 1,
-    borderColor: colors.border.light,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
   },
 });

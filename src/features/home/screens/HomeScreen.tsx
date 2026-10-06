@@ -1,3 +1,4 @@
+import { JourneyIllustration } from '../components/JourneyIllustration';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -14,10 +15,17 @@ import { setSkipSplashOnNextAuthMount } from '../../../app/authEntryPreference';
 import { clearSessionLoginMode } from '../../../app/sessionLoginMode';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
-import { Button, Card, Skeleton, Surface } from '../../../shared/components/ui-v2';
+import {
+  AmbientBackground,
+  Button,
+  Card,
+  Skeleton,
+  Surface,
+} from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
 import { IconContainer } from '../../../shared/components/ui/IconButton';
 import { sessionAdapter } from '../../../core/auth/sessionAdapter';
+import { unregisterTripNotifications } from '../../ride-runtime/pushRegistration';
 import { bookingApi } from '../../ride/api/bookingApi';
 import { useCurrentUserRole } from '../hooks/useCurrentUserRole';
 import { useRecentRides } from '../hooks/useRecentRides';
@@ -77,8 +85,12 @@ export const HomeScreen = () => {
   const insets = useSafeAreaInsets();
   const [signingOut, setSigningOut] = useState(false);
 
-  const { user, loading: userLoading, error: userError, reload: reloadUser } =
-    useCurrentUserRole();
+  const {
+    user,
+    loading: userLoading,
+    error: userError,
+    reload: reloadUser,
+  } = useCurrentUserRole();
 
   const { activeRide } = useActiveRide();
 
@@ -99,8 +111,7 @@ export const HomeScreen = () => {
   // El `driver_profiles.driver_id` viene resuelto desde `useCurrentUserRole`,
   // por eso este efecto arranca directo en el query de `rides` sin re-leer
   // `driver_profiles`.
-  const driverProfileId =
-    user?.role === 'conductor' ? user.driverId : null;
+  const driverProfileId = user?.role === 'conductor' ? user.driverId : null;
   const [pendingCount, setPendingCount] = useState(0);
   const [pendingTick, setPendingTick] = useState(0);
   const reloadPending = useCallback(() => setPendingTick(t => t + 1), []);
@@ -139,6 +150,7 @@ export const HomeScreen = () => {
   const handleSignOut = async () => {
     setSigningOut(true);
     setSkipSplashOnNextAuthMount(true);
+    await unregisterTripNotifications().catch(() => undefined);
     const { error } = await sessionAdapter.signOut();
     if (!error) {
       await clearSessionLoginMode();
@@ -175,7 +187,13 @@ export const HomeScreen = () => {
 
   if (userLoading && !user) {
     return (
-      <View style={[styles.fallback, { paddingTop: insets.top, backgroundColor: theme.colors.background }]} accessibilityLabel="Cargando inicio">
+      <View
+        style={[
+          styles.fallback,
+          { paddingTop: insets.top, backgroundColor: theme.colors.background },
+        ]}
+        accessibilityLabel="Cargando inicio"
+      >
         <Skeleton width="50%" height={28} />
         <Skeleton height={120} style={{ marginTop: spacing.lg }} />
       </View>
@@ -184,7 +202,12 @@ export const HomeScreen = () => {
 
   if (userError && !user) {
     return (
-      <View style={[styles.fallback, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
+      <View
+        style={[
+          styles.fallback,
+          { paddingTop: insets.top, backgroundColor: theme.colors.background },
+        ]}
+      >
         <MaterialIcons
           name="error-outline"
           size={32}
@@ -192,6 +215,7 @@ export const HomeScreen = () => {
         />
         <Text style={styles.fallbackErrorText}>{userError}</Text>
         <View style={styles.fallbackActions}>
+          <Button title="Reintentar" onPress={reloadUser} style={{ marginBottom: spacing.md }} />
           <Button
             title="Cerrar sesión"
             variant="outline"
@@ -209,21 +233,26 @@ export const HomeScreen = () => {
 
   const isPassenger = user.role === 'pasajero';
   const primaryActionTitle = isPassenger ? 'Solicitar viaje' : 'Crear viaje';
-  const primaryActionIcon = isPassenger ? 'directions-car' : 'add-road';
   const roleLabel = isPassenger ? 'Pasajero' : 'Conductor';
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
+      <AmbientBackground />
       <View
-        style={[
-          styles.headerWrap,
-          { paddingTop: insets.top + spacing.lg, backgroundColor: theme.colors.background },
-        ]}
+        style={[styles.headerWrap, { paddingTop: insets.top + spacing.lg }]}
       >
         <View style={styles.headerRow}>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Hola,</Text>
-            <Text style={[styles.userName, { color: theme.colors.textPrimary }]}>{user.displayName}</Text>
+            <Text
+              style={[styles.greeting, { color: theme.colors.textSecondary }]}
+            >
+              Hola,
+            </Text>
+            <Text
+              style={[styles.userName, { color: theme.colors.textPrimary }]}
+            >
+              {user.displayName}
+            </Text>
             <View style={styles.badgeWrap}>
               <StatusBadge
                 tone={isPassenger ? 'info' : 'primary'}
@@ -259,7 +288,10 @@ export const HomeScreen = () => {
                 color={theme.colors.primary}
               />
             </IconContainer>
-            <Text style={[styles.bannerText, { color: theme.colors.primary }]} numberOfLines={2}>
+            <Text
+              style={[styles.bannerText, { color: theme.colors.primary }]}
+              numberOfLines={2}
+            >
               {bannerConfig.text}
             </Text>
             <MaterialIcons
@@ -272,7 +304,7 @@ export const HomeScreen = () => {
       </View>
 
       <ScrollView
-        style={styles.scroll}
+        style={[styles.scroll, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
@@ -288,20 +320,32 @@ export const HomeScreen = () => {
           />
         }
       >
-        <Surface elevation={1} radius={radii.xl} style={styles.ctaCard} contentStyle={{ padding: spacing.lg }}>
-          <View style={styles.ctaIconWrap}>
-            <MaterialIcons
-              name={primaryActionIcon}
-              size={28}
-              color={theme.colors.primary}
-            />
-          </View>
+        <Surface
+          elevation={3}
+          radius={32}
+          style={styles.ctaCard}
+          contentStyle={{ padding: spacing.lg }}
+        >
+          <Text
+            style={{
+              color: theme.colors.primary,
+              fontSize: 11,
+              fontWeight: '700',
+              letterSpacing: 2,
+              marginBottom: 16,
+            }}
+          >
+            KROW · COMPARTE EL CAMINO
+          </Text>
+          <JourneyIllustration />
           <Text style={[styles.ctaTitle, { color: theme.colors.textPrimary }]}>
             {isPassenger
-              ? '¿Necesitas trasladarte?'
-              : '¿Vas a salir y tienes lugares?'}
+              ? 'Tu siguiente destino,\njuntos.'
+              : 'Un camino.\nMás compañía.'}
           </Text>
-          <Text style={[styles.ctaSubtitle, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[styles.ctaSubtitle, { color: theme.colors.textSecondary }]}
+          >
             {isPassenger
               ? 'Encuentra estudiantes que vayan en tu misma dirección y comparte el viaje.'
               : 'Publica tu viaje y deja que otros estudiantes reserven asientos.'}
@@ -316,8 +360,14 @@ export const HomeScreen = () => {
             disabled={!isPassenger && !user.canPublishRides}
           />
           {!isPassenger && !user.canPublishRides && (
-            <Text style={[styles.approvalHint, { color: theme.colors.textSecondary }]}>
-              Administración debe aprobar tu perfil antes de que puedas publicar.
+            <Text
+              style={[
+                styles.approvalHint,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              Administración debe aprobar tu perfil antes de que puedas
+              publicar.
             </Text>
           )}
         </Surface>
@@ -361,9 +411,7 @@ export const HomeScreen = () => {
               />
             </View>
             <View style={styles.requestsTextWrap}>
-              <Text style={styles.requestsTitle}>
-                Solicitudes pendientes
-              </Text>
+              <Text style={styles.requestsTitle}>Solicitudes pendientes</Text>
               <Text style={styles.requestsSubtitle}>
                 {`${pendingCount} pasajero${
                   pendingCount === 1 ? '' : 's'
@@ -378,8 +426,16 @@ export const HomeScreen = () => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Viajes recientes</Text>
-            <Text style={[styles.sectionHint, { color: theme.colors.textMuted }]}>Últimos {RECENT_RIDES_LIMIT}</Text>
+            <Text
+              style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
+            >
+              Viajes recientes
+            </Text>
+            <Text
+              style={[styles.sectionHint, { color: theme.colors.textMuted }]}
+            >
+              Últimos {RECENT_RIDES_LIMIT}
+            </Text>
           </View>
           <RecentRidesTable
             rides={rides}
@@ -488,7 +544,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   ctaTitle: {
-    fontSize: typography.size.xl,
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -0.8,
     fontWeight: typography.weight.bold,
     color: colors.text.primary,
     marginBottom: spacing.xs,

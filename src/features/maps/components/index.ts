@@ -3,3 +3,5 @@ export type { PlacesAutocompleteValue } from './PlacesAutocompleteInput';
 
 export { RoutePreviewMap } from './RoutePreviewMap';
 export type { RoutePreviewMapProps } from './RoutePreviewMap';
+
+export { PlacePicker } from './PlacePicker';

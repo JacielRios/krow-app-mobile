@@ -7,8 +7,8 @@ export const sessionAdapter = {
   signOut: () => supabaseAuthClient.auth.signOut(),
   getSession: () => supabaseAuthClient.auth.getSession(),
   getUser: () => supabaseAuthClient.auth.getUser(),
-  onAuthStateChange: (callback: (authenticated: boolean) => void) => {
-    const { data: { subscription } } = supabaseAuthClient.auth.onAuthStateChange((_event, session) => callback(Boolean(session)));
+  onAuthStateChange: (callback: (authenticated: boolean, actorId?: string) => void) => {
+    const { data: { subscription } } = supabaseAuthClient.auth.onAuthStateChange((_event, session) => callback(Boolean(session), session?.user.id));
     return () => subscription.unsubscribe();
   },
 };

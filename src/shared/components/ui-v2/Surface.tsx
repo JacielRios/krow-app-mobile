@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, View, ViewProps, ViewStyle } from 'react-native';
-import { createShadow, ElevationLevel } from '../../theme/elevation';
+import { ElevationLevel } from '../../theme/elevation';
+import { depth, glass } from '../../theme/materials';
 import { useTheme } from '../../theme/ThemeProvider';
 
 export interface SurfaceProps extends ViewProps {
@@ -12,7 +13,7 @@ export interface SurfaceProps extends ViewProps {
 
 export const Surface: React.FC<SurfaceProps> = ({
   children,
-  elevation = 0,
+  elevation = 2,
   radius,
   bordered = false,
   style,
@@ -25,21 +26,15 @@ export const Surface: React.FC<SurfaceProps> = ({
   return (
     <View
       {...props}
-      style={[
-        { borderRadius: resolvedRadius },
-        createShadow(elevation, theme.colors.shadow),
-        style,
-      ]}
+      style={[{ borderRadius: resolvedRadius }, depth(theme, elevation), style]}
     >
       <View
         style={[
+          glass(theme),
           {
             overflow: 'hidden',
             borderRadius: resolvedRadius,
-            backgroundColor:
-              elevation > 0 ? theme.colors.surfaceRaised : theme.colors.surface,
-            borderColor: theme.colors.border,
-            borderWidth: bordered ? 1 : 0,
+            ...(bordered ? { borderColor: theme.colors.border } : {}),
           },
           contentStyle,
         ]}

@@ -1,4 +1,14 @@
 /* eslint-env jest */
+jest.mock('@rnmapbox/maps', () => ({
+  __esModule: true,
+  default: { setAccessToken: jest.fn(() => Promise.resolve()), StyleURL: { Street: 'mapbox://styles/mapbox/streets-v12' } },
+}));
+jest.mock('react-native-keychain', () => ({
+  getGenericPassword: jest.fn(async () => false),
+  setGenericPassword: jest.fn(async () => true),
+  resetGenericPassword: jest.fn(async () => true),
+  ACCESSIBLE: { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'device' },
+}));
 
 jest.mock('react-native-reanimated', () => {
   const { Animated } = require('react-native');
@@ -55,3 +65,13 @@ jest.mock('@react-native-community/datetimepicker', () => {
     default: props => React.createElement(View, props),
   };
 });
+
+jest.mock('@react-native-community/geolocation', () => ({
+  __esModule: true,
+  default: {
+    requestAuthorization: jest.fn((_success, error) => error?.()),
+    getCurrentPosition: jest.fn((_success, error) =>
+      error?.({ code: 1, message: 'Location unavailable in tests' }),
+    ),
+  },
+}));

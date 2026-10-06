@@ -1,12 +1,26 @@
 import React from 'react';
-import { ActivityIndicator, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleProp,
+  Text,
+  TextStyle,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { AnimatedPressable, AnimatedPressableProps } from './AnimatedPressable';
 import { useTheme } from '../../theme/ThemeProvider';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'text' | 'destructive';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'text'
+  | 'destructive';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-export interface ButtonProps extends Omit<AnimatedPressableProps, 'children' | 'contentStyle'> {
+export interface ButtonProps
+  extends Omit<AnimatedPressableProps, 'children' | 'contentStyle'> {
   title: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -34,27 +48,45 @@ export const Button: React.FC<ButtonProps> = ({
   const { theme } = useTheme();
   const isDisabled = disabled || loading;
   const sizeConfig = {
-    sm: { height: 36, padding: theme.spacing.md, fontSize: theme.typography.size.sm },
-    md: { height: 48, padding: theme.spacing.lg, fontSize: theme.typography.size.lg },
-    lg: { height: 56, padding: theme.spacing.xl, fontSize: theme.typography.size.xl },
+    sm: {
+      height: 44,
+      padding: theme.spacing.md,
+      fontSize: theme.typography.size.sm,
+    },
+    md: {
+      height: 48,
+      padding: theme.spacing.lg,
+      fontSize: theme.typography.size.lg,
+    },
+    lg: {
+      height: 56,
+      padding: theme.spacing.xl,
+      fontSize: theme.typography.size.xl,
+    },
   }[size];
-  const filled = variant === 'primary' || variant === 'secondary' || variant === 'destructive';
-  const backgroundColor = variant === 'destructive'
-    ? theme.colors.status.error
-    : variant === 'secondary'
+  const filled =
+    variant === 'primary' ||
+    variant === 'secondary' ||
+    variant === 'destructive';
+  const backgroundColor =
+    variant === 'destructive'
+      ? theme.colors.status.error
+      : variant === 'secondary'
       ? theme.colors.textPrimary
       : variant === 'ghost'
-        ? theme.colors.primarySoft
-        : variant === 'primary'
-          ? theme.colors.primary
-          : 'transparent';
+      ? theme.colors.primarySoft
+      : variant === 'primary'
+      ? theme.colors.primary
+      : variant === 'outline'
+      ? theme.colors.surfaceRaised
+      : 'transparent';
   const textColor = filled ? theme.colors.textInverse : theme.colors.primary;
 
   return (
     <AnimatedPressable
       {...props}
       disabled={isDisabled}
-      elevation={variant === 'primary' && !isDisabled ? 1 : 0}
+      elevation={variant !== 'text' && !isDisabled ? 2 : 0}
       radius={theme.radii.md}
       style={[{ width: fullWidth ? '100%' : undefined }, props.style]}
       contentStyle={[
@@ -62,34 +94,74 @@ export const Button: React.FC<ButtonProps> = ({
           minHeight: sizeConfig.height,
           paddingHorizontal: sizeConfig.padding,
           backgroundColor,
-          borderWidth: variant === 'outline' ? 1.5 : 0,
-          borderColor: theme.colors.primary,
+          borderWidth: variant === 'text' ? 0 : 1,
+          borderColor:
+            variant === 'outline' ? theme.colors.border : '#FFFFFF30',
+          experimental_backgroundImage:
+            variant === 'text'
+              ? undefined
+              : 'linear-gradient(155deg, #FFFFFF20, #FFFFFF00)',
+          paddingVertical: theme.spacing.sm,
           justifyContent: 'center',
         },
         contentStyle,
       ]}
       accessibilityLabel={props.accessibilityLabel ?? title}
+      accessibilityState={{
+        ...props.accessibilityState,
+        busy: loading,
+        disabled: Boolean(isDisabled),
+      }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         {loading ? (
-          <ActivityIndicator color={textColor} size="small" />
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+            }}
+          >
+            <ActivityIndicator color={textColor} size="small" />
+            <Text
+              style={{
+                color: textColor,
+                fontSize: sizeConfig.fontSize,
+                fontWeight: theme.typography.weight.semibold,
+                flexShrink: 1,
+              }}
+            >
+              Un momento…
+            </Text>
+          </View>
         ) : (
           <>
-            {leftIcon ? <View style={{ marginRight: theme.spacing.sm }}>{leftIcon}</View> : null}
+            {leftIcon ? (
+              <View style={{ marginRight: theme.spacing.sm }}>{leftIcon}</View>
+            ) : null}
             <Text
-              numberOfLines={1}
               style={[
                 {
                   color: textColor,
                   fontSize: sizeConfig.fontSize,
                   fontWeight: theme.typography.weight.semibold,
+                  textAlign: 'center',
+                  flexShrink: 1,
                 },
                 labelStyle,
               ]}
             >
               {title}
             </Text>
-            {rightIcon ? <View style={{ marginLeft: theme.spacing.sm }}>{rightIcon}</View> : null}
+            {rightIcon ? (
+              <View style={{ marginLeft: theme.spacing.sm }}>{rightIcon}</View>
+            ) : null}
           </>
         )}
       </View>

@@ -11,3 +11,4 @@ export * from './Skeleton';
 export * from './Surface';
 export * from './StatusBadge';
 export * from './Text';
+export * from './AmbientBackground';

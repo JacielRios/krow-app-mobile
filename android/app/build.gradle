@@ -73,6 +73,14 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Native SDK credentials can come from CI or the developer's ignored local.properties.
+def localMapsProperties = new Properties()
+def localMapsFile = rootProject.file("local.properties")
+if (localMapsFile.exists()) localMapsFile.withInputStream { localMapsProperties.load(it) }
+def nativeMapsKey = (System.getenv("KROW_ANDROID_MAPS_API_KEY") ?: localMapsProperties.getProperty("KROW_ANDROID_MAPS_API_KEY", "")).trim()
+// Compatibility for existing local development setups only. Never used by release.
+def debugMapsKey = nativeMapsKey ?: (project.env.get("GOOGLE_MAPS_API_KEY") ?: "").trim()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -83,11 +91,18 @@ android {
         applicationId "com.krownmobileapp"
         // La clave del SDK nativo se inyecta al compilar, fuera de
         // react-native-config y del bundle JavaScript.
-        resValue "string", "google_maps_android_sdk_key", System.getenv("KROW_ANDROID_MAPS_API_KEY") ?: ""
+        resValue "string", "google_maps_android_sdk_key", nativeMapsKey
+        resValue "string", "krow_firebase_app_id", System.getenv("KROW_FIREBASE_APP_ID") ?: ""
+        resValue "string", "krow_firebase_api_key", System.getenv("KROW_FIREBASE_API_KEY") ?: ""
+        resValue "string", "krow_firebase_project_id", System.getenv("KROW_FIREBASE_PROJECT_ID") ?: ""
+        resValue "string", "krow_firebase_sender_id", System.getenv("KROW_FIREBASE_SENDER_ID") ?: ""
+        resValue "string", "krow_link_origin", System.getenv("KROW_LINK_ORIGIN") ?: ""
+        manifestPlaceholders.krowLinkHost = System.getenv("KROW_LINK_ORIGIN") ? new URI(System.getenv("KROW_LINK_ORIGIN")).host : "links.invalid"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         debug {
@@ -99,6 +114,7 @@ android {
     }
     buildTypes {
         debug {
+            resValue "string", "google_maps_android_sdk_key", debugMapsKey
             signingConfig signingConfigs.debug
         }
         release {
@@ -114,6 +130,10 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation("com.mapbox.navigationcore:android-ndk27:3.23.0")
+    implementation("com.google.firebase:firebase-messaging:25.1.3")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
@@ -123,3 +143,15 @@ dependencies {
 }
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+// A missing native key otherwise produces an empty map only after installation.
+def validateReleaseMapsConfiguration = tasks.register("validateReleaseMapsConfiguration") {
+    doLast {
+        if (!nativeMapsKey) {
+            throw new GradleException("KROW_ANDROID_MAPS_API_KEY is required for release. Supply an Android SDK key restricted to this application's package and signing certificate; do not use the backend REST key.")
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseMapsConfiguration)
+}

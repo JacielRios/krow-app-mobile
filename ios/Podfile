@@ -8,6 +8,13 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# One SPM dependency graph for Maps and Navigation (Navigation 3.23.0 pins Maps 11.23.0).
+$RNMapboxMapsSwiftPackageManager = {
+  url: 'https://github.com/mapbox/mapbox-maps-ios.git',
+  requirement: { kind: 'exactVersion', version: '11.23.0' },
+  product_name: 'MapboxMaps'
+}
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -17,6 +24,8 @@ end
 target 'KrownMobileApp' do
   config = use_native_modules!
 
+  pod 'react-native-maps/Google', :path => '../node_modules/react-native-maps'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
@@ -24,6 +33,7 @@ target 'KrownMobileApp' do
   )
 
   post_install do |installer|
+    $RNMapboxMaps.post_install(installer)
     react_native_post_install(
       installer,
       config[:reactNativePath],

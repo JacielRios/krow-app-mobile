@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name=".MainApplication"
@@ -13,6 +14,11 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+      <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+      <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+      <service android:name=".runtime.KrowMessagingService" android:exported="false">
+        <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+      </service>
 
       <!-- Llave exclusiva del Android Maps SDK para renderizar el mapa.
            Places, geocoding y rutas se consumen mediante KROW API. -->
@@ -27,6 +33,12 @@
         android:launchMode="singleTask"
         android:windowSoftInputMode="adjustResize"
         android:exported="true">
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="${krowLinkHost}" android:pathPrefix="/rides/" />
+        </intent-filter>
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
