@@ -4,9 +4,11 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { AccessibilityInfo, Appearance, ColorSchemeName } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkTheme, lightTheme, ThemePreference } from './themes';
 
 interface ThemeContextValue {
@@ -23,35 +25,64 @@ const resolveScheme = (
   preference: ThemePreference,
   systemScheme: ColorSchemeName | null,
 ): 'light' | 'dark' =>
-  preference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : preference;
+  preference === 'system'
+    ? systemScheme === 'dark'
+      ? 'dark'
+      : 'light'
+    : preference;
 
-export const ThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const ThemeProvider: React.FC<React.PropsWithChildren> = ({
+  children,
+}) => {
   const [preference, setPreference] = useState<ThemePreference>('system');
   const [systemScheme, setSystemScheme] = useState<ColorSchemeName | null>(
     Appearance.getColorScheme() ?? null,
   );
   const [motionEnabled, setMotionEnabled] = useState(true);
+  const preferenceEdited = useRef(false);
 
   useEffect(() => {
-    const appearanceSubscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setSystemScheme(colorScheme ?? null);
-    });
-    AccessibilityInfo.isReduceMotionEnabled().then(reduced => {
-      setMotionEnabled(!reduced);
-    });
+    let alive = true;
+    let receivedMotionChange = false;
+    void AsyncStorage.getItem('@krow/theme')
+      .then(value => {
+        if (
+          alive &&
+          !preferenceEdited.current &&
+          (value === 'light' || value === 'dark' || value === 'system')
+        )
+          setPreference(value);
+      })
+      .catch(() => undefined);
+    const appearanceSubscription = Appearance.addChangeListener(
+      ({ colorScheme }) => {
+        if (alive) setSystemScheme(colorScheme ?? null);
+      },
+    );
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then(reduced => {
+        if (alive && !receivedMotionChange) setMotionEnabled(!reduced);
+      })
+      .catch(() => undefined);
     const motionSubscription = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
-      reduced => setMotionEnabled(!reduced),
+      reduced => {
+        receivedMotionChange = true;
+        if (alive) setMotionEnabled(!reduced);
+      },
     );
 
     return () => {
+      alive = false;
       appearanceSubscription.remove();
       motionSubscription.remove();
     };
   }, []);
 
   const updatePreference = useCallback((next: ThemePreference) => {
+    preferenceEdited.current = true;
     setPreference(next);
+    void AsyncStorage.setItem('@krow/theme', next).catch(() => undefined);
   }, []);
   const colorScheme = resolveScheme(preference, systemScheme);
   const value = useMemo<ThemeContextValue>(
@@ -65,7 +96,9 @@ export const ThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) =
     [colorScheme, motionEnabled, preference, updatePreference],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 };
 
 export const useTheme = (): ThemeContextValue => {

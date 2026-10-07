@@ -18,6 +18,8 @@ interface Props {
   price: string;
   onPriceChange: (value: string) => void;
   optional?: boolean;
+  seatsError?: string;
+  priceError?: string;
 }
 
 export const RideComfortControls = ({
@@ -27,6 +29,8 @@ export const RideComfortControls = ({
   price,
   onPriceChange,
   optional,
+  seatsError,
+  priceError,
 }: Props) => {
   const { theme } = useTheme();
   const [precise, setPrecise] = useState(false);
@@ -47,14 +51,18 @@ export const RideComfortControls = ({
             <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>
               {maxSeats > 0
                 ? `Hasta ${maxSeats} asientos. Gira el dial o toca un lugar.`
+                : optional
+                ? 'Puedes definir el cupo después, al publicar.'
                 : 'Elige un vehículo para ver su capacidad.'}
             </Text>
           </View>
-          <SeatDial
-            value={seats === '' ? null : Number(seats)}
-            max={maxSeats}
-            onChange={value => onSeatsChange(String(value))}
-          />
+          {maxSeats > 0 && (
+            <SeatDial
+              value={seats === '' ? null : Number(seats)}
+              max={maxSeats}
+              onChange={value => onSeatsChange(String(value))}
+            />
+          )}
         </View>
         <ScrollView
           horizontal
@@ -102,6 +110,23 @@ export const RideComfortControls = ({
             </AnimatedPressable>
           ))}
         </ScrollView>
+        {optional && maxSeats === 0 && (
+          <Input
+            label="Cupo predeterminado (opcional)"
+            value={seats}
+            onChangeText={onSeatsChange}
+            keyboardType="number-pad"
+            error={seatsError}
+          />
+        )}
+        {!!seatsError && !(optional && maxSeats === 0) && (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.colors.status.error }}
+          >
+            {seatsError}
+          </Text>
+        )}
         {optional && seats !== '' && (
           <Button
             title="Sin cupo predeterminado"
@@ -154,7 +179,16 @@ export const RideComfortControls = ({
             value={price}
             onChangeText={onPriceChange}
             keyboardType="decimal-pad"
+            error={priceError}
           />
+        )}
+        {!!priceError && !precise && (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.colors.status.error }}
+          >
+            {priceError}
+          </Text>
         )}
         {optional && price !== '' && (
           <Button

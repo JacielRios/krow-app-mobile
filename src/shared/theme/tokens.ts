@@ -8,20 +8,20 @@ export const spacing = {
 };
 
 export const radii = {
-  sm: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  sm: 12,
+  md: 16,
+  lg: 24,
+  xl: 32,
   full: 9999,
 };
 
 export const typography = {
   size: {
-    xs: 11,
-    sm: 12,
-    md: 14,
-    lg: 16,
-    xl: 20,
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 22,
     xxl: 24,
     xxxl: 32,
   },
@@ -47,7 +47,7 @@ export const motion = {
 } as const;
 
 export const touchTarget = {
-  minimum: 44,
+  minimum: 48,
   comfortable: 48,
 } as const;
 

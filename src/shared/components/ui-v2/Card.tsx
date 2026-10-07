@@ -17,6 +17,7 @@ export interface CardProps {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -27,6 +28,7 @@ export const Card: React.FC<CardProps> = ({
   onPress,
   style,
   contentStyle,
+  accessibilityLabel,
 }) => {
   const { theme } = useTheme();
   const paddingValue = {
@@ -52,6 +54,8 @@ export const Card: React.FC<CardProps> = ({
         onPress={onPress}
         style={style}
         contentStyle={innerStyle}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
       >
         {children}
       </AnimatedPressable>

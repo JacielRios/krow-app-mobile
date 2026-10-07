@@ -15,7 +15,7 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Button, IconButton } from '../../../shared/components/ui-v2';
-import { decodePolyline, LatLng } from '../api/mapsApi';
+import { decodePolyline, isValidPoint, LatLng } from '../api/mapsApi';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export interface RoutePreviewMapProps {
@@ -29,6 +29,7 @@ export interface RoutePreviewMapProps {
     point: LatLng;
     color?: string;
     iconName?: string;
+    label?: string;
     selected?: boolean;
     accessibilityLabel?: string;
     onPress?: () => void;
@@ -36,6 +37,9 @@ export interface RoutePreviewMapProps {
   interactive?: boolean;
   style?: ViewStyle;
   height?: number;
+  trackingMode?: boolean;
+  viewportInsets?: { top: number; bottom: number };
+  vehicle?: { point: LatLng; stale: boolean; heading?: number };
   onOriginDrag?: (point: LatLng) => void;
   onDestinationDrag?: (point: LatLng) => void;
   onMapPress?: (point: LatLng) => void;
@@ -69,35 +73,67 @@ const computeRegion = (points: LatLng[]) => {
 };
 
 export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
-  origin,
-  destination,
+  origin: originInput,
+  destination: destinationInput,
   encodedPolyline,
-  extraMarkers,
+  extraMarkers: markerInput,
   interactive = false,
   style,
   height = 220,
+  trackingMode = false,
+  viewportInsets,
+  vehicle: vehicleInput,
   onOriginDrag,
   onDestinationDrag,
   onMapPress,
 }) => {
   const mapRef = useRef<MapView>(null);
+  // Never send incomplete API/GPS coordinates to a native map command.
+  const origin = isValidPoint(originInput) ? originInput : null;
+  const destination = isValidPoint(destinationInput) ? destinationInput : null;
+  const extraMarkers = useMemo(
+    () =>
+      (Array.isArray(markerInput) ? markerInput : []).filter(
+        marker => !!marker && isValidPoint(marker.point),
+      ),
+    [markerInput],
+  );
+  const vehicle =
+    vehicleInput && isValidPoint(vehicleInput.point) ? vehicleInput : undefined;
+  const safeHeight = Number.isFinite(height) && height > 0 ? height : 220;
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const mounted = useRef(true);
+  const readyCanvas = useRef<string | null>(null);
+  const loadedCanvas = useRef<string | null>(null);
+  const lastAutomaticFrame = useRef<string | null>(null);
+  const [following, setFollowing] = useState(true);
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
   const { theme, motionEnabled } = useTheme();
+  const canvasRouteKey = trackingMode ? 'tracking' : encodedPolyline;
+  const canvasKey = `${mapAttempt}:${canvasRouteKey ?? 'pending'}`;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      readyCanvas.current = null;
+      loadedCanvas.current = null;
+    };
+  }, []);
   // Recreate the native canvas when the resolved route replaces its provisional
   // endpoints; Fabric may retain the previous native overlay otherwise.
   useEffect(() => {
     setReady(false);
     setLoaded(false);
     setLoadFailed(false);
-  }, [encodedPolyline]);
+  }, [canvasRouteKey]);
   useEffect(() => {
     if (loaded) return;
     const timer = setTimeout(() => setLoadFailed(true), 15000);
     return () => clearTimeout(timer);
-  }, [loaded, mapAttempt, encodedPolyline]);
+  }, [loaded, mapAttempt, canvasRouteKey]);
   const retryMap = () => {
     setReady(false);
     setLoaded(false);
@@ -173,39 +209,155 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
     return [...byCoordinate.values()];
   }, [extraMarkers, polylineCoords, origin, destination]);
 
+  const cameraReady =
+    ready && loaded && layout.width >= 48 && layout.height >= 48;
+  const executeCamera = useCallback(
+    (command: () => void) => {
+      if (
+        !mounted.current ||
+        !cameraReady ||
+        readyCanvas.current !== canvasKey ||
+        loadedCanvas.current !== canvasKey
+      )
+        return;
+      try {
+        command();
+      } catch {
+        // A detached native view must leave the trip controls available.
+        if (mounted.current) setLoadFailed(true);
+      }
+    },
+    [cameraReady, canvasKey],
+  );
   const frameRoute = useCallback(() => {
-    if (!mapRef.current || !ready) return;
+    if (!mapRef.current) return;
     if (visibleCoords.length === 0) return;
     if (visibleCoords.length === 1) {
-      mapRef.current.animateCamera(
-        { center: visibleCoords[0] },
-        { duration: motionEnabled ? 250 : 0 },
+      executeCamera(() =>
+        mapRef.current?.animateCamera(
+          { center: visibleCoords[0] },
+          { duration: motionEnabled ? 250 : 0 },
+        ),
       );
       return;
     }
-    mapRef.current.fitToCoordinates(visibleCoords, {
-      edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
-      animated: motionEnabled,
-    });
-  }, [visibleCoords, ready, motionEnabled]);
-  useEffect(frameRoute, [frameRoute]);
+    // fitToCoordinates throws in the Android SDK before layout, or when its
+    // padding consumes the map. Wait for layout/tiles and bound extra padding.
+    const horizontalPadding = Math.min(
+      24,
+      Math.max(0, Math.floor((layout.width - 120) / 2)),
+    );
+    executeCamera(() =>
+      mapRef.current?.fitToCoordinates(visibleCoords, {
+        edgePadding: {
+          top: 12,
+          right: horizontalPadding,
+          bottom: 12,
+          left: horizontalPadding,
+        },
+        animated: motionEnabled,
+      }),
+    );
+  }, [visibleCoords, executeCamera, motionEnabled, layout.width]);
+  const hasVehicle = !!vehicle;
+  const vehicleLat = vehicle?.point.lat;
+  const vehicleLng = vehicle?.point.lng;
+  const vehicleStale = vehicle?.stale;
+  const paddingBudget = Math.max(0, (layout.height || safeHeight) - 144);
+  const viewportTop = Math.min(
+    paddingBudget,
+    Math.max(0, Number.isFinite(viewportInsets?.top) ? viewportInsets!.top : 0),
+  );
+  const viewportBottom = Math.min(
+    paddingBudget - viewportTop,
+    Math.max(
+      0,
+      Number.isFinite(viewportInsets?.bottom) ? viewportInsets!.bottom : 0,
+    ),
+  );
+  const frameKey = `${canvasKey}:${layout.width}:${
+    layout.height
+  }:${viewportTop}:${viewportBottom}:${visibleCoords
+    .map(point => `${point.latitude},${point.longitude}`)
+    .join(';')}`;
+  useEffect(() => {
+    if (
+      hasVehicle ||
+      !cameraReady ||
+      readyCanvas.current !== canvasKey ||
+      loadedCanvas.current !== canvasKey ||
+      lastAutomaticFrame.current === frameKey
+    )
+      return;
+    lastAutomaticFrame.current = frameKey;
+    frameRoute();
+  }, [frameRoute, hasVehicle, cameraReady, canvasKey, frameKey]);
+  useEffect(() => {
+    if (
+      vehicleLat == null ||
+      vehicleLng == null ||
+      !cameraReady ||
+      vehicleStale
+    )
+      return;
+    const center = { latitude: vehicleLat, longitude: vehicleLng };
+    // The marker follows its coordinate prop. Avoid concurrent Fabric marker
+    // animation commands while the native marker is being attached/removed.
+    if (following)
+      executeCamera(() =>
+        mapRef.current?.animateCamera(
+          { center, zoom: 16 },
+          { duration: motionEnabled ? 600 : 0 },
+        ),
+      );
+  }, [
+    vehicleLat,
+    vehicleLng,
+    vehicleStale,
+    cameraReady,
+    executeCamera,
+    following,
+    motionEnabled,
+    viewportTop,
+    viewportBottom,
+  ]);
 
   return (
     <View
       style={[
         styles.wrap,
-        { height, backgroundColor: theme.colors.surfaceOverlay },
+        { height: safeHeight, backgroundColor: theme.colors.surfaceOverlay },
         style,
       ]}
+      onLayout={event => {
+        const { width, height: measuredHeight } = event.nativeEvent.layout;
+        if (Number.isFinite(width) && Number.isFinite(measuredHeight))
+          setLayout({
+            width: Math.max(0, width),
+            height: Math.max(0, measuredHeight),
+          });
+      }}
     >
       <MapView
-        key={`${mapAttempt}:${encodedPolyline ?? 'pending'}`}
+        key={canvasKey}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
         initialRegion={region}
-        onMapReady={() => setReady(true)}
+        mapPadding={{
+          top: viewportTop,
+          bottom: viewportBottom,
+          left: 0,
+          right: 0,
+        }}
+        onMapReady={() => {
+          if (!mounted.current) return;
+          readyCanvas.current = canvasKey;
+          setReady(true);
+        }}
         onMapLoaded={() => {
+          if (!mounted.current) return;
+          loadedCanvas.current = canvasKey;
           setLoaded(true);
           setLoadFailed(false);
         }}
@@ -216,9 +368,14 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         zoomEnabled={interactive}
         rotateEnabled={false}
         pitchEnabled={false}
+        onPanDrag={() => setFollowing(false)}
         onPress={
           onMapPress
             ? event =>
+                isValidPoint({
+                  lat: event.nativeEvent.coordinate.latitude,
+                  lng: event.nativeEvent.coordinate.longitude,
+                }) &&
                 onMapPress({
                   lat: event.nativeEvent.coordinate.latitude,
                   lng: event.nativeEvent.coordinate.longitude,
@@ -227,6 +384,36 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         }
         pointerEvents={interactive ? 'auto' : 'none'}
       >
+        {vehicle && (
+          <Marker
+            coordinate={toCoord(vehicle.point)}
+            rotation={Number.isFinite(vehicle.heading) ? vehicle.heading! : 0}
+            anchor={{ x: 0.5, y: 0.5 }}
+            accessibilityLabel={
+              vehicle.stale
+                ? 'Última ubicación del vehículo'
+                : 'Vehículo en vivo'
+            }
+          >
+            <View
+              style={{
+                backgroundColor: vehicle.stale
+                  ? theme.colors.textMuted
+                  : theme.colors.primary,
+                borderRadius: 24,
+                padding: 8,
+                borderWidth: 3,
+                borderColor: theme.colors.surfaceRaised,
+              }}
+            >
+              <MaterialIcons
+                name="navigation"
+                size={22}
+                color={theme.colors.textInverse}
+              />
+            </View>
+          </Marker>
+        )}
         {origin && (
           <Marker
             coordinate={toCoord(origin)}
@@ -307,11 +494,23 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
                 },
               ]}
             >
-              <MaterialIcons
-                name={m.iconName ?? 'circle'}
-                size={12}
-                color={theme.colors.textInverse}
-              />
+              {m.label ? (
+                <Text
+                  style={{
+                    color: theme.colors.textInverse,
+                    fontSize: 14,
+                    fontWeight: '700',
+                  }}
+                >
+                  {m.label}
+                </Text>
+              ) : (
+                <MaterialIcons
+                  name={m.iconName ?? 'circle'}
+                  size={12}
+                  color={theme.colors.textInverse}
+                />
+              )}
             </View>
           </Marker>
         ))}
@@ -335,6 +534,10 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
           pointerEvents="none"
           style={[
             styles.state,
+            {
+              paddingTop: viewportInsets?.top ?? 0,
+              paddingBottom: viewportInsets?.bottom ?? 0,
+            },
             { backgroundColor: theme.colors.surfaceOverlay },
           ]}
         >
@@ -348,6 +551,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         <View
           style={[
             styles.state,
+            { paddingTop: viewportTop, paddingBottom: viewportBottom },
             { backgroundColor: theme.colors.surfaceOverlay },
           ]}
         >
@@ -378,6 +582,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
           variant="outline"
           style={[
             styles.recenter,
+            { top: viewportTop + 12 },
             { backgroundColor: theme.colors.surfaceRaised },
           ]}
           icon={
@@ -387,7 +592,24 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
               color={theme.colors.primary}
             />
           }
-          onPress={frameRoute}
+          onPress={() => {
+            setFollowing(false);
+            frameRoute();
+          }}
+        />
+      )}
+      {loaded && vehicle && (
+        <Button
+          title={following ? 'Siguiendo vehículo' : 'Seguir vehículo'}
+          variant="outline"
+          fullWidth={false}
+          style={{
+            position: 'absolute',
+            left: 12,
+            bottom: viewportBottom + 12,
+            backgroundColor: theme.colors.surfaceRaised,
+          }}
+          onPress={() => setFollowing(true)}
         />
       )}
     </View>

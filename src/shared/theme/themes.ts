@@ -3,7 +3,7 @@ import { motion, radii, spacing, touchTarget, typography } from './tokens';
 const status = {
   error: '#D92D20',
   success: '#16875B',
-  warning: '#D99B00',
+  warning: '#956700',
   info: '#2474C6',
 } as const;
 
@@ -16,7 +16,7 @@ export const lightTheme = {
     surfaceOverlay: '#EEF3F9',
     textPrimary: '#10213D',
     textSecondary: '#526078',
-    textMuted: '#738096',
+    textMuted: '#627087',
     textInverse: '#FFFFFF',
     primary: '#174F9C',
     primaryPressed: '#103E7D',
@@ -28,7 +28,7 @@ export const lightTheme = {
     status,
   },
   spacing,
-  radii: { ...radii, sm: 12, md: 18, lg: 24, xl: 32 },
+  radii,
   typography,
   motion,
   touchTarget,

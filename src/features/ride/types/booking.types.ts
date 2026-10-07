@@ -6,7 +6,9 @@ export type BookingStatus =
   | 'cancelled'
   | 'rejected'
   | 'in_progress'
-  | 'completed';
+  | 'completed'
+  | 'no_show'
+  | 'interrupted';
 
 export type BookingMutableStatus = Extract<
   BookingStatus,

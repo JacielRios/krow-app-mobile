@@ -62,6 +62,7 @@ internal class NavigationJournal(context: Context, name: String = "krow-navigati
         }
     }
     @Synchronized fun acknowledge(sequence: Long) { writableDatabase.delete("samples", "sequence<=?", arrayOf(sequence.toString())) }
+    @Synchronized fun prune(retentionMs: Long) { writableDatabase.delete("samples", "captured<?", arrayOf((System.currentTimeMillis() - retentionMs).toString())) }
     @Synchronized fun clear() {
         writableDatabase.delete("state", null, null)
         writableDatabase.delete("samples", null, null)

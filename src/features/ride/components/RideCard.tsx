@@ -39,7 +39,8 @@ const formatPriceMxn = (value: number): string =>
   new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 
 export const RideCard: React.FC<RideCardProps> = ({
@@ -67,7 +68,10 @@ export const RideCard: React.FC<RideCardProps> = ({
       <View style={styles.headerRow}>
         <Avatar name={driverName} size="md" />
         <View style={styles.headerText}>
-          <Text style={[styles.driverName, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+          <Text
+            style={[styles.driverName, { color: theme.colors.textPrimary }]}
+            numberOfLines={1}
+          >
             {driverName}
           </Text>
           {ride.driverRating != null && (
@@ -77,7 +81,12 @@ export const RideCard: React.FC<RideCardProps> = ({
                 size={14}
                 color={theme.colors.status.warning}
               />
-              <Text style={[styles.ratingText, { color: theme.colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.ratingText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
                 {ride.driverRating.toFixed(1)}
               </Text>
             </View>
@@ -86,7 +95,12 @@ export const RideCard: React.FC<RideCardProps> = ({
         <StatusBadge tone="info" label="Programado" size="sm" />
       </View>
 
-      <View style={[styles.routeBlock, { backgroundColor: theme.colors.surfaceOverlay }]}>
+      <View
+        style={[
+          styles.routeBlock,
+          { backgroundColor: theme.colors.surfaceOverlay },
+        ]}
+      >
         <View style={styles.routeRow}>
           <MaterialIcons
             name="trip-origin"
@@ -94,11 +108,19 @@ export const RideCard: React.FC<RideCardProps> = ({
             color={theme.colors.primary}
             style={styles.routeIcon}
           />
-          <Text style={[styles.routeText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+          <Text
+            style={[styles.routeText, { color: theme.colors.textPrimary }]}
+            numberOfLines={1}
+          >
             {ride.originAddress ?? 'Origen sin dirección'}
           </Text>
         </View>
-        <View style={[styles.routeConnector, { backgroundColor: theme.colors.border }]} />
+        <View
+          style={[
+            styles.routeConnector,
+            { backgroundColor: theme.colors.border },
+          ]}
+        />
         <View style={styles.routeRow}>
           <MaterialIcons
             name="place"
@@ -106,7 +128,10 @@ export const RideCard: React.FC<RideCardProps> = ({
             color={colors.status.error}
             style={styles.routeIcon}
           />
-          <Text style={[styles.routeText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+          <Text
+            style={[styles.routeText, { color: theme.colors.textPrimary }]}
+            numberOfLines={1}
+          >
             {ride.destinationAddress ?? 'Destino sin dirección'}
           </Text>
         </View>
@@ -119,10 +144,12 @@ export const RideCard: React.FC<RideCardProps> = ({
         ]}
       >
         <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Sube en {ride.bestPickupStop.name} · {ride.match.pickupDistanceMeters} m
+          Sube en {ride.bestPickupStop.name} · {ride.match.pickupDistanceMeters}{' '}
+          m
         </Text>
         <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Baja en {ride.bestDropoffStop.name} · {ride.match.dropoffDistanceMeters} m
+          Baja en {ride.bestDropoffStop.name} ·{' '}
+          {ride.match.dropoffDistanceMeters} m
         </Text>
       </View>
 
@@ -133,7 +160,10 @@ export const RideCard: React.FC<RideCardProps> = ({
             size={14}
             color={theme.colors.textSecondary}
           />
-          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+          <Text
+            style={[styles.metaText, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
             {formatDepartureTime(ride.departureTime)}
           </Text>
         </View>
@@ -143,14 +173,24 @@ export const RideCard: React.FC<RideCardProps> = ({
             size={14}
             color={theme.colors.textSecondary}
           />
-          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{seatsLabel}</Text>
+          <Text
+            style={[styles.metaText, { color: theme.colors.textSecondary }]}
+          >
+            {seatsLabel}
+          </Text>
         </View>
       </View>
 
       <View style={styles.footer}>
         <View style={styles.priceWrap}>
-          <Text style={[styles.price, { color: theme.colors.primary }]}>{formatPriceMxn(ride.pricePerSeat)}</Text>
-          <Text style={[styles.priceUnit, { color: theme.colors.textSecondary }]}>/ asiento</Text>
+          <Text style={[styles.price, { color: theme.colors.primary }]}>
+            {formatPriceMxn(ride.pricePerSeat)}
+          </Text>
+          <Text
+            style={[styles.priceUnit, { color: theme.colors.textSecondary }]}
+          >
+            / asiento
+          </Text>
         </View>
         <View style={styles.actionWrap}>
           <Button

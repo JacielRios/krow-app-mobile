@@ -37,8 +37,14 @@ export function useRequestBooking(): UseRequestBookingResult {
         payload.seats_reserved ?? 1,
       );
       return { bookingId: data.bookingId, error: null };
-    } catch (error: any) {
-      return { bookingId: null, error: error?.message ?? 'No se pudo solicitar el viaje' };
+    } catch (error: unknown) {
+      return {
+        bookingId: null,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo solicitar el viaje',
+      };
     } finally {
       setLoading(false);
     }

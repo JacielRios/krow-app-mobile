@@ -44,6 +44,8 @@ local.properties
 # node.js
 #
 node_modules/
+.gradle-cache/
+.g/
 npm-debug.log
 yarn-error.log
 
@@ -71,7 +73,9 @@ yarn-error.log
 
 # testing
 /coverage
+/.tmp/
 /artifacts/ios/
+/artifacts/android/
 
 # Yarn
 .yarn/*

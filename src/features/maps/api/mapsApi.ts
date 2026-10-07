@@ -89,7 +89,13 @@ export async function getPlaceDetails(
     `/maps/places/${encodeURIComponent(placeId)}${query ? `?${query}` : ''}`,
     { signal: options.signal },
   );
-  if (!result?.placeId || !isValidPoint(result.location)) {
+  if (
+    !result ||
+    typeof result.placeId !== 'string' ||
+    !result.placeId ||
+    typeof result.formattedAddress !== 'string' ||
+    !isValidPoint(result.location)
+  ) {
     throw new Error(
       'No pudimos obtener la ubicación de este lugar. Prueba otra dirección.',
     );
@@ -106,18 +112,30 @@ export const isValidPoint = (
   Math.abs(point.lat) <= 90 &&
   Math.abs(point.lng) <= 180;
 
-export function reverseGeocode(
+export async function reverseGeocode(
   point: LatLng,
   options: { signal?: AbortSignal } = {},
 ): Promise<{ formattedAddress: string; placeId: string | null } | null> {
-  return apiRequest('/maps/reverse-geocode', {
+  const result = await apiRequest<{
+    formattedAddress: string;
+    placeId: string | null;
+  } | null>('/maps/reverse-geocode', {
     method: 'POST',
     body: JSON.stringify({ point }),
     signal: options.signal,
   });
+  if (
+    result !== null &&
+    (!result ||
+      typeof result.formattedAddress !== 'string' ||
+      (result.placeId !== null && typeof result.placeId !== 'string'))
+  ) {
+    throw new Error('No pudimos identificar la dirección. Elige otro punto.');
+  }
+  return result;
 }
 
-export function getDirections(
+export async function getDirections(
   origin: LatLng,
   destination: LatLng,
   options: {
@@ -126,7 +144,7 @@ export function getDirections(
     language?: string;
   } = {},
 ): Promise<DirectionsResult | null> {
-  return apiRequest('/routes/preview', {
+  const result = await apiRequest<DirectionsResult>('/routes/preview', {
     method: 'POST',
     body: JSON.stringify({
       origin,
@@ -134,6 +152,31 @@ export function getDirections(
       departureTime: options.departureTime?.toISOString(),
     }),
   });
+  if (
+    !result ||
+    typeof result.encodedPolyline !== 'string' ||
+    !Number.isFinite(result.distanceMeters) ||
+    result.distanceMeters < 0 ||
+    !Number.isFinite(result.durationSeconds) ||
+    result.durationSeconds < 0 ||
+    !Array.isArray(result.compatibleStops) ||
+    result.compatibleStops.some(
+      stop =>
+        !stop ||
+        typeof stop.stopId !== 'string' ||
+        !stop.stopId ||
+        typeof stop.name !== 'string' ||
+        !isValidPoint(stop.location) ||
+        !Number.isFinite(stop.routeFraction) ||
+        !Number.isFinite(stop.distanceFromRouteMeters),
+    )
+  ) {
+    throw new Error(
+      'No pudimos leer el recorrido. Reintenta calcular la ruta.',
+    );
+  }
+  decodePolyline(result.encodedPolyline);
+  return result;
 }
 
 /* eslint-disable no-bitwise */
@@ -144,24 +187,26 @@ export function decodePolyline(
   let index = 0;
   let lat = 0;
   let lng = 0;
-  while (index < encoded.length) {
+  const readDelta = () => {
     let result = 0;
     let shift = 0;
     let byte: number;
     do {
+      if (index >= encoded.length || shift >= 30)
+        throw new Error('La ruta recibida está incompleta.');
       byte = encoded.charCodeAt(index++) - 63;
+      if (byte < 0 || byte > 63)
+        throw new Error('La ruta recibida no es válida.');
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-    lat += result & 1 ? ~(result >> 1) : result >> 1;
-    result = 0;
-    shift = 0;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20);
-    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (index < encoded.length) {
+    lat += readDelta();
+    lng += readDelta();
+    if (!isValidPoint({ lat: lat / 1e5, lng: lng / 1e5 }))
+      throw new Error('La ruta contiene una ubicación inválida.');
     points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
   }
   return points;

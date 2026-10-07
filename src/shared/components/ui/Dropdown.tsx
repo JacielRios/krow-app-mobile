@@ -31,7 +31,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   error,
   icon,
 }) => {
-  const { theme } = useTheme();
+  const { theme, motionEnabled } = useTheme();
   const [visible, setVisible] = useState(false);
 
   const toggleDropdown = () => setVisible(!visible);
@@ -43,38 +43,92 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
   return (
     <View style={styles.container}>
-      {label && <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text>}
-      
+      {label && (
+        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+          {label}
+        </Text>
+      )}
+
       <TouchableOpacity
-        style={[styles.inputContainer, { backgroundColor: theme.colors.surfaceRaised, borderColor: error ? theme.colors.status.error : theme.colors.border }]}
+        style={[
+          styles.inputContainer,
+          {
+            backgroundColor: theme.colors.surfaceRaised,
+            borderColor: error
+              ? theme.colors.status.error
+              : theme.colors.border,
+          },
+        ]}
         onPress={toggleDropdown}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`${label ?? placeholder}: ${
+          value || 'Sin selección'
+        }`}
+        accessibilityState={{ expanded: visible }}
       >
         {icon && <View style={styles.iconContainer}>{icon}</View>}
-        <Text style={[styles.input, { color: value ? theme.colors.textPrimary : theme.colors.textMuted }]}>
+        <Text
+          style={[
+            styles.input,
+            {
+              color: value ? theme.colors.textPrimary : theme.colors.textMuted,
+            },
+          ]}
+        >
           {value || placeholder}
         </Text>
       </TouchableOpacity>
 
-      {error && <Text style={[styles.errorText, { color: theme.colors.status.error }]}>{error}</Text>}
+      {error && (
+        <Text style={[styles.errorText, { color: theme.colors.status.error }]}>
+          {error}
+        </Text>
+      )}
 
-      <Modal visible={visible} transparent animationType="fade">
+      <Modal
+        visible={visible}
+        transparent
+        animationType={motionEnabled ? 'fade' : 'none'}
+        onRequestClose={() => setVisible(false)}
+      >
         <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View style={[styles.modalOverlay, { backgroundColor: theme.colors.backdrop }]}>
+          <View
+            style={[
+              styles.modalOverlay,
+              { backgroundColor: theme.colors.backdrop },
+            ]}
+          >
             <TouchableWithoutFeedback>
-              <View style={[styles.dropdownContainer, { backgroundColor: theme.colors.surfaceRaised }, createShadow(3, theme.colors.shadow)]}>
+              <View
+                style={[
+                  styles.dropdownContainer,
+                  { backgroundColor: theme.colors.surfaceRaised },
+                  createShadow(3, theme.colors.shadow),
+                ]}
+              >
                 <FlatList
                   data={options}
                   keyExtractor={(item, index) => index.toString()}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={[styles.optionItem, { borderBottomColor: theme.colors.border }]}
+                      style={[
+                        styles.optionItem,
+                        { borderBottomColor: theme.colors.border },
+                      ]}
                       onPress={() => handleSelect(item)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: value === item }}
                     >
                       <Text
                         style={[
                           styles.optionText,
-                          { color: value === item ? theme.colors.primary : theme.colors.textPrimary },
+                          {
+                            color:
+                              value === item
+                                ? theme.colors.primary
+                                : theme.colors.textPrimary,
+                          },
                         ]}
                       >
                         {item}

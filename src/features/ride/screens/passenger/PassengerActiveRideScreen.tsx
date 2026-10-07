@@ -84,8 +84,7 @@ export const PassengerActiveRideScreen: React.FC = () => {
   }, [data]);
 
   const showInitialLoader = loading && !data;
-  const passengerData =
-    data && data.role === 'pasajero' ? data : null;
+  const passengerData = data && data.role === 'pasajero' ? data : null;
 
   return (
     <View style={styles.flex}>
@@ -148,11 +147,7 @@ const ScreenHeader: React.FC<{
       style={styles.backBtn}
       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
-      <MaterialIcons
-        name="arrow-back"
-        size={24}
-        color={colors.text.primary}
-      />
+      <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
     </TouchableOpacity>
     <View style={styles.headerText}>
       <Text style={styles.title}>Tu viaje</Text>
@@ -247,17 +242,14 @@ const DriverInfoBlock: React.FC<{ driver: ActiveRideDriver }> = ({
     'Vehículo';
   const vehicleDetails: string[] = [];
   if (driver.vehicleColor) vehicleDetails.push(driver.vehicleColor);
-  if (driver.vehicleLicensePlate) vehicleDetails.push(driver.vehicleLicensePlate);
+  if (driver.vehicleLicensePlate)
+    vehicleDetails.push(driver.vehicleLicensePlate);
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardLabel}>Conductor</Text>
       <View style={styles.driverRow}>
-        <Avatar
-          uri={driver.profilePhoto ?? undefined}
-          name={name}
-          size="md"
-        />
+        <Avatar uri={driver.profilePhoto ?? undefined} name={name} size="md" />
         <View style={styles.driverRowText}>
           <Text style={styles.driverName} numberOfLines={1}>
             {name}
@@ -269,9 +261,7 @@ const DriverInfoBlock: React.FC<{ driver: ActiveRideDriver }> = ({
                 size={14}
                 color={colors.status.warning}
               />
-              <Text style={styles.ratingText}>
-                {driver.rating.toFixed(1)}
-              </Text>
+              <Text style={styles.ratingText}>{driver.rating.toFixed(1)}</Text>
             </View>
           )}
         </View>
@@ -329,6 +319,10 @@ const renderStatusBadge = (status: BookingStatus) => {
       return <StatusBadge status="in_progress" size="sm" />;
     case 'completed':
       return <StatusBadge status="completed" size="sm" />;
+    case 'no_show':
+      return <StatusBadge tone="warning" label="Ausencia" size="sm" />;
+    case 'interrupted':
+      return <StatusBadge tone="error" label="Interrumpida" size="sm" />;
   }
 };
 
@@ -347,6 +341,10 @@ const statusMessageFor = (status: BookingStatus): string => {
       return 'El conductor rechazó tu solicitud.';
     case 'cancelled':
       return 'Esta reserva fue cancelada.';
+    case 'no_show':
+      return 'Se registró tu ausencia en la parada.';
+    case 'interrupted':
+      return 'El viaje fue interrumpido. Consulta el detalle de tu reserva.';
   }
 };
 

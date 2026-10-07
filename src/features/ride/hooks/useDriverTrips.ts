@@ -2,10 +2,13 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { rideApi } from '../api/rideApi';
 import type { RideStatus } from '../types/ride.types';
 
-export function useDriverTrips(status?: RideStatus) {
+export function useDriverTrips(
+  status?: RideStatus,
+  group?: 'upcoming' | 'active' | 'history',
+) {
   const query = useInfiniteQuery({
-    queryKey: ['driver-rides', status ?? 'all'],
-    queryFn: ({ pageParam }) => rideApi.mine(status, pageParam, 50),
+    queryKey: ['driver-rides', status ?? 'all', group],
+    queryFn: ({ pageParam }) => rideApi.mine(status, pageParam, 50, group),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) =>
       lastPage.length === 50 ? pages.length * 50 : undefined,

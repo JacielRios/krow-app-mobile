@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-10-07T15:06:09.5404653Z",
+  "apk": "artifacts/android/krow-trial.apk",
+  "sha256": "CB03A21209D47EE943948CAFAB3682A406E59E3840E4E5CE7296501EB8497EB8",
+  "bytes": 136764786,
+  "package": "com.krownmobileapp",
+  "versionCode": 3,
+  "versionName": "0.2.1-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3860212,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false
+}

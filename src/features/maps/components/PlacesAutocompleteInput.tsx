@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -34,6 +35,8 @@ interface Props {
   /** Si false, los resultados no se cierran automáticamente al elegir. */
   closeOnSelect?: boolean;
   autoFocus?: boolean;
+  /** Keep the field visible while results scroll inside a bounded picker. */
+  scrollResults?: boolean;
 }
 
 /**
@@ -61,6 +64,7 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
   icon,
   closeOnSelect = true,
   autoFocus = false,
+  scrollResults = false,
 }) => {
   const { theme } = useTheme();
   const {
@@ -141,9 +145,10 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
 
   // Keep results tappable when the keyboard loses focus during a scroll or tap.
   const showSuggestions = !value && query.trim().length >= 2;
+  const ResultsContainer = scrollResults ? ScrollView : View;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, scrollResults && styles.bounded]}>
       <Input
         label={label}
         placeholder={placeholder}
@@ -191,9 +196,17 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
       />
 
       {showSuggestions && (
-        <View
+        <ResultsContainer
+          {...(scrollResults
+            ? {
+                keyboardShouldPersistTaps: 'always' as const,
+                keyboardDismissMode: 'none' as const,
+              }
+            : {})}
+          accessibilityLabel="Resultados de búsqueda"
           style={[
             styles.suggestions,
+            scrollResults && styles.resultsScroll,
             depth(theme, 1),
             {
               backgroundColor: theme.colors.surfaceRaised,
@@ -279,7 +292,7 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
               />
             </Pressable>
           ))}
-        </View>
+        </ResultsContainer>
       )}
     </View>
   );
@@ -290,6 +303,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 10,
   },
+  bounded: { flex: 1, minHeight: 0 },
+  resultsScroll: { flexShrink: 1, minHeight: 0 },
   suggestions: {
     borderWidth: 1,
     marginTop: -spacing.sm,

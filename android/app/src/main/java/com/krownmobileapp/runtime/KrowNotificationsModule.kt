@@ -26,6 +26,9 @@ class KrowNotificationsModule(private val context: ReactApplicationContext) : Re
         }
     }
     override fun getName() = "KrowNotifications"
+    @ReactMethod fun setSessionActor(actor: String) {
+        context.getSharedPreferences("krow_push", 0).edit().putString("actor_id",actor).apply()
+    }
     @ReactMethod fun setSessionActive(active: Boolean) {
         context.getSharedPreferences("krow_push", 0).edit().putBoolean("session_active", active).apply()
         if (!active) androidx.core.app.NotificationManagerCompat.from(context).cancelAll()

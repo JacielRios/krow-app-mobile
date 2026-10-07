@@ -28,6 +28,8 @@ class KrowMessagingService : FirebaseMessagingService() {
     }
     override fun onMessageReceived(message: RemoteMessage) {
         if (!getSharedPreferences("krow_push", 0).getBoolean("session_active", false)) return
+        val recipient = message.data["recipientId"]
+        if (recipient != null && recipient != getSharedPreferences("krow_push",0).getString("actor_id",null)) return
         val ride = message.data["rideId"] ?: return
         val id = message.data["intentId"] ?: return
         try { UUID.fromString(ride); UUID.fromString(id) } catch (_: Exception) { return }

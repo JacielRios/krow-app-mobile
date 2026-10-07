@@ -85,6 +85,9 @@ export const Input = forwardRef<RNTextInput, InputProps>(
           ) : null}
           <RNTextInput
             {...rest}
+            accessibilityLabel={
+              rest.accessibilityLabel ?? label ?? rest.placeholder
+            }
             ref={ref}
             style={[
               {
@@ -120,6 +123,7 @@ export const Input = forwardRef<RNTextInput, InputProps>(
         </View>
         {error ? (
           <Text
+            accessibilityLiveRegion="polite"
             style={{
               color: theme.colors.status.error,
               fontSize: theme.typography.size.sm,

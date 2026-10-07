@@ -1,7 +1,3 @@
-import {
-  AmbientBackground,
-  Surface,
-} from '../../../../shared/components/ui-v2';
 import React, {
   useCallback,
   useEffect,
@@ -10,17 +6,12 @@ import React, {
   useState,
 } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  NativeModules,
-  PermissionsAndroid,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  TurboModuleRegistry,
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -48,10 +39,16 @@ import type {
   PassengerStopCandidates,
   StopPair,
 } from '../../types/rideSearch.types';
-import { PlacePicker, RoutePreviewMap, useReverseGeocode } from '../../../maps';
+import { PlacePicker, RoutePreviewMap } from '../../../maps';
 import type { PlacesAutocompleteValue } from '../../../maps';
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
+import { Card, Surface } from '../../../../shared/components/ui-v2';
+import { ScreenHeader } from '../../../../shared/components/ui-v2/ScreenHeader';
+import { useQueryClient } from '@tanstack/react-query';
+import Config from 'react-native-config';
+import { CAMPUS_ORIGIN } from '../../domain/driverRideRules';
+import { RideOriginSummary } from '../../components/RideOriginSummary';
 
 type RequestRideNav = NativeStackNavigationProp<
   MainStackParamList,
@@ -75,7 +72,8 @@ const formatPriceMxn = (value: number): string =>
   new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 
 interface ActiveBookingRow {
@@ -90,50 +88,19 @@ const EMPTY_CANDIDATES: PassengerStopCandidates = {
   pairs: [],
 };
 
-type GeolocationModule =
-  typeof import('@react-native-community/geolocation')['default'];
-
-const loadGeolocation = (): GeolocationModule | null => {
-  const nativeModule =
-    TurboModuleRegistry.get('RNCGeolocation') ?? NativeModules.RNCGeolocation;
-  if (!nativeModule) return null;
-  try {
-    return require('@react-native-community/geolocation')
-      .default as GeolocationModule;
-  } catch {
-    return null;
-  }
-};
-
-const requestLocationPermission = async (
-  geolocation: GeolocationModule,
-): Promise<boolean> => {
-  if (Platform.OS === 'ios') {
-    return new Promise<boolean>(resolve => {
-      geolocation.requestAuthorization(
-        () => resolve(true),
-        () => resolve(false),
-      );
-    });
-  }
-  if (Platform.OS !== 'android' || Number(Platform.Version) < 23) return true;
-  const status = await PermissionsAndroid.request(
-    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    {
-      title: 'Usar tu ubicación',
-      message:
-        'KROW usa tu ubicación para encontrar paradas de subida cercanas.',
-      buttonPositive: 'Permitir',
-      buttonNegative: 'Ahora no',
-    },
-  );
-  return status === PermissionsAndroid.RESULTS.GRANTED;
-};
-
 export const RequestRideScreen: React.FC = () => {
   const { theme } = useTheme();
   const navigation = useNavigation<RequestRideNav>();
   const insets = useSafeAreaInsets();
+  const cache = useQueryClient();
+  const scroll = useRef<ScrollView>(null);
+  const [stage, setStage] = useState<'route' | 'stops' | 'results'>('route');
+  const [feedback, setFeedback] = useState('');
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+  const [candidateAttempt, setCandidateAttempt] = useState(0);
+  useEffect(() => {
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [stage]);
 
   const {
     rides,
@@ -143,7 +110,6 @@ export const RequestRideScreen: React.FC = () => {
     reset,
   } = useSearchRides();
   const { requestBooking, loading: requesting } = useRequestBooking();
-  const { resolve: reverseGeocode } = useReverseGeocode();
 
   const [requestedRideIds, setRequestedRideIds] = useState<Set<string>>(
     new Set(),
@@ -151,8 +117,11 @@ export const RequestRideScreen: React.FC = () => {
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [selectedRide, setSelectedRide] = useState<AvailableRide | null>(null);
   const [requestingRideId, setRequestingRideId] = useState<string | null>(null);
+  const sendingRequest = useRef(false);
+  const mounted = useRef(true);
+  const bookingsRequest = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [origin, setOrigin] = useState<PlacesAutocompleteValue | null>(null);
+  const origin = CAMPUS_ORIGIN;
   const [destination, setDestination] =
     useState<PlacesAutocompleteValue | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -170,78 +139,29 @@ export const RequestRideScreen: React.FC = () => {
   const [selectedDropoffId, setSelectedDropoffId] = useState<string | null>(
     null,
   );
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [locationMessage, setLocationMessage] = useState(
-    'Obteniendo tu ubicación actual…',
-  );
-  const requestedLocation = useRef(false);
-
-  const locateCurrentPosition = useCallback(async () => {
-    setLocationLoading(true);
-    setLocationMessage('Obteniendo tu ubicación actual…');
-    try {
-      const geolocation = loadGeolocation();
-      if (!geolocation) {
-        setLocationMessage(
-          'Actualiza la aplicación para usar el GPS. Mientras tanto, puedes escribir tu origen.',
-        );
-        return;
-      }
-      const allowed = await requestLocationPermission(geolocation);
-      if (!allowed) {
-        setLocationMessage(
-          'Permiso de ubicación no concedido. Puedes elegir tu origen en el mapa.',
-        );
-        return;
-      }
-      const position = await new Promise<{
-        coords: { latitude: number; longitude: number };
-      }>((resolvePosition, rejectPosition) => {
-        geolocation.getCurrentPosition(resolvePosition, rejectPosition, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 30000,
-        });
-      });
-      const point = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      };
-      const address = await reverseGeocode(point);
-      setOrigin({
-        address: address ?? 'Mi ubicación actual',
-        placeId: '',
-        location: point,
-      });
-      setLocationMessage('Ubicación actual detectada');
-    } catch {
-      setLocationMessage(
-        'No pudimos obtener tu ubicación. Puedes elegir tu origen en el mapa.',
-      );
-    } finally {
-      setLocationLoading(false);
-    }
-  }, [reverseGeocode]);
-
+  const [pickupScope, setPickupScope] = useState<'campus' | 'route'>('campus');
   useEffect(() => {
-    if (requestedLocation.current) return;
-    requestedLocation.current = true;
-    locateCurrentPosition().catch(() => undefined);
-  }, [locateCurrentPosition]);
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      bookingsRequest.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
-    if (!origin || !destination) {
+    if (!destination) {
       setStopCandidates(EMPTY_CANDIDATES);
       setSelectedPickupId(null);
       setSelectedDropoffId(null);
       setStopCandidatesError(null);
+      setStopCandidatesLoading(false);
       return;
     }
     setStopCandidatesLoading(true);
     setStopCandidatesError(null);
     rideApi
-      .stopCandidates(origin.location, destination.location)
+      .stopCandidates(origin.location, destination.location, { pickupScope })
       .then(result => {
         if (!active) return;
         setStopCandidates(result);
@@ -264,12 +184,14 @@ export const RequestRideScreen: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [destination, origin]);
+  }, [destination, origin, candidateAttempt, pickupScope]);
 
   const loadActiveBookings = useCallback(async () => {
+    const request = ++bookingsRequest.current;
     setBookingsLoading(true);
     try {
       const data = await bookingApi.activeRideIds();
+      if (!mounted.current || request !== bookingsRequest.current) return;
 
       const ids = new Set(
         (data as ActiveBookingRow[])
@@ -277,10 +199,15 @@ export const RequestRideScreen: React.FC = () => {
           .filter((id): id is string => typeof id === 'string'),
       );
       setRequestedRideIds(ids);
+      setBookingsError(null);
     } catch {
-      // Silencio defensivo: degradar sin crashear el screen.
+      if (!mounted.current || request !== bookingsRequest.current) return;
+      setBookingsError(
+        'No pudimos comprobar tus reservas. Reintenta antes de solicitar un viaje.',
+      );
     } finally {
-      setBookingsLoading(false);
+      if (mounted.current && request === bookingsRequest.current)
+        setBookingsLoading(false);
     }
   }, []);
 
@@ -288,10 +215,13 @@ export const RequestRideScreen: React.FC = () => {
     async (forceSearch = false) => {
       try {
         const searchPromise =
-          origin && destination && (hasSearched || forceSearch)
+          destination && (hasSearched || forceSearch)
             ? search({
                 maxResults: 50,
-                origin: origin.location,
+                origin:
+                  stopCandidates.pickupStops.find(
+                    stop => stop.stopId === selectedPickupId,
+                  )?.location ?? origin.location,
                 destination: destination.location,
                 maxDistanceKm: 1,
                 pickupTransportStopId: selectedPickupId ?? undefined,
@@ -312,14 +242,15 @@ export const RequestRideScreen: React.FC = () => {
       hasSearched,
       selectedPickupId,
       selectedDropoffId,
+      stopCandidates.pickupStops,
     ],
   );
 
   const handleSearch = () => {
-    if (!origin || !destination) {
+    if (!destination) {
       Alert.alert(
         'Ruta incompleta',
-        'Selecciona un origen y un destino para buscar coincidencias.',
+        'Selecciona un destino para buscar coincidencias.',
       );
       return;
     }
@@ -331,6 +262,7 @@ export const RequestRideScreen: React.FC = () => {
       return;
     }
     setHasSearched(true);
+    setStage('results');
     loadAll(true).catch(() => undefined);
   };
 
@@ -376,7 +308,7 @@ export const RequestRideScreen: React.FC = () => {
     try {
       await loadAll();
     } finally {
-      setRefreshing(false);
+      if (mounted.current) setRefreshing(false);
     }
   };
 
@@ -384,7 +316,7 @@ export const RequestRideScreen: React.FC = () => {
     ride: AvailableRide,
     pair: StopPair | undefined,
   ) => {
-    if (requestedRideIds.has(ride.rideId)) return;
+    if (requestedRideIds.has(ride.rideId) || sendingRequest.current) return;
     if (!pair) {
       Alert.alert(
         'Selecciona tus paradas',
@@ -393,33 +325,45 @@ export const RequestRideScreen: React.FC = () => {
       return;
     }
 
+    sendingRequest.current = true;
     setRequestingRideId(ride.rideId);
-    const { bookingId, error } = await requestBooking({
-      ride_id: ride.rideId,
-      seats_reserved: 1,
-      pickup_stop_id: pair.pickup.stopId,
-      dropoff_stop_id: pair.dropoff.stopId,
-    });
-    setRequestingRideId(null);
+    try {
+      const { bookingId, error } = await requestBooking({
+        ride_id: ride.rideId,
+        seats_reserved: 1,
+        pickup_stop_id: pair.pickup.stopId,
+        dropoff_stop_id: pair.dropoff.stopId,
+      });
 
-    if (error || !bookingId) {
-      Alert.alert(
-        'No se pudo solicitar',
-        error ?? 'Inténtalo de nuevo en un momento.',
-      );
-      return;
+      if (error || !bookingId) {
+        if (!mounted.current) return;
+        Alert.alert(
+          'No se pudo solicitar',
+          error ?? 'Inténtalo de nuevo en un momento.',
+        );
+        return;
+      }
+
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: ['activity'] }),
+        cache.invalidateQueries({ queryKey: ['recent-rides'] }),
+        cache.invalidateQueries({ queryKey: ['active-ride'] }),
+      ]);
+      if (!mounted.current) return;
+      setRequestedRideIds(prev => {
+        const next = new Set(prev);
+        next.add(ride.rideId);
+        return next;
+      });
+      setSelectedRide(null);
+      if (Config.KROW_PILOT_ENABLED === 'true')
+        navigation.navigate('RideScheduled', { rideId: ride.rideId });
+      else
+        setFeedback('Solicitud enviada. El conductor debe confirmar tu lugar.');
+    } finally {
+      sendingRequest.current = false;
+      if (mounted.current) setRequestingRideId(null);
     }
-
-    setRequestedRideIds(prev => {
-      const next = new Set(prev);
-      next.add(ride.rideId);
-      return next;
-    });
-    setSelectedRide(null);
-    Alert.alert(
-      'Solicitud enviada',
-      'Tu solicitud está pendiente de confirmación por el conductor.',
-    );
   };
 
   const isInitialLoading =
@@ -469,16 +413,23 @@ export const RequestRideScreen: React.FC = () => {
     reset();
   };
 
+  const pickup = stopCandidates.pickupStops.find(
+    stop => stop.stopId === selectedPickupId,
+  );
+  const dropoff = stopCandidates.dropoffStops.find(
+    stop => stop.stopId === selectedDropoffId,
+  );
   return (
     <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <AmbientBackground />
       <ScrollView
-        style={{ flex: 1 }}
+        ref={scroll}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.container,
           {
             paddingTop: insets.top + spacing.md,
             paddingBottom: insets.bottom + spacing.xl,
+            gap: 16,
           },
         ]}
         refreshControl={
@@ -489,160 +440,220 @@ export const RequestRideScreen: React.FC = () => {
           />
         }
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialIcons
-              name="arrow-back"
-              size={24}
-              color={theme.colors.textPrimary}
+        <ScreenHeader
+          title={
+            stage === 'route'
+              ? '¿A dónde vamos?'
+              : stage === 'stops'
+              ? 'Elige tus paradas'
+              : 'Viajes para ti'
+          }
+          subtitle={
+            stage === 'route'
+              ? 'Los viajes salen del Tecnológico. Elige a dónde vas.'
+              : stage === 'stops'
+              ? 'Confirma dónde subirás y dónde bajarás.'
+              : 'Revisa el recorrido y solicita tu lugar.'
+          }
+          onBack={() =>
+            stage === 'route'
+              ? navigation.goBack()
+              : setStage(stage === 'results' ? 'stops' : 'route')
+          }
+        />
+        <Text
+          style={{ color: theme.colors.textSecondary }}
+          accessibilityLiveRegion="polite"
+        >
+          {stage === 'route'
+            ? '1 de 3 · Tu recorrido'
+            : stage === 'stops'
+            ? '2 de 3 · Encuentro y descenso'
+            : '3 de 3 · Elige un viaje'}
+        </Text>
+        {stage === 'route' ? (
+          <Surface contentStyle={{ padding: 16, gap: 16 }}>
+            <RideOriginSummary />
+            <PlacePicker
+              label="Destino"
+              value={destination}
+              bias={origin.location}
+              onChange={value => {
+                setDestination(value);
+                setSelectedRide(null);
+                setHasSearched(false);
+                reset();
+              }}
             />
-          </TouchableOpacity>
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-              Viajes disponibles
-            </Text>
-            <Text
-              style={[styles.subtitle, { color: theme.colors.textSecondary }]}
-            >
-              Tu recorrido, a tu manera. Elige tus puntos en el mapa.
-            </Text>
-          </View>
-        </View>
-
-        {origin && destination && (
-          <View style={{ marginBottom: -24 }}>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+            <Button
+              title="Elegir paradas"
+              disabled={!destination}
+              onPress={() => setStage('stops')}
+            />
+          </Surface>
+        ) : (
+          <Card>
+            <View style={{ gap: 12 }}>
+              <Text style={{ color: theme.colors.textSecondary }}>
+                Recorrido desde el Tecnológico
+              </Text>
+              <Text style={{ color: theme.colors.textPrimary, fontSize: 16 }}>
+                {origin.address} → {destination?.address}
+              </Text>
+              {stage === 'results' && (
+                <>
+                  <Text style={{ color: theme.colors.textPrimary }}>
+                    Subida: {pickup?.name}
+                  </Text>
+                  <Text style={{ color: theme.colors.textPrimary }}>
+                    Bajada: {dropoff?.name}
+                  </Text>
+                </>
+              )}
               <Button
-                title="Elegir subida"
-                variant={mapRole === 'pickup' ? 'primary' : 'outline'}
-                fullWidth={false}
-                size="sm"
-                onPress={() => setMapRole('pickup')}
-                accessibilityState={{ selected: mapRole === 'pickup' }}
-              />
-              <Button
-                title="Elegir bajada"
-                variant={mapRole === 'dropoff' ? 'primary' : 'outline'}
-                fullWidth={false}
-                size="sm"
-                onPress={() => setMapRole('dropoff')}
-                accessibilityState={{ selected: mapRole === 'dropoff' }}
+                title="Cambiar recorrido"
+                variant="ghost"
+                onPress={() => setStage('route')}
               />
             </View>
-            <RoutePreviewMap
-              origin={origin.location}
-              destination={destination.location}
-              interactive
-              height={320}
-              extraMarkers={mapStops.map(stop => ({
-                id: `candidate-${stop.stopId}`,
-                point: stop.location,
-                onPress: () =>
-                  mapRole === 'pickup'
-                    ? selectPickup(stop)
-                    : selectDropoff(stop),
-                color:
-                  stop.enabled &&
-                  (mapRole === 'pickup' ||
-                    stopCandidates.pairs.some(
-                      pair =>
-                        pair.pickupStopId === selectedPickupId &&
-                        pair.dropoffStopId === stop.stopId,
-                    ))
-                    ? theme.colors.primary
-                    : theme.colors.textMuted,
-                iconName: stop.enabled ? 'directions-bus' : 'block',
-                selected:
-                  stop.stopId === selectedPickupId ||
-                  stop.stopId === selectedDropoffId,
-                accessibilityLabel: `${stop.name}. ${
-                  stop.enabled ? 'Disponible' : 'Sin rutas disponibles'
-                }`,
-              }))}
-            />
-          </View>
+          </Card>
         )}
-        <Surface
-          radius={28}
-          style={{ marginBottom: spacing.lg }}
-          contentStyle={[styles.searchPanel, { paddingTop: 24 }]}
-        >
-          <PlacePicker
-            label="¿Desde dónde sales?"
-            value={origin}
-            onChange={value => {
-              setOrigin(value);
-              setSelectedRide(null);
-              setHasSearched(false);
-              setLocationMessage('Punto de salida seleccionado');
-              reset();
-            }}
-          />
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => locateCurrentPosition().catch(() => undefined)}
-            style={styles.locationStatus}
-            disabled={locationLoading}
-          >
-            {locationLoading ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            ) : (
-              <MaterialIcons
-                name="my-location"
-                size={18}
-                color={theme.colors.primary}
+        {stage === 'stops' && (
+          <>
+            <Button
+              title={
+                pickupScope === 'campus'
+                  ? 'Subir en otra parada'
+                  : 'Subir en el Tecnológico'
+              }
+              variant="outline"
+              onPress={() => {
+                setPickupScope(value =>
+                  value === 'campus' ? 'route' : 'campus',
+                );
+                setMapRole('pickup');
+                setSelectedPickupId(null);
+                setSelectedDropoffId(null);
+                setHasSearched(false);
+                setSelectedRide(null);
+                reset();
+              }}
+            />
+            {stopCandidatesLoading ? (
+              <View
+                style={{ gap: 12 }}
+                accessibilityLabel="Buscando paradas cercanas"
+              >
+                <Skeleton height={260} />
+                <Skeleton height={96} />
+              </View>
+            ) : stopCandidatesError ? (
+              <FeedbackState
+                kind="error"
+                title="No pudimos cargar las paradas"
+                description={stopCandidatesError}
+                actionLabel="Reintentar"
+                onAction={() => setCandidateAttempt(value => value + 1)}
               />
-            )}
-            <Text
-              style={[
-                styles.locationStatusText,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              {locationMessage}
-            </Text>
-          </TouchableOpacity>
-          <PlacePicker
-            label="¿A dónde vas?"
-            value={destination}
-            onChange={value => {
-              setDestination(value);
-              setSelectedRide(null);
-              setHasSearched(false);
-              reset();
-            }}
-            bias={origin?.location}
-          />
-
-          {origin && destination ? (
-            <>
-              {stopCandidatesLoading ? (
-                <View style={styles.candidateLoading}>
-                  <ActivityIndicator color={theme.colors.primary} />
-                  <Text style={{ color: theme.colors.textSecondary }}>
-                    Buscando paradas a menos de 1 km…
-                  </Text>
+            ) : (
+              <>
+                <Text style={{ color: theme.colors.textSecondary }}>
+                  {pickupScope === 'campus'
+                    ? 'Elige tu encuentro cerca del Tecnológico y una parada de bajada cerca de tu destino.'
+                    : 'El viaje sale del Tecnológico. Puedes abordar en una parada intermedia habilitada del recorrido.'}{' '}
+                  Azul: disponible. Gris: sin viaje compatible.
+                </Text>
+                <View
+                  style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}
+                >
+                  <Button
+                    title="Subida"
+                    variant={mapRole === 'pickup' ? 'primary' : 'outline'}
+                    fullWidth={false}
+                    onPress={() => setMapRole('pickup')}
+                    accessibilityState={{ selected: mapRole === 'pickup' }}
+                  />
+                  <Button
+                    title="Bajada"
+                    variant={mapRole === 'dropoff' ? 'primary' : 'outline'}
+                    fullWidth={false}
+                    onPress={() => setMapRole('dropoff')}
+                    accessibilityState={{ selected: mapRole === 'dropoff' }}
+                  />
                 </View>
-              ) : stopCandidatesError ? (
-                <FeedbackState
-                  kind="error"
-                  title="No pudimos cargar las paradas"
-                  description={stopCandidatesError}
+                <RoutePreviewMap
+                  origin={null}
+                  destination={null}
+                  interactive
+                  height={280}
+                  extraMarkers={[
+                    ...(origin
+                      ? [
+                          {
+                            id: 'requested-origin',
+                            point: origin.location,
+                            iconName: 'trip-origin',
+                            color: theme.colors.textSecondary,
+                            accessibilityLabel:
+                              'Origen solicitado: ' + origin.address,
+                          },
+                        ]
+                      : []),
+                    ...(destination
+                      ? [
+                          {
+                            id: 'requested-destination',
+                            point: destination.location,
+                            iconName: 'place',
+                            color: theme.colors.textSecondary,
+                            accessibilityLabel:
+                              'Destino solicitado: ' + destination.address,
+                          },
+                        ]
+                      : []),
+                    ...mapStops.map((stop, index) => ({
+                      id: 'candidate-' + stop.stopId,
+                      point: stop.location,
+                      onPress: () =>
+                        mapRole === 'pickup'
+                          ? selectPickup(stop)
+                          : selectDropoff(stop),
+                      color:
+                        stop.enabled &&
+                        (mapRole === 'pickup' ||
+                          stopCandidates.pairs.some(
+                            pair =>
+                              pair.pickupStopId === selectedPickupId &&
+                              pair.dropoffStopId === stop.stopId,
+                          ))
+                          ? theme.colors.primary
+                          : theme.colors.textMuted,
+                      iconName: stop.enabled ? 'directions-bus' : 'block',
+                      label: String(index + 1),
+                      selected:
+                        stop.stopId ===
+                        (mapRole === 'pickup'
+                          ? selectedPickupId
+                          : selectedDropoffId),
+                      accessibilityLabel:
+                        `Parada ${index + 1}: ${stop.name}` +
+                        (stop.stopId === selectedPickupId ||
+                        stop.stopId === selectedDropoffId
+                          ? '. Seleccionada'
+                          : ''),
+                    })),
+                  ]}
                 />
-              ) : (
-                <>
+                {mapRole === 'pickup' ? (
                   <StopCandidateList
-                    title="¿Dónde subes?"
+                    title="Parada de subida"
                     stops={stopCandidates.pickupStops}
                     selectedId={selectedPickupId}
                     onSelect={selectPickup}
                   />
+                ) : (
                   <StopCandidateList
-                    title="¿Dónde bajas?"
+                    title="Parada de bajada"
                     stops={stopCandidates.dropoffStops}
                     selectedId={selectedDropoffId}
                     excludedId={selectedPickupId}
@@ -657,78 +668,129 @@ export const RequestRideScreen: React.FC = () => {
                     }
                     onSelect={selectDropoff}
                   />
-                </>
-              )}
-            </>
-          ) : null}
-
-          <Button
-            title="Buscar viajes compatibles"
-            onPress={handleSearch}
-            loading={searchLoading}
-            disabled={
-              stopCandidatesLoading || !selectedPickupId || !selectedDropoffId
-            }
-          />
-        </Surface>
-
-        {isInitialLoading ? (
-          <View style={styles.centered} accessibilityLabel="Cargando viajes">
-            <Skeleton height={112} />
-            <Skeleton height={112} style={{ marginTop: spacing.md }} />
-          </View>
-        ) : searchError ? (
-          <FeedbackState
-            kind="error"
-            title="No pudimos cargar los viajes"
-            description={searchError}
-            actionLabel="Reintentar"
-            onAction={loadAll}
-          />
-        ) : !hasSearched ? (
-          <FeedbackState
-            title="Indica tu recorrido"
-            description="KROW mostrará las paradas a menos de 1 km y habilitará las que tengan rutas disponibles."
-          />
-        ) : sortedRides.length === 0 ? (
-          <FeedbackState
-            title="No encontramos viajes compatibles"
-            description="No hay un viaje con paradas válidas cerca de ambos puntos. Prueba con ubicaciones cercanas."
-          />
-        ) : (
-          sortedRides.map(ride => (
-            <RideCard
-              key={ride.rideId}
-              ride={ride}
-              alreadyRequested={requestedRideIds.has(ride.rideId)}
-              requesting={requestingRideId === ride.rideId}
-              onPress={() => setSelectedRide(ride)}
-              onRequest={() => setSelectedRide(ride)}
-            />
-          ))
+                )}
+                <Card>
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ color: theme.colors.textPrimary }}>
+                      Subida: {pickup?.name ?? 'Selecciona una parada'}
+                    </Text>
+                    <Text style={{ color: theme.colors.textPrimary }}>
+                      Bajada: {dropoff?.name ?? 'Selecciona una parada'}
+                    </Text>
+                    {pickup && pickupScope === 'campus' && (
+                      <Text style={{ color: theme.colors.textSecondary }}>
+                        {pickup.distanceMeters} m de la salida del Tecnológico
+                      </Text>
+                    )}
+                    {dropoff && (
+                      <Text style={{ color: theme.colors.textSecondary }}>
+                        {dropoff.distanceMeters} m del destino solicitado
+                      </Text>
+                    )}
+                  </View>
+                </Card>
+                <Button
+                  title="Buscar viajes"
+                  onPress={handleSearch}
+                  loading={searchLoading}
+                  disabled={!selectedPickupId || !selectedDropoffId}
+                />
+              </>
+            )}
+          </>
+        )}
+        {stage === 'results' && (
+          <>
+            {!!bookingsError && (
+              <FeedbackState
+                kind="error"
+                title="Revisa tus reservas"
+                description={bookingsError}
+                actionLabel="Reintentar"
+                onAction={() => void loadActiveBookings()}
+              />
+            )}
+            {isInitialLoading ? (
+              <View style={{ gap: 16 }} accessibilityLabel="Cargando viajes">
+                <Skeleton height={200} />
+                <Skeleton height={200} />
+              </View>
+            ) : searchError && !sortedRides.length ? (
+              <FeedbackState
+                kind="error"
+                title="No pudimos cargar los viajes"
+                description={searchError}
+                actionLabel="Reintentar"
+                onAction={() => void loadAll(true)}
+              />
+            ) : !sortedRides.length ? (
+              <FeedbackState
+                title="No encontramos viajes compatibles"
+                description="Prueba otras paradas o un recorrido cercano."
+                actionLabel="Cambiar paradas"
+                onAction={() => setStage('stops')}
+              />
+            ) : (
+              <>
+                <Text
+                  style={{
+                    color: theme.colors.textPrimary,
+                    fontSize: 22,
+                    fontWeight: '600',
+                  }}
+                  accessibilityRole="header"
+                >
+                  {sortedRides.length}{' '}
+                  {sortedRides.length === 1
+                    ? 'viaje disponible'
+                    : 'viajes disponibles'}
+                </Text>
+                {!!searchError && (
+                  <Text style={{ color: theme.colors.status.error }}>
+                    No pudimos actualizar. Se conserva la última información.
+                  </Text>
+                )}
+                {sortedRides.map(ride => (
+                  <RideCard
+                    key={ride.rideId}
+                    ride={ride}
+                    alreadyRequested={requestedRideIds.has(ride.rideId)}
+                    requesting={requestingRideId === ride.rideId}
+                    onPress={() => setSelectedRide(ride)}
+                    onRequest={() => setSelectedRide(ride)}
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
+        {!!feedback && (
+          <Text
+            style={{ color: theme.colors.textPrimary }}
+            accessibilityLiveRegion="polite"
+          >
+            {feedback}
+          </Text>
         )}
       </ScrollView>
-
       <RideDetailModal
         ride={selectedRide}
         alreadyRequested={
           selectedRide ? requestedRideIds.has(selectedRide.rideId) : false
         }
-        requesting={
-          selectedRide && requestingRideId === selectedRide.rideId
-            ? true
-            : requesting
-        }
+        requesting={requesting}
         stopPairs={stopPairs}
         selectedPairIndex={selectedPairIndex}
         onSelectPair={setSelectedPairIndex}
-        stopOptionsLoading={stopOptionsLoading}
-        stopOptionsError={stopOptionsError}
-        onClose={() => setSelectedRide(null)}
-        onRequest={() =>
-          selectedRide &&
-          handleRequest(selectedRide, stopPairs[selectedPairIndex])
-        }
+        stopOptionsLoading={stopOptionsLoading || bookingsLoading}
+        stopOptionsError={bookingsError ?? stopOptionsError}
+        onClose={() => {
+          if (!requesting) setSelectedRide(null);
+        }}
+        onRequest={() => {
+          if (selectedRide && !bookingsError && !bookingsLoading)
+            void handleRequest(selectedRide, stopPairs[selectedPairIndex]);
+        }}
       />
     </View>
   );
@@ -754,7 +816,7 @@ const StopCandidateList: React.FC<{
         <Text
           style={[styles.candidateEmpty, { color: theme.colors.textSecondary }]}
         >
-          No hay paradas del catálogo dentro de 1 km.
+          No hay paradas disponibles para este recorrido.
         </Text>
       ) : (
         <ScrollView
@@ -762,7 +824,7 @@ const StopCandidateList: React.FC<{
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 12, paddingVertical: 8 }}
         >
-          {stops.map(stop => {
+          {stops.map((stop, index) => {
             const unavailable =
               !stop.enabled ||
               stop.stopId === excludedId ||
@@ -772,6 +834,7 @@ const StopCandidateList: React.FC<{
               <TouchableOpacity
                 key={`${stop.role}-${stop.stopId}`}
                 accessibilityRole="radio"
+                accessibilityLabel={`Parada ${index + 1}: ${stop.name}`}
                 accessibilityState={{ selected, disabled: unavailable }}
                 disabled={unavailable}
                 onPress={() => onSelect(stop)}
@@ -809,7 +872,7 @@ const StopCandidateList: React.FC<{
                         { color: theme.colors.textPrimary },
                       ]}
                     >
-                      {stop.name}
+                      {index + 1}. {stop.name}
                     </Text>
                     {stop.stopType === 'official_boarding_zone' ? (
                       <Text
@@ -825,6 +888,16 @@ const StopCandidateList: React.FC<{
                       </Text>
                     ) : null}
                   </View>
+                  {stop.address ? (
+                    <Text
+                      style={[
+                        styles.candidateMeta,
+                        { color: theme.colors.textSecondary },
+                      ]}
+                    >
+                      {stop.address}
+                    </Text>
+                  ) : null}
                   <Text
                     style={[
                       styles.candidateMeta,
@@ -1129,13 +1202,19 @@ const RideDetailModal: React.FC<{
               alreadyRequested ||
               requesting ||
               stopOptionsLoading ||
+              !!stopOptionsError ||
               stopPairs.length === 0
             }
             loading={requesting}
             variant={alreadyRequested ? 'ghost' : 'primary'}
             style={styles.modalCta}
           />
-          <Button title="Cerrar" variant="outline" onPress={onClose} />
+          <Button
+            title="Cerrar"
+            variant="outline"
+            disabled={requesting}
+            onPress={onClose}
+          />
         </ScrollView>
       )}
     </AnimatedModal>
@@ -1173,18 +1252,6 @@ const styles = StyleSheet.create({
   searchPanel: {
     borderRadius: 28,
     padding: spacing.md,
-  },
-  locationStatus: {
-    minHeight: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: spacing.sm,
-    marginTop: -spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  locationStatusText: {
-    flex: 1,
-    fontSize: typography.size.sm,
   },
   candidateLoading: {
     minHeight: 64,

@@ -22,6 +22,7 @@ interface Props {
   onChange: (value: PlacesAutocompleteValue | null) => void;
   bias?: LatLng | null;
   placeholder?: string;
+  error?: string;
 }
 
 /** A committed location changes only after confirmation; stale geocodes cannot overwrite it. */
@@ -31,6 +32,7 @@ export const PlacePicker = ({
   onChange,
   bias,
   placeholder,
+  error: fieldError,
 }: Props) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -98,7 +100,9 @@ export const PlacePicker = ({
           styles.location,
           {
             backgroundColor: theme.colors.surfaceOverlay,
-            borderColor: theme.colors.border,
+            borderColor: fieldError
+              ? theme.colors.status.error
+              : theme.colors.border,
             borderWidth: 1,
           },
         ]}
@@ -129,11 +133,22 @@ export const PlacePicker = ({
           color={theme.colors.primary}
         />
       </AnimatedPressable>
+      {!!fieldError && (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ color: theme.colors.status.error, marginBottom: 12 }}
+        >
+          {fieldError}
+        </Text>
+      )}
       {open && (
         <AnimatedModal
           visible={open}
           onDismissRequest={dismiss}
-          sheetStyle={{ paddingBottom: insets.bottom + 16 }}
+          sheetStyle={[
+            { paddingBottom: insets.bottom + 16 },
+            searching && styles.searchSheet,
+          ]}
         >
           <View
             style={[styles.handle, { backgroundColor: theme.colors.border }]}
@@ -192,19 +207,35 @@ export const PlacePicker = ({
               />
             ))}
           </View>
-          <ScrollView
-            keyboardShouldPersistTaps="always"
-            style={styles.scroll}
-            contentContainerStyle={styles.sheet}
-          >
-            {!searching && (
+          {searching ? (
+            <View style={styles.searchContent}>
+              <PlacesAutocompleteInput
+                label="Buscar lugar"
+                autoFocus
+                scrollResults
+                value={draft}
+                bias={bias}
+                onChange={next => {
+                  request.current += 1;
+                  active.current?.abort();
+                  setResolving(false);
+                  setError(null);
+                  setDraft(next);
+                  setPin(next?.location ?? null);
+                }}
+              />
+            </View>
+          ) : (
+            <ScrollView
+              keyboardShouldPersistTaps="always"
+              style={styles.scroll}
+              contentContainerStyle={styles.sheet}
+            >
               <Text
                 style={[styles.hint, { color: theme.colors.textSecondary }]}
               >
                 Toca el mapa o mantén presionado el pin para arrastrarlo.
               </Text>
-            )}
-            {!searching && (
               <RoutePreviewMap
                 origin={pin ?? bias ?? null}
                 destination={null}
@@ -217,8 +248,6 @@ export const PlacePicker = ({
                   void pickPoint(point);
                 }}
               />
-            )}
-            {!searching && (
               <Surface contentStyle={styles.selection} style={styles.spacing}>
                 <Text
                   style={[styles.address, { color: theme.colors.textPrimary }]}
@@ -236,36 +265,22 @@ export const PlacePicker = ({
                   </Text>
                 )}
               </Surface>
-            )}
-            {searching && (
-              <PlacesAutocompleteInput
-                label="Buscar lugar"
-                autoFocus
-                value={draft}
-                bias={bias}
-                onChange={next => {
-                  request.current += 1;
-                  active.current?.abort();
-                  setResolving(false);
-                  setError(null);
-                  setDraft(next);
-                  setPin(next?.location ?? null);
+            </ScrollView>
+          )}
+          {(!searching || draft) && (
+            <View style={[styles.footer, { borderColor: theme.colors.border }]}>
+              <Button
+                title="Usar este punto"
+                loading={resolving}
+                disabled={!draft || resolving || Boolean(error)}
+                onPress={() => {
+                  if (!draft || resolving || error) return;
+                  onChange(draft);
+                  dismiss();
                 }}
               />
-            )}
-          </ScrollView>
-          <View style={[styles.footer, { borderColor: theme.colors.border }]}>
-            <Button
-              title="Usar este punto"
-              loading={resolving}
-              disabled={!draft || resolving || Boolean(error)}
-              onPress={() => {
-                if (!draft || resolving || error) return;
-                onChange(draft);
-                dismiss();
-              }}
-            />
-          </View>
+            </View>
+          )}
         </AnimatedModal>
       )}
     </>
@@ -292,6 +307,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, marginBottom: 4 },
   address: { fontSize: 15, fontWeight: '600', lineHeight: 22 },
   sheet: { padding: 20, gap: 8 },
+  searchSheet: { height: '92%' },
+  searchContent: { flex: 1, minHeight: 0, padding: 20 },
   scroll: { flexShrink: 1 },
   handle: {
     width: 36,

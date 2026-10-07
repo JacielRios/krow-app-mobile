@@ -11,6 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { PanResponder, Platform, TouchableOpacity } from 'react-native';
 import { RideDateTimePicker } from '../src/features/ride/components/RideDateTimePicker';
 import { RideComfortControls } from '../src/features/ride/components/RideComfortControls';
+import { Input } from '../src/shared/components/ui-v2';
 
 jest.mock('../src/features/maps/api/mapsApi', () => ({
   reverseGeocode: jest.fn(),
@@ -213,6 +214,34 @@ test('price shortcuts select an exact amount without changing the seat count', a
   );
   expect(onPriceChange).toHaveBeenCalledWith('35');
   expect(onSeatsChange).not.toHaveBeenCalled();
+});
+
+test('a favorite can retain an optional seat default without an assigned vehicle', async () => {
+  const onSeatsChange = jest.fn();
+  const result = await render(
+    <RideComfortControls
+      optional
+      seats="2"
+      maxSeats={0}
+      price="35"
+      onPriceChange={jest.fn()}
+      onSeatsChange={onSeatsChange}
+    />,
+  );
+  expect(result.root.findAllByType(SeatDial)).toHaveLength(0);
+  const input = result.root
+    .findAllByType(Input)
+    .find(node => node.props.label === 'Cupo predeterminado (opcional)')!;
+  expect(input.props.value).toBe('2');
+  await act(() => input.props.onChangeText('3'));
+  expect(onSeatsChange).toHaveBeenLastCalledWith('3');
+  await act(() =>
+    result.root
+      .findAllByType(Button)
+      .find(node => node.props.title === 'Sin cupo predeterminado')!
+      .props.onPress(),
+  );
+  expect(onSeatsChange).toHaveBeenLastCalledWith('');
 });
 
 test('quick departures earlier than the allowed date are disabled instead of mislabeled', async () => {

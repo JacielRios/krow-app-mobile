@@ -1,13 +1,11 @@
 import { depth, glass } from '../../../shared/theme/materials';
 import React from 'react';
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from 'react-native-reanimated';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { StatusBadge, BadgeStatus } from '../../../shared/components/ui';
@@ -15,6 +13,7 @@ import { SessionLoginMode } from '../../../app/sessionLoginMode';
 import { RecentRide, RecentRideStatus } from '../hooks/useRecentRides';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Skeleton } from '../../../shared/components/ui-v2';
+import { money, rideDate } from '../../../shared/format';
 
 interface Props {
   rides: RecentRide[];
@@ -33,73 +32,85 @@ const STATUS_TO_BADGE: Record<RecentRideStatus, BadgeStatus> = {
   cancelled: 'cancelled',
 };
 
-const formatDate = (iso: string): string => {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return iso;
-  return date.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
 const formatPrice = (price: number | null): string => {
   if (price == null) return '—';
-  return `$${price.toFixed(0)} MXN`;
+  return `${money(Math.round(price * 100))} MXN`;
 };
 
 const RideRow: React.FC<{
   ride: RecentRide;
   onPress?: () => void;
   index: number;
-}> = ({ ride, index }) => {
+}> = ({ ride, index, onPress }) => {
   const { theme, motionEnabled } = useTheme();
   return (
     <Animated.View
-      entering={motionEnabled && index < 8 ? FadeInDown.duration(200).delay(index * 35) : undefined}
+      entering={
+        motionEnabled && index < 8
+          ? FadeInDown.duration(200).delay(index * 35)
+          : undefined
+      }
       layout={motionEnabled ? LinearTransition.duration(200) : undefined}
       style={[styles.row, glass(theme), depth(theme, 1), { borderRadius: 24 }]}
     >
-      <View style={styles.rowHeader}>
-        <Text style={[styles.rowDate, { color: theme.colors.textPrimary }]}>{formatDate(ride.departureTime)}</Text>
-        <StatusBadge status={STATUS_TO_BADGE[ride.status]} size="sm" />
-      </View>
-
-      <View style={styles.routeContainer}>
-        <MaterialIcons
-          name="trip-origin"
-          size={14}
-          color={theme.colors.primary}
-          style={styles.routeIcon}
-        />
-        <Text style={[styles.routeText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-          {ride.originLabel}
-        </Text>
-      </View>
-      <View style={styles.routeContainer}>
-        <MaterialIcons
-          name="place"
-          size={14}
-          color={colors.status.error}
-          style={styles.routeIcon}
-        />
-        <Text style={[styles.routeText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-          {ride.destinationLabel}
-        </Text>
-      </View>
-
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <MaterialIcons
-            name="event-seat"
-            size={14}
-            color={theme.colors.textSecondary}
-          />
-          <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{ride.seats} asientos</Text>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+      >
+        <View style={styles.rowHeader}>
+          <Text style={[styles.rowDate, { color: theme.colors.textPrimary }]}>
+            {rideDate(ride.departureTime)}
+          </Text>
+          <StatusBadge status={STATUS_TO_BADGE[ride.status]} size="sm" />
         </View>
-        <Text style={[styles.priceText, { color: theme.colors.primary }]}>{formatPrice(ride.pricePerSeat)}</Text>
-      </View>
+
+        <View style={styles.routeContainer}>
+          <MaterialIcons
+            name="trip-origin"
+            size={14}
+            color={theme.colors.primary}
+            style={styles.routeIcon}
+          />
+          <Text
+            style={[styles.routeText, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {ride.originLabel}
+          </Text>
+        </View>
+        <View style={styles.routeContainer}>
+          <MaterialIcons
+            name="place"
+            size={14}
+            color={colors.status.error}
+            style={styles.routeIcon}
+          />
+          <Text
+            style={[styles.routeText, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {ride.destinationLabel}
+          </Text>
+        </View>
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <MaterialIcons
+              name="event-seat"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            <Text
+              style={[styles.metaText, { color: theme.colors.textSecondary }]}
+            >
+              {ride.seats} asientos
+            </Text>
+          </View>
+          <Text style={[styles.priceText, { color: theme.colors.primary }]}>
+            {formatPrice(ride.pricePerSeat)}
+          </Text>
+        </View>
+      </Pressable>
     </Animated.View>
   );
 };
@@ -115,7 +126,16 @@ export const RecentRidesTable: React.FC<Props> = ({
   const { theme } = useTheme();
   if (loading) {
     return (
-      <View accessibilityLabel="Cargando viajes" style={[styles.stateContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        accessibilityLabel="Cargando viajes"
+        style={[
+          styles.stateContainer,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
         <Skeleton height={18} width="42%" />
         <Skeleton height={14} style={{ marginTop: spacing.md }} />
         <Skeleton height={14} width="78%" style={{ marginTop: spacing.sm }} />
@@ -143,11 +163,7 @@ export const RecentRidesTable: React.FC<Props> = ({
         : 'Aún no has creado ningún viaje.';
     return (
       <View style={styles.stateContainer}>
-        <MaterialIcons
-          name="inbox"
-          size={32}
-          color={colors.text.placeholder}
-        />
+        <MaterialIcons name="inbox" size={32} color={colors.text.placeholder} />
         <Text style={styles.stateText}>{notice ?? emptyMessage}</Text>
       </View>
     );
@@ -158,14 +174,21 @@ export const RecentRidesTable: React.FC<Props> = ({
       data={rides}
       keyExtractor={item => item.rideId}
       renderItem={({ item, index }) => (
-        <RideRow ride={item} index={index} onPress={() => onPressItem?.(item)} />
+        <RideRow
+          ride={item}
+          index={index}
+          onPress={onPressItem ? () => onPressItem(item) : undefined}
+        />
       )}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      ItemSeparatorComponent={RideSeparator}
       scrollEnabled={false}
     />
   );
 };
 
+function RideSeparator() {
+  return <View style={styles.separator} />;
+}
 const styles = StyleSheet.create({
   row: {
     paddingVertical: spacing.md,

@@ -100,11 +100,17 @@ android {
         manifestPlaceholders.krowLinkHost = System.getenv("KROW_LINK_ORIGIN") ? new URI(System.getenv("KROW_LINK_ORIGIN")).host : "links.invalid"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode((System.getenv("KROW_VERSION_CODE") ?: "2").toInteger())
+        versionName System.getenv("KROW_VERSION_NAME") ?: "0.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
+        release {
+            storeFile file(System.getenv("KROW_RELEASE_STORE_FILE") ?: "release.keystore")
+            storePassword System.getenv("KROW_RELEASE_STORE_PASSWORD")
+            keyAlias System.getenv("KROW_RELEASE_KEY_ALIAS")
+            keyPassword System.getenv("KROW_RELEASE_KEY_PASSWORD")
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -120,9 +126,20 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+        // Installable private test build: bundled JS and no Metro dependency.
+        // Keep production release signing and its validation independent.
+        trial {
+            initWith release
+            // React Native sets this for its built-in variants only.
+            manifestPlaceholders.usesCleartextTraffic = "false"
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+            versionNameSuffix "-trial"
+            debuggable false
         }
     }
 }
@@ -147,6 +164,9 @@ apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 // A missing native key otherwise produces an empty map only after installation.
 def validateReleaseMapsConfiguration = tasks.register("validateReleaseMapsConfiguration") {
     doLast {
+        if (["KROW_RELEASE_STORE_FILE", "KROW_RELEASE_STORE_PASSWORD", "KROW_RELEASE_KEY_ALIAS", "KROW_RELEASE_KEY_PASSWORD"].any { !System.getenv(it) }) {
+            throw new GradleException("Release requires the KROW_RELEASE_* signing credentials. Debug signing is never used for release.")
+        }
         if (!nativeMapsKey) {
             throw new GradleException("KROW_ANDROID_MAPS_API_KEY is required for release. Supply an Android SDK key restricted to this application's package and signing certificate; do not use the backend REST key.")
         }
@@ -154,4 +174,23 @@ def validateReleaseMapsConfiguration = tasks.register("validateReleaseMapsConfig
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     dependsOn(validateReleaseMapsConfiguration)
+}
+
+def validateTrialConfiguration = tasks.register("validateTrialConfiguration") {
+    doLast {
+        if (!nativeMapsKey) {
+            throw new GradleException("Trial requires KROW_ANDROID_MAPS_API_KEY. Prefer an Android SDK key restricted to com.krownmobileapp and the debug certificate.")
+        }
+        def api = (project.env.get("KROW_API_URL") ?: "").trim()
+        def apiUri = api ? new URI(api) : null
+        if (!apiUri || apiUri.scheme != "https" || !apiUri.host || apiUri.host in ["localhost", "127.0.0.1", "10.0.2.2"]) {
+            throw new GradleException("Trial requires a deployed HTTPS KROW_API_URL in the mobile environment file.")
+        }
+        if (!(project.env.get("SUPABASE_URL") ?: "").startsWith("https://") || !(project.env.get("SUPABASE_ANON_KEY") ?: "").trim()) {
+            throw new GradleException("Trial requires the project's public Supabase URL and anon/publishable key.")
+        }
+    }
+}
+tasks.matching { it.name == "preTrialBuild" }.configureEach {
+    dependsOn(validateTrialConfiguration)
 }

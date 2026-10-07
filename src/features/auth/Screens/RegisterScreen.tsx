@@ -1,16 +1,29 @@
 import { AmbientBackground } from '../../../shared/components/ui-v2';
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Input } from '../../../shared/components/ui/Input';
 import { Button } from '../../../shared/components/ui/Button';
 import { Dropdown } from '../../../shared/components/ui/Dropdown';
-import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAlert';
+import {
+  CustomAlert,
+  AlertType,
+} from '../../../shared/components/ui/CustomAlert';
 import { colors } from '../../../shared/theme/colors';
 import { sessionAdapter } from '../../../core/auth/sessionAdapter';
 import { userApi } from '../api/userApi';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 
 const CARRERAS = [
   'Ing Sistemas Computacionales',
@@ -19,12 +32,14 @@ const CARRERAS = [
   'Ing Industrial',
   'Ing Electromecánica',
   'Ing Administración',
-  'Ing Semiconductores'
+  'Ing Semiconductores',
 ];
 
 const SEMESTRES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({
+  navigation,
+}: NativeStackScreenProps<AuthStackParamList, 'Register'>) {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
     nombre: '',
@@ -36,6 +51,7 @@ export default function RegisterScreen({ navigation }: any) {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const registerPending = useRef(false);
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
     type: 'error' as AlertType,
@@ -44,7 +60,12 @@ export default function RegisterScreen({ navigation }: any) {
     onCloseUrl: false, // flag to navigate back
   });
 
-  const showAlert = (title: string, message: string, type: AlertType = 'error', onCloseUrl = false) => {
+  const showAlert = (
+    title: string,
+    message: string,
+    type: AlertType = 'error',
+    onCloseUrl = false,
+  ) => {
     setAlertConfig({ visible: true, title, message, type, onCloseUrl });
   };
 
@@ -59,11 +80,14 @@ export default function RegisterScreen({ navigation }: any) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const normalizeInstitutionalEmail = (input: string) => input.trim().toLowerCase();
+  const normalizeInstitutionalEmail = (input: string) =>
+    input.trim().toLowerCase();
 
-  const isValidInstitutionalEmail = (email: string) => /^[^\s@]+@[^\s@]+\.tecnm\.mx$/i.test(email);
+  const isValidInstitutionalEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.tecnm\.mx$/i.test(email);
 
   const handleRegister = async () => {
+    if (registerPending.current) return;
     const {
       nombre,
       numeroControl,
@@ -74,167 +98,265 @@ export default function RegisterScreen({ navigation }: any) {
       confirmPassword,
     } = formData;
 
-    if (!nombre || !numeroControl || !correo || !carrera || !semestre || !password || !confirmPassword) {
+    if (
+      !nombre ||
+      !numeroControl ||
+      !correo ||
+      !carrera ||
+      !semestre ||
+      !password ||
+      !confirmPassword
+    ) {
       showAlert('Campos incompletos', 'Por favor completa todos los campos.');
       return;
     }
 
     if (password !== confirmPassword) {
-      showAlert('Contraseñas distintas', 'La contraseña y su confirmación deben coincidir.');
+      showAlert(
+        'Contraseñas distintas',
+        'La contraseña y su confirmación deben coincidir.',
+      );
       return;
     }
 
-    if (password.length < 6) {
-      showAlert('Contraseña inválida', 'La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < 8) {
+      showAlert(
+        'Contraseña inválida',
+        'La contraseña debe tener al menos 8 caracteres.',
+      );
       return;
     }
 
     const email = normalizeInstitutionalEmail(correo);
     if (!isValidInstitutionalEmail(email)) {
-      showAlert('Correo inválido', 'Usa formato institucional: usuario@algo.tecnm.mx');
-      return;
-    }
-
-    setLoading(true);
-
-    const { data: signUpData, error: signUpError } = await sessionAdapter.signUp(email, password, {
-      full_name: nombre.trim(),
-      institutional_id: numeroControl.trim(),
-      academic_program: carrera,
-      academic_period: semestre,
-    });
-
-    if (signUpError || !signUpData.user) {
-      setLoading(false);
-      showAlert('Error al registrar', signUpError?.message ?? 'No se pudo crear la cuenta.', 'error');
-      return;
-    }
-
-    const periodValue = Number.parseInt(semestre, 10);
-
-    let profileError: Error | null = null;
-    if (signUpData.session) {
-      try {
-        await userApi.upsertProfile({
-        fullName: nombre.trim(),
-        institutionalId: numeroControl.trim(),
-        academicProgram: carrera,
-        academicPeriod: Number.isNaN(periodValue) ? null : periodValue,
-        });
-      } catch (reason: any) {
-        profileError = reason instanceof Error ? reason : new Error('No se pudo guardar el perfil');
-      }
-    }
-
-    setLoading(false);
-
-    if (profileError) {
-      console.warn('Profile insert warning:', {
-        message: profileError.message,
-        hasSessionAfterSignUp: Boolean(signUpData.session),
-      });
-
       showAlert(
-        'Cuenta creada con advertencia',
-        `Se creó la cuenta de acceso, pero no se guardó el perfil.\n\nError: ${profileError.message}`,
-        'warning'
+        'Correo inválido',
+        'Usa formato institucional: usuario@algo.tecnm.mx',
       );
       return;
     }
 
-    showAlert(
-      'Cuenta creada',
-      'Tu cuenta fue creada correctamente. Si tienes confirmación por correo, revísala antes de iniciar sesión.',
-      'success',
-      true
-    );
+    registerPending.current = true;
+    setLoading(true);
+
+    try {
+      const { data: signUpData, error: signUpError } =
+        await sessionAdapter.signUp(email, password, {
+          full_name: nombre.trim(),
+          institutional_id: numeroControl.trim(),
+          academic_program: carrera,
+          academic_period: semestre,
+        });
+
+      if (signUpError || !signUpData.user) {
+        setLoading(false);
+        showAlert(
+          'Error al registrar',
+          signUpError?.message ?? 'No se pudo crear la cuenta.',
+          'error',
+        );
+        return;
+      }
+
+      const periodValue = Number.parseInt(semestre, 10);
+
+      let profileError: Error | null = null;
+      if (signUpData.session) {
+        try {
+          await userApi.upsertProfile({
+            fullName: nombre.trim(),
+            institutionalId: numeroControl.trim(),
+            academicProgram: carrera,
+            academicPeriod: Number.isNaN(periodValue) ? null : periodValue,
+          });
+        } catch (reason: unknown) {
+          profileError =
+            reason instanceof Error
+              ? reason
+              : new Error('No se pudo guardar el perfil');
+        }
+      }
+
+      setLoading(false);
+
+      if (profileError) {
+        showAlert(
+          'Cuenta creada con advertencia',
+          `Se creó la cuenta de acceso, pero no se guardó el perfil.\n\nError: ${profileError.message}`,
+          'warning',
+        );
+        return;
+      }
+
+      showAlert(
+        'Cuenta creada',
+        'Tu cuenta fue creada correctamente. Si tienes confirmación por correo, revísala antes de iniciar sesión.',
+        'success',
+        true,
+      );
+    } catch (error) {
+      showAlert(
+        'No pudimos crear la cuenta',
+        error instanceof Error
+          ? error.message
+          : 'Revisa tu conexión e intenta nuevamente.',
+      );
+    } finally {
+      registerPending.current = false;
+      setLoading(false);
+    }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <AmbientBackground />
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Crear Cuenta</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
+              Crear Cuenta
+            </Text>
           </View>
 
           <View style={styles.formContainer}>
-            <Input 
-              placeholder="Nombre completo" 
+            <Input
+              label="Nombre completo"
+              placeholder="Nombre completo"
               value={formData.nombre}
-              onChangeText={(text) => handleChange('nombre', text)}
-              icon={<Icon name="person" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Input 
-              placeholder="Número de control" 
-              value={formData.numeroControl}
-              onChangeText={(text) => handleChange('numeroControl', text)}
-              keyboardType="numeric"
-              icon={<Icon name="badge" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Input 
-              placeholder="ej. alumno@campus.tecnm.mx" 
-              value={formData.correo}
-              onChangeText={(text) => handleChange('correo', text)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              icon={<Icon name="email" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Dropdown 
-              placeholder="Seleccionar carrera" 
-              value={formData.carrera}
-              options={CARRERAS}
-              onSelect={(text) => handleChange('carrera', text)}
-              icon={<Icon name="school" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Dropdown 
-              placeholder="Seleccionar semestre" 
-              value={formData.semestre}
-              options={SEMESTRES}
-              onSelect={(text) => handleChange('semestre', text)}
-              icon={<Icon name="format-list-numbered" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Input 
-              placeholder="Contraseña" 
-              value={formData.password}
-              onChangeText={(text) => handleChange('password', text)}
-              secureTextEntry
-              icon={<Icon name="lock" size={24} color={theme.colors.textSecondary} />}
-            />
-            
-            <Input 
-              placeholder="Confirmar contraseña" 
-              value={formData.confirmPassword}
-              onChangeText={(text) => handleChange('confirmPassword', text)}
-              secureTextEntry
-              icon={<Icon name="lock-outline" size={24} color={theme.colors.textSecondary} />}
+              onChangeText={text => handleChange('nombre', text)}
+              icon={
+                <Icon
+                  name="person"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
             />
 
-            <Button 
-              title="Registrarse" 
+            <Input
+              label="Número de control"
+              placeholder="Número de control"
+              value={formData.numeroControl}
+              onChangeText={text => handleChange('numeroControl', text)}
+              keyboardType="numeric"
+              icon={
+                <Icon
+                  name="badge"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Input
+              label="ej. alumno@campus.tecnm.mx"
+              placeholder="ej. alumno@campus.tecnm.mx"
+              value={formData.correo}
+              onChangeText={text => handleChange('correo', text)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              icon={
+                <Icon
+                  name="email"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Dropdown
+              label="Seleccionar carrera"
+              placeholder="Seleccionar carrera"
+              value={formData.carrera}
+              options={CARRERAS}
+              onSelect={text => handleChange('carrera', text)}
+              icon={
+                <Icon
+                  name="school"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Dropdown
+              label="Seleccionar semestre"
+              placeholder="Seleccionar semestre"
+              value={formData.semestre}
+              options={SEMESTRES}
+              onSelect={text => handleChange('semestre', text)}
+              icon={
+                <Icon
+                  name="format-list-numbered"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Input
+              label="Contraseña"
+              placeholder="Contraseña"
+              value={formData.password}
+              onChangeText={text => handleChange('password', text)}
+              secureTextEntry
+              icon={
+                <Icon
+                  name="lock"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Input
+              label="Confirmar contraseña"
+              placeholder="Confirmar contraseña"
+              value={formData.confirmPassword}
+              onChangeText={text => handleChange('confirmPassword', text)}
+              secureTextEntry
+              icon={
+                <Icon
+                  name="lock-outline"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              }
+            />
+
+            <Button
+              title="Registrarse"
               onPress={handleRegister}
               loading={loading}
               style={styles.registerButton}
             />
 
             <View style={styles.loginContainer}>
-              <Text style={[styles.loginText, { color: theme.colors.textSecondary }]}>¿Ya tienes una cuenta? </Text>
+              <Text
+                style={[
+                  styles.loginText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                ¿Ya tienes una cuenta?{' '}
+              </Text>
               <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text style={[styles.loginLink, { color: theme.colors.primary }]}>Iniciar sesión</Text>
+                <Text
+                  style={[styles.loginLink, { color: theme.colors.primary }]}
+                >
+                  Iniciar sesión
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
-          
         </ScrollView>
       </KeyboardAvoidingView>
 

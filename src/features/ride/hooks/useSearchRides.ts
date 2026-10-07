@@ -12,7 +12,7 @@ export interface UseSearchRidesResult {
 }
 
 export interface SearchOptions {
-  origin: { lat: number; lng: number };
+  origin?: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   maxDistanceKm?: number;
   pickupTransportStopId?: string;
@@ -41,10 +41,13 @@ export function useSearchRides(): UseSearchRidesResult {
         const mapped = await rideApi.search(options);
         if (currentRequest === requestId.current) setRides(mapped);
         return mapped;
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (currentRequest === requestId.current) {
-          setError(e?.message ?? 'Error inesperado al buscar viajes.');
-          setRides([]);
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Error inesperado al buscar viajes.',
+          );
         }
         return [];
       } finally {

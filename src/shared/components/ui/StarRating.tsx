@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeProvider';
 
 export interface StarRatingProps {
   value?: number;
@@ -21,10 +21,11 @@ export const StarRating: React.FC<StarRatingProps> = ({
   readOnly = false,
   maxStars = 5,
   size = 28,
-  activeColor = colors.status.warning,
-  inactiveColor = colors.border.default,
+  activeColor,
+  inactiveColor,
   style,
 }) => {
+  const { theme } = useTheme();
   return (
     <View style={[styles.container, style]}>
       {Array.from({ length: maxStars }, (_, i) => {
@@ -37,13 +38,26 @@ export const StarRating: React.FC<StarRatingProps> = ({
             disabled={readOnly}
             activeOpacity={0.7}
             onPress={() => onChange?.(starNumber)}
+            accessibilityRole="button"
+            accessibilityLabel={`${starNumber} de ${maxStars} estrellas`}
+            accessibilityState={{ selected: filled, disabled: readOnly }}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-            style={{ marginHorizontal: spacing.xs / 2 }}
+            style={{
+              marginHorizontal: spacing.xs / 2,
+              minWidth: 48,
+              minHeight: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
             <MaterialIcons
               name={filled ? 'star' : 'star-border'}
               size={size}
-              color={filled ? activeColor : inactiveColor}
+              color={
+                filled
+                  ? activeColor ?? theme.colors.status.warning
+                  : inactiveColor ?? theme.colors.textMuted
+              }
             />
           </TouchableOpacity>
         );

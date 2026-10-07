@@ -24,8 +24,14 @@ export function usePublishRide(): UsePublishRideResult {
     try {
       const data = await rideApi.create(payload);
       return { rideId: data.rideId, error: null };
-    } catch (error: any) {
-      return { rideId: null, error: error?.message ?? 'No se pudo publicar el viaje' };
+    } catch (error: unknown) {
+      return {
+        rideId: null,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo publicar el viaje',
+      };
     } finally {
       setLoading(false);
     }

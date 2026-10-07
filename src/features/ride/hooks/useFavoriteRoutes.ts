@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { routeApi, SaveFavoriteRoutePayload } from '../api/routeApi';
+import { useCurrentUserRole } from '../../home/hooks/useCurrentUserRole';
 
 export function useFavoriteRoutes() {
+  const { user } = useCurrentUserRole();
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ['favorite-routes'],
+    queryKey: ['favorite-routes', user?.userId],
     queryFn: routeApi.favorites,
+    enabled: !!user,
   });
   const createMutation = useMutation({
     mutationFn: routeApi.createFavorite,

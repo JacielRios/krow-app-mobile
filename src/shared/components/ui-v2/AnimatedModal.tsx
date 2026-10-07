@@ -7,7 +7,6 @@ import {
   ViewStyle,
   View,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { depth, glass } from '../../theme/materials';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -36,7 +35,9 @@ export const AnimatedModal: React.FC<AnimatedModalProps> = ({
       statusBarTranslucent
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android dialogs may overlay the keyboard in edge-to-edge mode. If
+        // adjustResize already reduced the viewport, no overlap is added.
+        behavior="padding"
         style={{
           flex: 1,
           justifyContent: 'flex-end',

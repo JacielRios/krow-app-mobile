@@ -17,22 +17,33 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input } from '../../../shared/components/ui/Input';
 import { Button } from '../../../shared/components/ui/Button';
-import { CustomAlert, AlertType } from '../../../shared/components/ui/CustomAlert';
+import {
+  CustomAlert,
+  AlertType,
+} from '../../../shared/components/ui/CustomAlert';
 import { setConductorLoginGateBlocking } from '../../../app/conductorLoginGate';
 import { setSessionLoginMode } from '../../../app/sessionLoginMode';
 import { colors } from '../../../shared/theme/colors';
 import { sessionAdapter } from '../../../core/auth/sessionAdapter';
 import { userApi } from '../api/userApi';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type UserType = 'pasajero' | 'conductor';
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({
+  navigation,
+}: NativeStackScreenProps<AuthStackParamList, 'Login'>) {
   const { theme, motionEnabled } = useTheme();
   const [userType, setUserType] = useState<UserType>('pasajero');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const loginPending = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef<import('react-native').TextInput>(null);
+  const [formError, setFormError] = useState('');
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
     type: 'error' as AlertType,
@@ -60,18 +71,26 @@ export default function LoginScreen({ navigation }: any) {
     }).start();
   }, [motionEnabled, slideAnim, userType, slideWidth]);
 
-  const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+  const showAlert = (
+    title: string,
+    message: string,
+    type: AlertType = 'error',
+  ) => {
     setAlertConfig({ visible: true, title, message, type });
   };
 
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
   const handleLogin = async () => {
+    if (loginPending.current) return;
     if (!email || !password) {
-      showAlert('Error', 'Por favor ingresa tu correo y contraseña.', 'error');
+      setFormError('Ingresa tu correo y contraseña.');
+      if (email) passwordRef.current?.focus();
       return;
     }
 
+    setFormError('');
+    loginPending.current = true;
     const isConductor = userType === 'conductor';
     if (isConductor) {
       setConductorLoginGateBlocking(true);
@@ -80,7 +99,8 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
 
     try {
-      const { data: signInData, error: signInError } = await sessionAdapter.signIn(normalizeEmail(email), password);
+      const { data: signInData, error: signInError } =
+        await sessionAdapter.signIn(normalizeEmail(email), password);
 
       if (signInError) {
         if (isConductor) {
@@ -115,9 +135,15 @@ export default function LoginScreen({ navigation }: any) {
           }
 
           await setSessionLoginMode('conductor');
-        } catch (reason: any) {
+        } catch (reason: unknown) {
           await sessionAdapter.signOut();
-          showAlert('Error al verificar conductor', reason?.message ?? 'No se pudo verificar tu perfil.', 'error');
+          showAlert(
+            'Error al verificar conductor',
+            reason instanceof Error
+              ? reason.message
+              : 'No se pudo verificar tu perfil.',
+            'error',
+          );
           return;
         } finally {
           setConductorLoginGateBlocking(false);
@@ -127,36 +153,59 @@ export default function LoginScreen({ navigation }: any) {
       }
     } catch (reason: unknown) {
       if (isConductor) setConductorLoginGateBlocking(false);
-      showAlert('No pudimos iniciar sesión', reason instanceof Error ? reason.message : 'Revisa tu conexión y vuelve a intentar.', 'error');
+      showAlert(
+        'No pudimos iniciar sesión',
+        reason instanceof Error
+          ? reason.message
+          : 'Revisa tu conexión y vuelve a intentar.',
+        'error',
+      );
     } finally {
+      loginPending.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <AmbientBackground />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Image
               source={require('../../../assets/Krow Logo Icon.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Muévete con KROW</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
+              Muévete con KROW
+            </Text>
           </View>
 
           <View style={styles.content}>
-            <View style={[styles.typeSelectorContainer, { backgroundColor: theme.colors.surfaceOverlay }, depth(theme, 1)]}>
+            <View
+              style={[
+                styles.typeSelectorContainer,
+                { backgroundColor: theme.colors.surfaceOverlay },
+                depth(theme, 1),
+              ]}
+            >
               <Animated.View
                 style={[
                   styles.activeSliderIndicator,
-                  { width: slideWidth, transform: [{ translateX: slideAnim }], backgroundColor: theme.colors.primary }
+                  {
+                    width: slideWidth,
+                    transform: [{ translateX: slideAnim }],
+                    backgroundColor: theme.colors.primary,
+                  },
                 ]}
               />
               <TouchableOpacity
@@ -164,7 +213,17 @@ export default function LoginScreen({ navigation }: any) {
                 onPress={() => setUserType('pasajero')}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeButtonText, { color: theme.colors.textSecondary }, userType === 'pasajero' && { color: theme.colors.textInverse }]}>Pasajero</Text>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { color: theme.colors.textSecondary },
+                    userType === 'pasajero' && {
+                      color: theme.colors.textInverse,
+                    },
+                  ]}
+                >
+                  Pasajero
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -172,26 +231,85 @@ export default function LoginScreen({ navigation }: any) {
                 onPress={() => setUserType('conductor')}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.typeButtonText, { color: theme.colors.textSecondary }, userType === 'conductor' && { color: theme.colors.textInverse }]}>Conductor</Text>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { color: theme.colors.textSecondary },
+                    userType === 'conductor' && {
+                      color: theme.colors.textInverse,
+                    },
+                  ]}
+                >
+                  Conductor
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.formContainer, glass(theme), depth(theme, 2), { borderRadius: 28, padding: 20 }]}>
+            <View
+              style={[
+                styles.formContainer,
+                glass(theme),
+                depth(theme, 2),
+                { borderRadius: 28, padding: 20 },
+              ]}
+            >
               <Input
-                placeholder="Correo Institucional"
+                label="Correo institucional"
+                placeholder="tu.nombre@campus.tecnm.mx"
+                autoComplete="email"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                icon={<Icon name="email" size={24} color={theme.colors.textSecondary} />}
+                icon={
+                  <Icon
+                    name="email"
+                    size={24}
+                    color={theme.colors.textSecondary}
+                  />
+                }
               />
 
               <Input
-                placeholder="Contraseña"
+                label="Contraseña"
+                ref={passwordRef}
+                autoComplete="current-password"
+                onSubmitEditing={() => void handleLogin()}
+                returnKeyType="go"
+                error={formError || undefined}
+                rightElement={
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                    }
+                    style={{
+                      minWidth: 48,
+                      minHeight: 48,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setShowPassword(v => !v)}
+                  >
+                    <Icon
+                      name={showPassword ? 'visibility-off' : 'visibility'}
+                      size={24}
+                      color={theme.colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                }
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
-                icon={<Icon name="lock" size={24} color={theme.colors.textSecondary} />}
+                secureTextEntry={!showPassword}
+                icon={
+                  <Icon
+                    name="lock"
+                    size={24}
+                    color={theme.colors.textSecondary}
+                  />
+                }
               />
 
               <Button
@@ -201,16 +319,44 @@ export default function LoginScreen({ navigation }: any) {
                 style={styles.loginButton}
               />
 
-              <TouchableOpacity style={styles.forgotPasswordContainer}>
-                <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>¿Olvidaste tu contraseña?</Text>
+              <TouchableOpacity
+                style={styles.forgotPasswordContainer}
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('Recover')}
+              >
+                <Text
+                  style={[
+                    styles.forgotPasswordText,
+                    { color: theme.colors.primary },
+                  ]}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Text>
               </TouchableOpacity>
 
               {userType === 'pasajero' && (
                 <>
                   <View style={styles.dividerContainer}>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-                    <Text style={[styles.dividerText, { color: theme.colors.textSecondary }]}>O</Text>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                    <View
+                      style={[
+                        styles.divider,
+                        { backgroundColor: theme.colors.border },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.dividerText,
+                        { color: theme.colors.textSecondary },
+                      ]}
+                    >
+                      O
+                    </Text>
+                    <View
+                      style={[
+                        styles.divider,
+                        { backgroundColor: theme.colors.border },
+                      ]}
+                    />
                   </View>
 
                   <Button
@@ -239,7 +385,7 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -250,7 +396,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    marginBottom: 20
+    marginBottom: 20,
   },
   logoImage: {
     width: 150,
@@ -287,13 +433,13 @@ const styles = StyleSheet.create({
   typeButtonText: {
     color: colors.text.secondary,
     fontWeight: '600',
-    fontSize: 15
+    fontSize: 15,
   },
   textActive: {
-    color: colors.text.inverse
+    color: colors.text.inverse,
   },
   formContainer: {
-    width: '100%'
+    width: '100%',
   },
   loginButton: {
     marginTop: 10,

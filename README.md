@@ -59,15 +59,20 @@ Actualmente incluye:
 * Chat básico
 * Registro de pagos
 
+La entrega del piloto online incorpora navegación Inicio/Viajes/Perfil, nuevas
+pantallas programadas/activas/históricas, seguimiento GPS Android, chat, efectivo
+y reseñas reales bajo flags. Consulta la [guía Android y matriz de aceptación](docs/android-pilot.md)
+para configurarlo y revisar lo que falta. Aún no está certificado en dispositivos
+ni publicado como piloto. Búsqueda/publicación, favoritas y el mapa activo ya
+incorporan el rediseño; el QA visual integral y las pruebas físicas siguen pendientes.
+
 ---
 
 # 📦 Instalación
 
 ```bash
-git clone <repo-url>
-cd krow
-npm install
-npm run dev
+npm ci
+npm start
 ```
 
 ---

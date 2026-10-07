@@ -6,7 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
+  AccessibilityInfo,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../theme/colors';
@@ -29,7 +30,10 @@ const getAlertConfig = (type: AlertType, theme: AppTheme) => {
     case 'error':
       return { icon: 'error-outline', color: theme.colors.status.error };
     case 'success':
-      return { icon: 'check-circle-outline', color: theme.colors.status.success };
+      return {
+        icon: 'check-circle-outline',
+        color: theme.colors.status.success,
+      };
     case 'warning':
       return { icon: 'warning-amber', color: theme.colors.status.warning };
     case 'info':
@@ -47,11 +51,18 @@ export function CustomAlert({
   confirmText = 'Entendido',
 }: CustomAlertProps) {
   const { theme, motionEnabled } = useTheme();
+  const { width } = useWindowDimensions();
   const scaleValue = useRef(new Animated.Value(0)).current;
   const opacityValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
+      AccessibilityInfo.announceForAccessibility(title + '. ' + message);
+      if (!motionEnabled) {
+        scaleValue.setValue(1);
+        opacityValue.setValue(1);
+        return;
+      }
       Animated.parallel([
         Animated.spring(scaleValue, {
           toValue: 1,
@@ -79,44 +90,67 @@ export function CustomAlert({
         }),
       ]).start();
     }
-  }, [motionEnabled, visible, scaleValue, opacityValue]);
+  }, [motionEnabled, visible, scaleValue, opacityValue, title, message]);
 
   if (!visible) return null;
 
   const config = getAlertConfig(type, theme);
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
-      <View style={[styles.overlay, { backgroundColor: theme.colors.backdrop }]}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType={motionEnabled ? 'fade' : 'none'}
+      onRequestClose={onClose}
+    >
+      <View
+        style={[styles.overlay, { backgroundColor: theme.colors.backdrop }]}
+      >
         <Animated.View
           style={[
             styles.alertContainer,
-            { backgroundColor: theme.colors.surfaceRaised },
+            {
+              backgroundColor: theme.colors.surfaceRaised,
+              width: Math.min(width - 48, 480),
+            },
             {
               transform: [{ scale: scaleValue }],
               opacity: opacityValue,
             },
           ]}
         >
-          <View style={[styles.iconContainer, { backgroundColor: config.color + '1A' }]}>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: config.color + '1A' },
+            ]}
+          >
             <Icon name={config.icon} size={40} color={config.color} />
           </View>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
-          <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{message}</Text>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
+            {title}
+          </Text>
+          <Text style={[styles.message, { color: theme.colors.textSecondary }]}>
+            {message}
+          </Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: config.color }]}
             onPress={onClose}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={confirmText}
           >
-            <Text style={[styles.buttonText, { color: theme.colors.textInverse }]}>{confirmText}</Text>
+            <Text
+              style={[styles.buttonText, { color: theme.colors.textInverse }]}
+            >
+              {confirmText}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
     </Modal>
   );
 }
-
-const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   overlay: {
@@ -128,7 +162,7 @@ const styles = StyleSheet.create({
   },
   alertContainer: {
     backgroundColor: colors.background,
-    width: width - 48,
+    width: '100%',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',

@@ -1,6 +1,16 @@
 import { apiRequest } from '../../../core/api/apiClient';
 import type { DirectionsResult } from '../../maps/api/mapsApi';
 import type { FavoriteRoute, RouteEndpoint } from '../types/ride.types';
+import { CAMPUS_ORIGIN } from '../domain/driverRideRules';
+
+const withCampusOrigin = (payload: SaveFavoriteRoutePayload) => ({
+  ...payload,
+  origin: {
+    address: CAMPUS_ORIGIN.address,
+    placeId: CAMPUS_ORIGIN.placeId,
+    ...CAMPUS_ORIGIN.location,
+  },
+});
 
 export interface SaveFavoriteRoutePayload {
   name: string;
@@ -32,12 +42,12 @@ export const routeApi = {
   createFavorite: (payload: SaveFavoriteRoutePayload) =>
     apiRequest<{ routeId: string }>('/routes/favorites', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(withCampusOrigin(payload)),
     }),
   updateFavorite: (routeId: string, payload: SaveFavoriteRoutePayload) =>
     apiRequest<{ routeId: string }>(`/routes/favorites/${routeId}`, {
       method: 'PATCH',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(withCampusOrigin(payload)),
     }),
   deleteFavorite: (routeId: string) =>
     apiRequest<{ success: boolean }>(`/routes/favorites/${routeId}`, {

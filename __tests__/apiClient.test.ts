@@ -67,3 +67,33 @@ test('network failures are actionable and HTTP errors retain their code', async 
   });
   expect(jest.getTimerCount()).toBe(0);
 });
+
+test('malformed successful JSON is an API error, while valid null responses and 204 remain allowed', async () => {
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError('Truncated JSON');
+    },
+  });
+  await expect(apiRequest('/activity')).rejects.toMatchObject({
+    status: 502,
+    body: { code: 'INVALID_RESPONSE' },
+  });
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => null,
+  });
+  await expect(apiRequest('/rides/active')).resolves.toBeNull();
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 204,
+    json: async () => {
+      throw new SyntaxError('Empty body');
+    },
+  });
+  await expect(
+    apiRequest('/devices/device', { method: 'DELETE' }),
+  ).resolves.toBeNull();
+});
