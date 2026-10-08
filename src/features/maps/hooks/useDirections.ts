@@ -5,6 +5,8 @@ interface UseDirectionsOptions {
   /** Si true, recalcula automáticamente cuando origin/destination cambian. */
   autoFetch?: boolean;
   departureTime?: Date | null;
+  corridorId?: string;
+  transportStopIds?: string[];
 }
 
 interface UseDirectionsResult {
@@ -24,7 +26,8 @@ export function useDirections(
   destination: LatLng | null,
   options: UseDirectionsOptions = {},
 ): UseDirectionsResult {
-  const { autoFetch = true, departureTime } = options;
+  const { autoFetch = true, departureTime, corridorId } = options;
+  const stopIdsKey = (options.transportStopIds ?? []).join(',');
   const [directions, setDirections] = useState<DirectionsResult | null>(null);
   const [resultKey, setResultKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +41,7 @@ export function useDirections(
     origin && destination
       ? `${origin.lat},${origin.lng}|${destination.lat},${destination.lng}|${
           departureTime?.toISOString() ?? ''
-        }`
+        }|${corridorId ?? ''}|${stopIdsKey}`
       : null;
 
   const fetchDirections =
@@ -60,6 +63,8 @@ export function useDirections(
           { lat: destinationLat, lng: destinationLng },
           {
             departureTime: departureTime ?? undefined,
+            corridorId,
+            transportStopIds: stopIdsKey ? stopIdsKey.split(',') : undefined,
           },
         );
         if (currentRequest === requestId.current) {
@@ -84,6 +89,8 @@ export function useDirections(
       destinationLat,
       destinationLng,
       departureTime,
+      corridorId,
+      stopIdsKey,
     ]);
 
   useEffect(() => {

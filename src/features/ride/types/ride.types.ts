@@ -15,6 +15,7 @@ export type RideStatus =
 
 export interface PublishRidePayload {
   vehicle_id: string;
+  corridor_id?: string;
   favorite_route_id?: string;
   origin_lat: number;
   origin_lng: number;
@@ -52,6 +53,8 @@ export interface RideStop {
 
 export interface FavoriteRoute {
   routeId: string;
+  corridorId?: string | null;
+  corridorName?: string | null;
   name: string;
   origin: RouteEndpoint;
   destination: RouteEndpoint;
@@ -75,6 +78,8 @@ export interface RouteEndpoint {
 
 export interface RideDetail {
   rideId: string;
+  corridorId?: string | null;
+  corridorName?: string | null;
   favoriteRouteId: string | null;
   origin: RouteEndpoint;
   destination: RouteEndpoint;

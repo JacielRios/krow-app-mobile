@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { bookingApi } from '../api/bookingApi';
 import type {
   RequestBookingPayload,
@@ -24,6 +24,13 @@ interface UseRequestBookingResult {
  */
 export function useRequestBooking(): UseRequestBookingResult {
   const [loading, setLoading] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   async function requestBooking(
     payload: RequestBookingPayload,
@@ -46,7 +53,7 @@ export function useRequestBooking(): UseRequestBookingResult {
             : 'No se pudo solicitar el viaje',
       };
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 

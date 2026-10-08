@@ -3,6 +3,7 @@ import { readActiveRideView } from './activeRideView';
 import type {
   AvailableRide,
   PassengerStopCandidates,
+  RideStopOptions,
   StopOption,
 } from '../types/rideSearch.types';
 import { isValidPoint } from '../../maps/api/mapsApi';
@@ -18,7 +19,6 @@ import type {
   BookingStatus,
   RideHeader,
 } from '../types/booking.types';
-import type { StopPair } from '../types/rideSearch.types';
 
 export interface RecentRideApiView {
   bookingStatus?: BookingStatus;
@@ -126,6 +126,7 @@ const validStop = (stop: StopOption | null | undefined) =>
   typeof stop.stopId === 'string' &&
   !!stop.stopId &&
   typeof stop.name === 'string' &&
+  (stop.address == null || typeof stop.address === 'string') &&
   isValidPoint(stop.location) &&
   Number.isFinite(stop.distanceMeters) &&
   stop.distanceMeters >= 0;
@@ -148,12 +149,16 @@ const fromApi = (ride: ApiRide): AvailableRide => {
     (ride.destinationAddress != null &&
       typeof ride.destinationAddress !== 'string') ||
     (ride.routePolyline != null && typeof ride.routePolyline !== 'string') ||
+    (ride.corridorId != null && typeof ride.corridorId !== 'string') ||
+    (ride.corridorName != null && typeof ride.corridorName !== 'string') ||
     (ride.driverRating != null && !Number.isFinite(ride.driverRating)) ||
     !validStop(ride.bestPickupStop) ||
     !validStop(ride.bestDropoffStop) ||
     !ride.match ||
     !Number.isFinite(ride.match.pickupDistanceMeters) ||
-    !Number.isFinite(ride.match.dropoffDistanceMeters)
+    ride.match.pickupDistanceMeters < 0 ||
+    !Number.isFinite(ride.match.dropoffDistanceMeters) ||
+    ride.match.dropoffDistanceMeters < 0
   ) {
     throw new Error(
       'No pudimos leer los viajes disponibles. Reintenta la búsqueda.',
@@ -169,6 +174,7 @@ export const rideApi = {
       body: JSON.stringify({
         vehicleId: payload.vehicle_id,
         favoriteRouteId: payload.favorite_route_id,
+        corridorId: payload.corridor_id,
         origin: CAMPUS_ORIGIN.location,
         destination: {
           lat: payload.destination_lat,
@@ -199,7 +205,10 @@ export const rideApi = {
         origin: options.origin ?? CAMPUS_ORIGIN.location,
         destination: options.destination,
         maxResults: options.maxResults,
-        maxDistanceMeters: 1000,
+        maxDistanceMeters:
+          options.maxDistanceKm == null
+            ? undefined
+            : Math.round(options.maxDistanceKm * 1000),
         pickupTransportStopId: options.pickupTransportStopId,
         dropoffTransportStopId: options.dropoffTransportStopId,
         fromTime: options.fromTime?.toISOString(),
@@ -225,7 +234,6 @@ export const rideApi = {
             origin,
             destination,
             pickupScope: options.pickupScope ?? 'campus',
-            maxDistanceMeters: 1000,
           }),
         },
       ),
@@ -291,6 +299,7 @@ export const rideApi = {
         version,
         vehicleId: payload.vehicle_id,
         favoriteRouteId: payload.favorite_route_id,
+        corridorId: payload.corridor_id,
         origin: { lat: payload.origin_lat, lng: payload.origin_lng },
         destination: {
           lat: payload.destination_lat,
@@ -304,15 +313,37 @@ export const rideApi = {
         pricePerSeatCents: Math.round(payload.price_per_seat * 100),
       }),
     }),
-  stopOptions: (
+  stopOptions: async (
     rideId: string,
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
-  ) =>
-    apiRequest<{ pairs: StopPair[] }>(`/rides/${rideId}/stop-options`, {
-      method: 'POST',
-      body: JSON.stringify({ origin, destination, maxDistanceMeters: 1000 }),
-    }),
+  ): Promise<RideStopOptions> => {
+    const data = await apiRequest<RideStopOptions>(
+      `/rides/${rideId}/stop-options`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ origin, destination }),
+      },
+    );
+    if (
+      !data ||
+      !Array.isArray(data.pairs) ||
+      data.pairs.some(
+        pair => !pair || !validStop(pair.pickup) || !validStop(pair.dropoff),
+      ) ||
+      !Number.isFinite(data.radiusMeters) ||
+      data.radiusMeters <= 0 ||
+      (data.recommendedDropoffStopId != null &&
+        !data.pairs.some(
+          pair => pair.dropoff.stopId === data.recommendedDropoffStopId,
+        ))
+    ) {
+      throw new Error(
+        'No pudimos leer las paradas disponibles. Reintenta la consulta.',
+      );
+    }
+    return data;
+  },
   scheduledView: (rideId: string) =>
     apiRequest<ScheduledRideApiView>(`/rides/${rideId}/scheduled-view`),
   activeView: async (rideId: string) =>

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button, Input } from '../src/shared/components/ui-v2';
 import { PlacePicker, RoutePreviewMap } from '../src/features/maps';
+import { routeApi } from '../src/features/ride/api/routeApi';
 import { PublishRideScreen } from '../src/features/ride/screens/driver/PublishRideScreen';
 import { RideDateTimePicker } from '../src/features/ride/components/RideDateTimePicker';
 import { RideComfortControls } from '../src/features/ride/components/RideComfortControls';
@@ -38,6 +39,15 @@ const mockStops = ['a', 'b', 'c'].map((stopId, index) => ({
   distanceFromRouteMeters: 1,
   routeFraction: index / 2,
 }));
+const mockCorridors = ['avenue-one', 'avenue-two'].map(corridorId => ({
+  corridorId,
+  name: corridorId === 'avenue-one' ? 'Avenida del catálogo' : 'Otra avenida',
+  code: corridorId,
+  direction: 'Salida del campus',
+  stops: [],
+}));
+let mockRouteError: string | null = null;
+const mockDirectionsRequest = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ params: mockParams }),
@@ -58,12 +68,16 @@ jest.mock('../src/features/maps', () => ({
   useDirections: (
     _origin: unknown,
     destination: unknown,
-    options: { departureTime?: Date },
+    options: {
+      departureTime?: Date;
+      corridorId?: string;
+      transportStopIds?: string[];
+    },
   ) => {
     const ReactModule = require('react');
     const directions = ReactModule.useMemo(
       () =>
-        destination
+        destination && !mockRouteError
           ? {
               encodedPolyline: 'test',
               distanceMeters: 1000,
@@ -71,9 +85,21 @@ jest.mock('../src/features/maps', () => ({
               compatibleStops: mockStops,
             }
           : null,
-      [destination, options.departureTime],
+      [
+        destination,
+        options.departureTime,
+        options.corridorId,
+        options.transportStopIds?.join(','),
+        mockRouteError,
+      ],
     );
-    return { directions, loading: false, error: null };
+    mockDirectionsRequest(destination, options);
+    return {
+      directions,
+      loading: false,
+      error: destination ? mockRouteError : null,
+      fetch: jest.fn(),
+    };
   },
 }));
 jest.mock('../src/features/ride/hooks', () => ({
@@ -98,6 +124,9 @@ jest.mock('../src/features/ride/hooks', () => ({
 jest.mock('../src/features/ride/api/rideApi', () => ({
   rideApi: { create: jest.fn() },
 }));
+jest.mock('../src/features/ride/api/routeApi', () => ({
+  routeApi: { corridors: jest.fn() },
+}));
 
 let tree: Renderer.ReactTestRenderer;
 let cache: QueryClient;
@@ -106,6 +135,8 @@ beforeEach(() => {
   mockParams = {};
   mockFavorites = [];
   mockRide = null;
+  mockRouteError = null;
+  jest.mocked(routeApi.corridors).mockResolvedValue(mockCorridors);
   jest.mocked(rideApi.create).mockResolvedValue({ rideId: 'ride' });
   mockCreateFavorite.mockResolvedValue({ routeId: 'saved-favorite' });
   mockUpdateFavorite.mockResolvedValue({ routeId: 'saved-favorite' });
@@ -126,6 +157,9 @@ async function mount() {
         </ThemeProvider>
       </QueryClientProvider>,
     );
+  });
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 20));
   });
 }
 function button(title: string) {
@@ -157,6 +191,28 @@ async function chooseDestination() {
       placeId: 'd',
       location: { lat: 25.69, lng: -100.3 },
     }),
+  );
+  await selectCorridor();
+  await selectStop('a');
+  await selectStop('c');
+}
+async function selectCorridor(index = 0) {
+  await act(() =>
+    tree.root
+      .findAll(
+        node =>
+          node.props.accessibilityLabel ===
+          `Avenida: ${mockCorridors[index].name}`,
+      )[0]
+      .props.onPress(),
+  );
+}
+async function selectStop(stopId: string) {
+  await act(() =>
+    tree.root
+      .findByType(RoutePreviewMap)
+      .props.extraMarkers.find((marker: { id: string }) => marker.id === stopId)
+      .onPress(),
   );
 }
 test('repeated taps publish once and keep the committed favorite when publication fails', async () => {
@@ -200,12 +256,13 @@ test('repeated taps publish once and keep the committed favorite when publicatio
     rideId: 'ride',
   });
 });
-test('recalculating a favorite uses the current automatic catalog stops, matching the backend', async () => {
+test('recalculating a favorite preserves its corridor and only its selected catalog stops', async () => {
   mockParams = { favoriteRouteId: 'favorite' };
   mockFavorites = [
     {
       routeId: 'favorite',
       name: 'Campus',
+      corridorId: 'avenue-one',
       origin: { address: 'Origen', lat: 25.67, lng: -100.3 },
       destination: { address: 'Destino', lat: 25.69, lng: -100.3 },
       defaults: {
@@ -236,7 +293,8 @@ test('recalculating a favorite uses the current automatic catalog stops, matchin
   await act(async () => button('Publicar viaje').props.onPress());
   expect(rideApi.create).toHaveBeenCalledWith(
     expect.objectContaining({
-      transport_stop_ids: ['a', 'b', 'c'],
+      transport_stop_ids: ['a', 'c'],
+      corridor_id: 'avenue-one',
       price_per_seat: 12.34,
       origin_lat: CAMPUS_ORIGIN.location.lat,
       origin_lng: CAMPUS_ORIGIN.location.lng,
@@ -254,7 +312,7 @@ test('new rides show a fixed campus origin and only ask for a destination', asyn
   );
 });
 
-test('identifying a stop on the map also selects its numbered list row', async () => {
+test('selecting a stop on the map also checks its numbered list row', async () => {
   await mount();
   await chooseDestination();
   const marker = tree.root.findByType(RoutePreviewMap).props.extraMarkers[1];
@@ -265,10 +323,105 @@ test('identifying a stop on the map also selects its numbered list row', async (
   ).toBe(true);
   const row = tree.root.findAll(
     node =>
-      node.props.accessibilityLabel ===
-      'Parada 2: Parada b. Incluida en el recorrido',
+      node.props.accessibilityLabel === 'Parada 2: Parada b. Seleccionada',
   )[0];
-  expect(row.props.accessibilityState.selected).toBe(true);
+  expect(row.props.accessibilityState.checked).toBe(true);
+});
+
+test('a new route needs an avenue and explicit stop selection; compatible stops are not auto-selected', async () => {
+  await mount();
+  await act(() =>
+    tree.root.findByType(PlacePicker).props.onChange({
+      address: 'Destino',
+      placeId: 'd',
+      location: { lat: 25.69, lng: -100.3 },
+    }),
+  );
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findAllByType(VehiclePicker)).toHaveLength(0);
+  await selectCorridor();
+  expect(
+    tree.root
+      .findByType(RoutePreviewMap)
+      .props.extraMarkers.every(
+        (marker: { selected: boolean }) => !marker.selected,
+      ),
+  ).toBe(true);
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findAllByType(VehiclePicker)).toHaveLength(0);
+  await selectStop('b');
+  await fillDetails();
+  await act(() => button('Continuar').props.onPress());
+  expect(mockDirectionsRequest).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      corridorId: 'avenue-one',
+      transportStopIds: ['b'],
+    }),
+  );
+  await act(async () => button('Publicar viaje').props.onPress());
+  expect(rideApi.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      corridor_id: 'avenue-one',
+      transport_stop_ids: ['b'],
+    }),
+  );
+});
+
+test('changing the avenue clears the prior selection and never silently enables other stops', async () => {
+  await mount();
+  await chooseDestination();
+  await selectCorridor(1);
+  expect(
+    tree.root
+      .findByType(RoutePreviewMap)
+      .props.extraMarkers.every(
+        (marker: { selected: boolean }) => !marker.selected,
+      ),
+  ).toBe(true);
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findAllByType(VehiclePicker)).toHaveLength(0);
+});
+
+test('an unavailable corridor catalog keeps publication blocked and offers a retry', async () => {
+  jest.mocked(routeApi.corridors).mockRejectedValue(new Error('Sin conexión'));
+  await mount();
+  await act(() =>
+    tree.root.findByType(PlacePicker).props.onChange({
+      address: 'Destino',
+      placeId: 'd',
+      location: { lat: 25.69, lng: -100.3 },
+    }),
+  );
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findAllByType(VehiclePicker)).toHaveLength(0);
+  expect(rideApi.create).not.toHaveBeenCalled();
+  expect(
+    tree.root.findAll(
+      node => node.props.title === 'No pudimos cargar las avenidas',
+    ),
+  ).not.toHaveLength(0);
+});
+
+test('a route service failure is shown without enabling publication', async () => {
+  mockRouteError = 'No pudimos calcular la ruta';
+  await mount();
+  await act(() =>
+    tree.root.findByType(PlacePicker).props.onChange({
+      address: 'Destino',
+      placeId: 'd',
+      location: { lat: 25.69, lng: -100.3 },
+    }),
+  );
+  await selectCorridor();
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findAllByType(VehiclePicker)).toHaveLength(0);
+  expect(rideApi.create).not.toHaveBeenCalled();
+  expect(
+    tree.root.findAll(
+      node => node.props.title === 'No pudimos calcular el recorrido',
+    ),
+  ).not.toHaveLength(0);
 });
 
 test('editing a historical ride keeps its real origin visible', async () => {

@@ -17,6 +17,8 @@ export interface PlaceDetail {
   location: LatLng;
 }
 export interface DirectionsResult {
+  corridorId?: string;
+  corridorName?: string;
   encodedPolyline: string;
   distanceMeters: number;
   durationSeconds: number;
@@ -140,6 +142,8 @@ export async function getDirections(
   destination: LatLng,
   options: {
     departureTime?: Date;
+    corridorId?: string;
+    transportStopIds?: string[];
     mode?: 'driving' | 'walking' | 'bicycling' | 'transit';
     language?: string;
   } = {},
@@ -150,6 +154,8 @@ export async function getDirections(
       origin,
       destination,
       departureTime: options.departureTime?.toISOString(),
+      corridorId: options.corridorId,
+      transportStopIds: options.transportStopIds,
     }),
   });
   if (

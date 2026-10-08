@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { rideApi } from '../api/rideApi';
 import type { AvailableRide } from '../types/rideSearch.types';
 
@@ -31,6 +31,14 @@ export function useSearchRides(): UseSearchRidesResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      requestId.current += 1;
+    };
+  }, []);
 
   const search = useCallback(
     async (options: SearchOptions): Promise<AvailableRide[]> => {
@@ -39,10 +47,11 @@ export function useSearchRides(): UseSearchRidesResult {
       setError(null);
       try {
         const mapped = await rideApi.search(options);
-        if (currentRequest === requestId.current) setRides(mapped);
+        if (mounted.current && currentRequest === requestId.current)
+          setRides(mapped);
         return mapped;
       } catch (e: unknown) {
-        if (currentRequest === requestId.current) {
+        if (mounted.current && currentRequest === requestId.current) {
           setError(
             e instanceof Error
               ? e.message
@@ -51,7 +60,8 @@ export function useSearchRides(): UseSearchRidesResult {
         }
         return [];
       } finally {
-        if (currentRequest === requestId.current) setLoading(false);
+        if (mounted.current && currentRequest === requestId.current)
+          setLoading(false);
       }
     },
     [],

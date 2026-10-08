@@ -65,6 +65,9 @@ y reseñas reales bajo flags. Consulta la [guía Android y matriz de aceptación
 para configurarlo y revisar lo que falta. Aún no está certificado en dispositivos
 ni publicado como piloto. Búsqueda/publicación, favoritas y el mapa activo ya
 incorporan el rediseño; el QA visual integral y las pruebas físicas siguen pendientes.
+El conductor elige avenida y bajadas del catálogo del servidor. El pasajero busca
+por destino, ve primero los viajes con mejores paradas y puede elegir cualquier
+bajada habilitada del viaje. El radio de búsqueda se configura en la API.
 
 ---
 
@@ -95,8 +98,9 @@ La integración de viajes v2 añade navegación Mapbox nativa. Consulta
 [implementación y validaciones locales](docs/native-runtime-validation.md) para
 las capacidades, requisitos offline y comprobaciones pendientes de iOS.
 
-El pasajero solicita ubicación mientras usa la app y puede escribir el origen
-si rechaza el permiso. Android recibe `KROW_ANDROID_MAPS_API_KEY` durante la
+Durante el piloto, el origen es siempre ITNL y buscar un destino no requiere
+permiso GPS. El conductor autoriza ubicación al comenzar el seguimiento.
+Android recibe `KROW_ANDROID_MAPS_API_KEY` durante la
 compilación desde el entorno o desde `android/local.properties` (archivo local
 ignorado por Git). La clave debe tener habilitado Maps SDK for Android y permitir
 el paquete `com.krownmobileapp` con el SHA-1 del certificado usado para firmar.

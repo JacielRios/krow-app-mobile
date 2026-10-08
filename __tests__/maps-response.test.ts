@@ -11,6 +11,30 @@ jest.mock('../src/core/api/apiClient', () => ({
   apiQuery: jest.fn(() => 'query=test'),
 }));
 
+test('the route preview forwards the selected avenue and stops for the publication review', async () => {
+  (apiRequest as jest.Mock).mockResolvedValueOnce({
+    encodedPolyline: '??',
+    distanceMeters: 1000,
+    durationSeconds: 120,
+    compatibleStops: [],
+  });
+  await getDirections(
+    { lat: 25, lng: -100 },
+    { lat: 26, lng: -100 },
+    {
+      corridorId: 'corridor',
+      transportStopIds: ['chosen'],
+    },
+  );
+  const options = (apiRequest as jest.Mock).mock.calls.at(-1)[1];
+  expect(JSON.parse(options.body)).toEqual(
+    expect.objectContaining({
+      corridorId: 'corridor',
+      transportStopIds: ['chosen'],
+    }),
+  );
+});
+
 test.each([null, {}, [null], [{ placeId: 'x' }]])(
   'rejects malformed suggestions before rendering them: %p',
   async response => {

@@ -9,6 +9,7 @@ import { Button, Card } from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
 import type { AvailableRide } from '../types/rideSearch.types';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { formatStopDistance } from '../domain/formatStopDistance';
 
 interface RideCardProps {
   ride: AvailableRide;
@@ -143,13 +144,18 @@ export const RideCard: React.FC<RideCardProps> = ({
           { backgroundColor: theme.colors.primarySoft },
         ]}
       >
+        {!!ride.corridorName && (
+          <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
+            Por {ride.corridorName}
+          </Text>
+        )}
         <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Sube en {ride.bestPickupStop.name} · {ride.match.pickupDistanceMeters}{' '}
-          m
+          Sube en {ride.bestPickupStop.name}
         </Text>
         <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Baja en {ride.bestDropoffStop.name} ·{' '}
-          {ride.match.dropoffDistanceMeters} m
+          Bajada recomendada: {ride.bestDropoffStop.name} ·{' '}
+          {formatStopDistance(ride.match.dropoffDistanceMeters)} aprox. de tu
+          destino
         </Text>
       </View>
 
@@ -194,7 +200,7 @@ export const RideCard: React.FC<RideCardProps> = ({
         </View>
         <View style={styles.actionWrap}>
           <Button
-            title={alreadyRequested ? 'Solicitado' : 'Solicitar unirse'}
+            title={alreadyRequested ? 'Solicitado' : 'Ver ruta y paradas'}
             onPress={onRequest}
             disabled={alreadyRequested || requesting}
             loading={requesting}

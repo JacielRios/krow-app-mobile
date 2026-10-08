@@ -104,7 +104,7 @@ export const FavoriteRoutesScreen: React.FC = () => {
         ) : favorites.length === 0 ? (
           <FeedbackState
             title="Aún no tienes rutas frecuentes"
-            description="Guarda una ruta con al menos dos paradas para reutilizarla al publicar."
+            description="Guarda tu avenida y las paradas de descenso para reutilizarlas al publicar."
           />
         ) : (
           favorites.map(favorite => (
@@ -134,6 +134,7 @@ export const FavoriteRoutesScreen: React.FC = () => {
                       { color: theme.colors.textSecondary },
                     ]}
                   >
+                    {favorite.corridorName ? `${favorite.corridorName} · ` : ''}
                     {favorite.stops.length} paradas · {favorite.origin.address}{' '}
                     → {favorite.destination.address}
                   </Text>

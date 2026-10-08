@@ -144,6 +144,17 @@ android {
     }
 }
 
+// Private pilot updates share the existing package/certificate. Keep production
+// versioning controlled by KROW_VERSION_* independently of this test variant.
+androidComponents {
+    onVariants(selector().withBuildType("trial")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(4)
+            output.versionName.set("0.2.2-trial")
+        }
+    }
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

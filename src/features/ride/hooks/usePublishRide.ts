@@ -9,8 +9,8 @@ interface UsePublishRideResult {
 
 /**
  * Publica un viaje mediante KROW API. El backend recalcula la ruta y la RPC
- * `create_ride_v2` inserta atómicamente el viaje, sus paradas de catálogo y el
- * primer registro de historial.
+ * `create_ride_v2` inserta atómicamente el viaje, la salida ITNL y las paradas
+ * que eligió el conductor dentro de su corredor. El servidor valida el catálogo.
  *
  * La pantalla decide qué hacer con el resultado (navegar, mostrar error, etc.).
  */

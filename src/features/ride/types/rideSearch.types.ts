@@ -37,6 +37,9 @@ export interface AvailableRide {
   status: RideStatus;
   routeDistanceMeters: number | null;
   routeDurationSeconds: number | null;
+  /** Avenida principal del catálogo del piloto. */
+  corridorId?: string | null;
+  corridorName?: string | null;
   bestPickupStop: StopOption;
   bestDropoffStop: StopOption;
   match: {
@@ -48,7 +51,7 @@ export interface AvailableRide {
 export interface StopOption {
   stopId: string;
   name: string;
-  address: string;
+  address: string | null;
   location: { lat: number; lng: number };
   distanceMeters: number;
 }
@@ -56,6 +59,13 @@ export interface StopOption {
 export interface StopPair {
   pickup: StopOption;
   dropoff: StopOption;
+}
+
+/** Todos los descensos habilitados de un viaje, sin restringir elección por radio. */
+export interface RideStopOptions {
+  pairs: StopPair[];
+  recommendedDropoffStopId: string | null;
+  radiusMeters: number;
 }
 
 export type PassengerStopRole = 'pickup' | 'dropoff';

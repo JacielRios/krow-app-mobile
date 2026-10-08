@@ -118,6 +118,71 @@ test('search defaults to the campus but keeps a selected intermediate pickup', a
   ).toEqual(point);
 });
 
+test('destination search leaves the matching tolerance to the backend configuration', async () => {
+  jest.mocked(apiRequest).mockResolvedValue([]);
+  await rideApi.search({ destination: point });
+  const body = JSON.parse(
+    jest.mocked(apiRequest).mock.calls[0][1]!.body as string,
+  );
+  expect(body).not.toHaveProperty('maxDistanceMeters');
+  expect(body).not.toHaveProperty('pickupTransportStopId');
+  expect(body).not.toHaveProperty('dropoffTransportStopId');
+  await rideApi.search({ destination: point, maxDistanceKm: 5 });
+  expect(
+    JSON.parse(jest.mocked(apiRequest).mock.calls[1][1]!.body as string)
+      .maxDistanceMeters,
+  ).toBe(5000);
+});
+
+test('keeps all available trip stops including a drop-off beyond the matching radius', async () => {
+  const farther = { ...dropoff, stopId: 'farther', distanceMeters: 4800 };
+  const options = {
+    pairs: [
+      { pickup, dropoff },
+      { pickup, dropoff: farther },
+    ],
+    recommendedDropoffStopId: dropoff.stopId,
+    radiusMeters: 3000,
+  };
+  jest.mocked(apiRequest).mockResolvedValue(options);
+  expect(
+    await rideApi.stopOptions('ride', CAMPUS_ORIGIN.location, point),
+  ).toEqual(options);
+  const body = JSON.parse(
+    jest.mocked(apiRequest).mock.calls[0][1]!.body as string,
+  );
+  expect(body).not.toHaveProperty('maxDistanceMeters');
+});
+
+test.each([
+  null,
+  { pairs: null, radiusMeters: 3000 },
+  {
+    pairs: [
+      { pickup, dropoff: { ...dropoff, location: { lat: 100, lng: 0 } } },
+    ],
+    radiusMeters: 3000,
+  },
+  {
+    pairs: [{ pickup, dropoff }],
+    recommendedDropoffStopId: 'missing',
+    radiusMeters: 3000,
+  },
+  {
+    pairs: [{ pickup, dropoff }],
+    recommendedDropoffStopId: dropoff.stopId,
+    radiusMeters: 0,
+  },
+])(
+  'rejects invalid available stops before handing coordinates to the native map: %p',
+  async response => {
+    jest.mocked(apiRequest).mockResolvedValue(response);
+    await expect(rideApi.stopOptions('ride', point, point)).rejects.toThrow(
+      'paradas disponibles',
+    );
+  },
+);
+
 test('saving a favorite normalizes its origin without mutating the selected template', async () => {
   jest.mocked(apiRequest).mockResolvedValue({ routeId: 'favorite' });
   const payload = {
@@ -125,6 +190,7 @@ test('saving a favorite normalizes its origin without mutating the selected temp
     origin: { address: 'Otra salida', ...point },
     destination: { address: 'Destino', ...point },
     transportStopIds: ['a', 'b'],
+    corridorId: 'corridor',
   };
   await routeApi.createFavorite(payload);
   await routeApi.updateFavorite('favorite', payload);

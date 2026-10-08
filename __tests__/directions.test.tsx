@@ -9,13 +9,58 @@ jest.mock('../src/features/maps/api/mapsApi', () => ({
 const origin = { lat: 25.68, lng: -100.31 };
 let result: ReturnType<typeof useDirections>;
 let tree: Renderer.ReactTestRenderer;
-function Probe({ destination }: { destination: typeof origin | null }) {
-  result = useDirections(origin, destination);
+function Probe({
+  destination,
+  corridorId,
+  transportStopIds,
+}: {
+  destination: typeof origin | null;
+  corridorId?: string;
+  transportStopIds?: string[];
+}) {
+  result = useDirections(origin, destination, { corridorId, transportStopIds });
   return null;
 }
 afterEach(async () => {
   await act(async () => tree.unmount());
   jest.resetAllMocks();
+});
+
+test('changing avenues invalidates a late preview for the previous avenue and sends explicit stops', async () => {
+  let resolveOld!: (value: null) => void;
+  jest
+    .mocked(getDirections)
+    .mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveOld = resolve;
+        }),
+    )
+    .mockRejectedValueOnce(new Error('Nueva avenida sin ruta'));
+  await act(async () => {
+    tree = Renderer.create(<Probe destination={origin} corridorId="one" />);
+  });
+  await act(async () =>
+    tree.update(
+      <Probe
+        destination={origin}
+        corridorId="two"
+        transportStopIds={['chosen']}
+      />,
+    ),
+  );
+  expect(getDirections).toHaveBeenLastCalledWith(
+    origin,
+    origin,
+    expect.objectContaining({
+      corridorId: 'two',
+      transportStopIds: ['chosen'],
+    }),
+  );
+  await act(async () => resolveOld(null));
+  expect(result.error).toBe('Nueva avenida sin ruta');
+  expect(result.directions).toBeNull();
+  expect(result.loading).toBe(false);
 });
 test('a failed route exposes its error and clearing the destination clears loading', async () => {
   jest

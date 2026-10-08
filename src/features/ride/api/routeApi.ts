@@ -2,6 +2,25 @@ import { apiRequest } from '../../../core/api/apiClient';
 import type { DirectionsResult } from '../../maps/api/mapsApi';
 import type { FavoriteRoute, RouteEndpoint } from '../types/ride.types';
 import { CAMPUS_ORIGIN } from '../domain/driverRideRules';
+import { isValidPoint } from '../../maps/api/mapsApi';
+
+export interface PilotCorridor {
+  corridorId: string;
+  name: string;
+  code: string;
+  direction: string | null;
+  stops: Array<{
+    stopId: string;
+    externalId: string;
+    name: string;
+    address: string | null;
+    municipality: string | null;
+    location: { lat: number; lng: number };
+    direction: string | null;
+    active: boolean;
+    stopOrder: number;
+  }>;
+}
 
 const withCampusOrigin = (payload: SaveFavoriteRoutePayload) => ({
   ...payload,
@@ -14,6 +33,7 @@ const withCampusOrigin = (payload: SaveFavoriteRoutePayload) => ({
 
 export interface SaveFavoriteRoutePayload {
   name: string;
+  corridorId: string;
   origin: RouteEndpoint;
   destination: RouteEndpoint;
   transportStopIds: string[];
@@ -23,10 +43,38 @@ export interface SaveFavoriteRoutePayload {
 }
 
 export const routeApi = {
+  async corridors(): Promise<PilotCorridor[]> {
+    const corridors = await apiRequest<PilotCorridor[]>('/routes/corridors');
+    if (
+      !Array.isArray(corridors) ||
+      corridors.some(
+        corridor =>
+          !corridor ||
+          typeof corridor.corridorId !== 'string' ||
+          !corridor.corridorId ||
+          typeof corridor.name !== 'string' ||
+          !Array.isArray(corridor.stops) ||
+          corridor.stops.some(
+            stop =>
+              !stop ||
+              typeof stop.stopId !== 'string' ||
+              !stop.stopId ||
+              typeof stop.name !== 'string' ||
+              !isValidPoint(stop.location) ||
+              typeof stop.active !== 'boolean',
+          ),
+      )
+    ) {
+      throw new Error('No pudimos leer las avenidas del piloto. Reintenta.');
+    }
+    return corridors;
+  },
   preview: (
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
     departureTime?: Date | null,
+    corridorId?: string,
+    transportStopIds?: string[],
   ) =>
     apiRequest<DirectionsResult>('/routes/preview', {
       method: 'POST',
@@ -34,6 +82,8 @@ export const routeApi = {
         origin,
         destination,
         departureTime: departureTime?.toISOString(),
+        corridorId,
+        transportStopIds,
       }),
     }),
   favorites: () => apiRequest<FavoriteRoute[]>('/routes/favorites'),

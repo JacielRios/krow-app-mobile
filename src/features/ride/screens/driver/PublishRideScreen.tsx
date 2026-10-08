@@ -22,7 +22,7 @@ import {
   usePreventRemove,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../../../core/api/apiClient';
 import { money, rideDate } from '../../../../shared/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +48,7 @@ import {
   type PlacesAutocompleteValue,
 } from '../../../maps';
 import { rideApi } from '../../api/rideApi';
-import type { SaveFavoriteRoutePayload } from '../../api/routeApi';
+import { routeApi, type SaveFavoriteRoutePayload } from '../../api/routeApi';
 import { RideComfortControls } from '../../components/RideComfortControls';
 import { RideDateTimePicker } from '../../components/RideDateTimePicker';
 import { VehiclePicker } from '../../components/VehiclePicker';
@@ -121,6 +121,12 @@ export const PublishRideScreen: React.FC = () => {
     reload: reloadRide,
   } = useRideDetail(editRideId);
   const { publishRide, loading: publishing } = usePublishRide();
+  const corridorsQuery = useQuery({
+    queryKey: ['route-corridors', user?.userId],
+    queryFn: routeApi.corridors,
+    enabled: !!user,
+  });
+  const corridors = corridorsQuery.data ?? [];
 
   const [step, setStep] = useState<Step>(0);
   const scroll = useRef<ScrollView>(null);
@@ -130,6 +136,7 @@ export const PublishRideScreen: React.FC = () => {
   const [origin, setOrigin] = useState(CAMPUS_ORIGIN);
   const [destination, setDestination] =
     useState<PlacesAutocompleteValue | null>(null);
+  const [corridorId, setCorridorId] = useState('');
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([]);
   const [focusedStopId, setFocusedStopId] = useState<string | null>(null);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState<
@@ -147,6 +154,7 @@ export const PublishRideScreen: React.FC = () => {
     Partial<
       Record<
         | 'destination'
+        | 'corridor'
         | 'coverage'
         | 'vehicle'
         | 'seats'
@@ -208,10 +216,16 @@ export const PublishRideScreen: React.FC = () => {
     directions,
     loading: routeLoading,
     error: routeError,
-  } = useDirections(origin?.location ?? null, destination?.location ?? null, {
-    autoFetch: true,
-    departureTime,
-  });
+    fetch: recalculateRoute,
+  } = useDirections(
+    origin.location,
+    corridorId ? destination?.location ?? null : null,
+    {
+      autoFetch: true,
+      departureTime,
+      corridorId: corridorId || undefined,
+    },
+  );
 
   const selectedVehicle = vehicles.find(
     vehicle => vehicle.vehicle_id === vehicleId,
@@ -225,7 +239,36 @@ export const PublishRideScreen: React.FC = () => {
       ),
     [directions?.compatibleStops, selectedStopIds],
   );
-  const focusedStop = selectedStops.find(stop => stop.stopId === focusedStopId);
+  const focusedStop = directions?.compatibleStops.find(
+    stop => stop.stopId === focusedStopId,
+  );
+  const selectedCorridor = corridors.find(
+    item => item.corridorId === corridorId,
+  );
+  const {
+    directions: reviewDirections,
+    loading: reviewRouteLoading,
+    error: reviewRouteError,
+    fetch: retryReviewRoute,
+  } = useDirections(
+    origin.location,
+    step === 2 ? destination?.location ?? null : null,
+    {
+      departureTime,
+      corridorId: corridorId || undefined,
+      transportStopIds: selectedStops.map(stop => stop.stopId),
+    },
+  );
+  const toggleStop = (stopId: string) => {
+    setDirty(true);
+    setFieldErrors({});
+    setFocusedStopId(stopId);
+    setSelectedStopIds(previous =>
+      previous.includes(stopId)
+        ? previous.filter(id => id !== stopId)
+        : [...previous, stopId],
+    );
+  };
 
   const applyFavorite = useCallback(
     (favorite: FavoriteRoute) => {
@@ -233,6 +276,7 @@ export const PublishRideScreen: React.FC = () => {
       // Una plantilla antigua no cambia la salida de un viaje nuevo.
       if (!editRideId) setOrigin(CAMPUS_ORIGIN);
       setDestination(endpointValue(favorite.destination));
+      setCorridorId(favorite.corridorId ?? '');
       setVehicleId(favorite.defaults.vehicleId ?? '');
       setAvailableSeats(
         favorite.defaults.availableSeats == null
@@ -273,6 +317,7 @@ export const PublishRideScreen: React.FC = () => {
     initializedEdit.current = true;
     setOrigin(endpointValue(ride.origin));
     setDestination(endpointValue(ride.destination));
+    setCorridorId(ride.corridorId ?? '');
     setSelectedFavoriteId(ride.favoriteRouteId ?? undefined);
     setSelectedStopIds(
       ride.stops
@@ -287,7 +332,13 @@ export const PublishRideScreen: React.FC = () => {
 
   useEffect(() => {
     if (!directions) return;
-    setSelectedStopIds(directions.compatibleStops.map(stop => stop.stopId));
+    const available = new Set(
+      directions.compatibleStops.map(stop => stop.stopId),
+    );
+    setSelectedStopIds(previous => {
+      const valid = previous.filter(id => available.has(id));
+      return valid.length === previous.length ? previous : valid;
+    });
     setFocusedStopId(null);
   }, [directions]);
 
@@ -312,6 +363,13 @@ export const PublishRideScreen: React.FC = () => {
     if (!destination) {
       return invalid('destination', 'Selecciona un lugar para continuar.', 0);
     }
+    if (!selectedCorridor) {
+      return invalid(
+        'corridor',
+        'Selecciona la avenida principal de tu viaje.',
+        0,
+      );
+    }
     if (
       origin.location.lat === destination.location.lat &&
       origin.location.lng === destination.location.lng
@@ -329,10 +387,10 @@ export const PublishRideScreen: React.FC = () => {
         0,
       );
     }
-    if (selectedStops.length < 2) {
+    if (selectedStops.length < 1) {
       return invalid(
         'coverage',
-        'El recorrido debe pasar cerca de al menos dos paradas activas del catálogo KROW.',
+        'Selecciona al menos una parada donde podrán bajar tus pasajeros.',
         0,
       );
     }
@@ -400,6 +458,7 @@ export const PublishRideScreen: React.FC = () => {
 
   const makePayload = (): PublishRidePayload => ({
     vehicle_id: vehicleId,
+    corridor_id: corridorId,
     favorite_route_id: selectedFavoriteId,
     origin_lat: origin!.location.lat,
     origin_lng: origin!.location.lng,
@@ -415,6 +474,7 @@ export const PublishRideScreen: React.FC = () => {
 
   const favoritePayload = (): SaveFavoriteRoutePayload => ({
     name: favoriteName.trim(),
+    corridorId,
     origin: {
       address: origin!.address,
       placeId: origin!.placeId || undefined,
@@ -437,6 +497,14 @@ export const PublishRideScreen: React.FC = () => {
   const submit = async () => {
     if (sending.current || saved.current) return;
     if (!validateRoute() || !validateDetails()) return;
+    if (!reviewDirections || reviewRouteLoading || reviewRouteError) {
+      Alert.alert(
+        'Revisa el recorrido',
+        reviewRouteError ??
+          'Espera a que se calcule la ruta con tus paradas seleccionadas.',
+      );
+      return;
+    }
     sending.current = true;
     setSubmitting(true);
     try {
@@ -656,7 +724,7 @@ export const PublishRideScreen: React.FC = () => {
             >
               {
                 [
-                  'Traza la ruta y revisa su cobertura',
+                  'Elige destino, avenida y paradas de descenso',
                   favoriteOnly
                     ? 'Agrega preferencias opcionales'
                     : 'Configura horario, vehículo y cupo',
@@ -742,6 +810,99 @@ export const PublishRideScreen: React.FC = () => {
               }}
               bias={origin?.location}
             />
+            {destination && (
+              <View style={styles.section}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Avenida principal
+                </Text>
+                <Text
+                  style={[
+                    styles.corridorHelp,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  La ruta se calculará por la avenida que elijas.
+                </Text>
+                {corridorsQuery.isLoading ? (
+                  <Skeleton height={52} />
+                ) : corridorsQuery.isError && !corridors.length ? (
+                  <FeedbackState
+                    kind="error"
+                    title="No pudimos cargar las avenidas"
+                    description={
+                      corridorsQuery.error instanceof Error
+                        ? corridorsQuery.error.message
+                        : 'Revisa tu conexión.'
+                    }
+                    actionLabel="Reintentar"
+                    onAction={() => void corridorsQuery.refetch()}
+                  />
+                ) : corridors.length === 0 ? (
+                  <FeedbackState
+                    title="Catálogo en preparación"
+                    description="No hay avenidas activas disponibles para publicar en el piloto."
+                    actionLabel="Actualizar"
+                    onAction={() => void corridorsQuery.refetch()}
+                  />
+                ) : (
+                  corridors.map(corridor => (
+                    <Pressable
+                      key={corridor.corridorId}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`Avenida: ${corridor.name}`}
+                      accessibilityState={{
+                        checked: corridorId === corridor.corridorId,
+                      }}
+                      onPress={() => {
+                        if (corridorId === corridor.corridorId) return;
+                        setDirty(true);
+                        setFieldErrors({});
+                        setCorridorId(corridor.corridorId);
+                        setSelectedStopIds([]);
+                        setFocusedStopId(null);
+                        if (!favoriteOnly) setSelectedFavoriteId(undefined);
+                      }}
+                      style={styles.corridorOption}
+                    >
+                      <MaterialIcons
+                        name={
+                          corridorId === corridor.corridorId
+                            ? 'radio-button-checked'
+                            : 'radio-button-unchecked'
+                        }
+                        size={24}
+                        color={
+                          corridorId === corridor.corridorId
+                            ? theme.colors.primary
+                            : theme.colors.textMuted
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.checkText,
+                          { color: theme.colors.textPrimary },
+                        ]}
+                      >
+                        {corridor.name}
+                      </Text>
+                    </Pressable>
+                  ))
+                )}
+                {!!fieldErrors.corridor && (
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    style={{ color: theme.colors.status.error }}
+                  >
+                    {fieldErrors.corridor}
+                  </Text>
+                )}
+              </View>
+            )}
             {!!fieldErrors.coverage && (
               <Text
                 accessibilityLiveRegion="polite"
@@ -751,24 +912,28 @@ export const PublishRideScreen: React.FC = () => {
               </Text>
             )}
 
-            {origin && destination && (
+            {origin && destination && corridorId && (
               <>
                 <RoutePreviewMap
                   origin={origin.location}
                   destination={destination.location}
                   encodedPolyline={directions?.encodedPolyline}
                   interactive
-                  extraMarkers={selectedStops.map((stop, index) => ({
-                    id: stop.stopId,
-                    point: stop.location,
-                    selected: focusedStopId === stop.stopId,
-                    onPress: () => setFocusedStopId(stop.stopId),
-                    iconName: 'directions-bus',
-                    label: String(index + 1),
-                    accessibilityLabel: `Parada ${index + 1}: ${
-                      stop.name
-                    }. Incluida automáticamente en la ruta`,
-                  }))}
+                  extraMarkers={(directions?.compatibleStops ?? []).map(
+                    (stop, index) => ({
+                      id: stop.stopId,
+                      point: stop.location,
+                      selected: selectedStopIds.includes(stop.stopId),
+                      onPress: () => toggleStop(stop.stopId),
+                      iconName: 'directions-bus',
+                      label: String(index + 1),
+                      accessibilityLabel: `Parada ${index + 1}: ${stop.name}. ${
+                        selectedStopIds.includes(stop.stopId)
+                          ? 'Seleccionada'
+                          : 'Disponible'
+                      }. Toca para cambiar`,
+                    }),
+                  )}
                 />
                 <View style={styles.routeMeta}>
                   {routeLoading ? (
@@ -782,7 +947,7 @@ export const PublishRideScreen: React.FC = () => {
                         {formatDuration(directions.durationSeconds)}
                       </Text>
                       <Text style={{ color: theme.colors.textSecondary }}>
-                        {selectedStops.length} paradas incluidas
+                        {selectedStops.length} paradas seleccionadas
                       </Text>
                     </>
                   ) : (
@@ -794,10 +959,20 @@ export const PublishRideScreen: React.FC = () => {
               </>
             )}
 
+            {!!routeError && corridorId && (
+              <FeedbackState
+                kind="error"
+                title="No pudimos calcular el recorrido"
+                description={routeError}
+                actionLabel="Reintentar ruta"
+                onAction={() => void recalculateRoute()}
+              />
+            )}
+
             {directions && directions.compatibleStops.length === 0 ? (
               <FeedbackState
                 title="No hay paradas compatibles"
-                description="El catálogo KROW no contiene paradas activas dentro del corredor de esta ruta."
+                description="No hay paradas de esa avenida convenientes antes de tu destino. Elige otra avenida o destino."
               />
             ) : (
               <View style={styles.stopList}>
@@ -807,29 +982,32 @@ export const PublishRideScreen: React.FC = () => {
                 >
                   {focusedStop
                     ? `${focusedStop.name} · ${
-                        focusedStop.address ?? 'Parada incluida en el viaje'
+                        focusedStop.address ?? 'Parada disponible'
                       }`
-                    : 'Toca una parada en el mapa o la lista para identificarla. Todas se incluyen en el recorrido.'}
+                    : directions
+                    ? 'Elige las paradas donde podrán bajar tus pasajeros. Toca el mapa o marca la lista.'
+                    : ''}
                 </Text>
-                {selectedStops.map((stop, index) => {
+                {(directions?.compatibleStops ?? []).map((stop, index) => {
+                  const selected = selectedStopIds.includes(stop.stopId);
                   return (
                     <Pressable
                       key={stop.stopId}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Parada ${index + 1}: ${
-                        stop.name
-                      }. Incluida en el recorrido`}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Parada ${index + 1}: ${stop.name}. ${
+                        selected ? 'Seleccionada' : 'Disponible'
+                      }`}
                       accessibilityState={{
-                        selected: focusedStopId === stop.stopId,
+                        checked: selected,
                       }}
-                      onPress={() => setFocusedStopId(stop.stopId)}
+                      onPress={() => toggleStop(stop.stopId)}
                     >
                       <Card
                         variant="filled"
                         padding="sm"
                         style={[
                           styles.stopCard,
-                          focusedStopId === stop.stopId && {
+                          selected && {
                             borderColor: theme.colors.primary,
                             borderWidth: 1,
                           },
@@ -837,7 +1015,9 @@ export const PublishRideScreen: React.FC = () => {
                       >
                         <View style={styles.stopRow}>
                           <MaterialIcons
-                            name="check-circle"
+                            name={
+                              selected ? 'check-box' : 'check-box-outline-blank'
+                            }
                             size={22}
                             color={theme.colors.primary}
                           />
@@ -859,7 +1039,7 @@ export const PublishRideScreen: React.FC = () => {
                               {stop.address ??
                                 stop.municipality ??
                                 'Parada KROW'}{' '}
-                              · {stop.distanceFromRouteMeters} m · Automática
+                              {selected ? '· Disponible para pasajeros' : ''}
                             </Text>
                           </View>
                         </View>
@@ -979,7 +1159,7 @@ export const PublishRideScreen: React.FC = () => {
                     value={favoriteName}
                     onChangeText={change(setFavoriteName)}
                     maxLength={80}
-                    placeholder="Casa → Campus"
+                    placeholder="ITNL → Casa"
                   />
                 )}
               </>
@@ -989,10 +1169,27 @@ export const PublishRideScreen: React.FC = () => {
 
         {step === 2 && origin && destination && directions && (
           <>
+            {reviewRouteLoading && (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                Calculando el recorrido con tus paradas…
+              </Text>
+            )}
+            {!!reviewRouteError && (
+              <FeedbackState
+                kind="error"
+                title="Revisa la ruta antes de guardar"
+                description={reviewRouteError}
+                actionLabel="Reintentar"
+                onAction={() => void retryReviewRoute()}
+              />
+            )}
             <RoutePreviewMap
               origin={origin.location}
               destination={destination.location}
-              encodedPolyline={directions.encodedPolyline}
+              encodedPolyline={reviewDirections?.encodedPolyline}
               extraMarkers={selectedStops.map(stop => ({
                 id: stop.stopId,
                 point: stop.location,
@@ -1001,6 +1198,11 @@ export const PublishRideScreen: React.FC = () => {
               }))}
             />
             <Card variant="outlined" style={styles.reviewCard}>
+              <ReviewRow
+                icon="alt-route"
+                label="Avenida"
+                value={selectedCorridor?.name ?? ''}
+              />
               <ReviewRow
                 icon="route"
                 label="Ruta"
@@ -1047,8 +1249,11 @@ export const PublishRideScreen: React.FC = () => {
                 icon="straighten"
                 label="Recorrido"
                 value={`${formatDistance(
-                  directions.distanceMeters,
-                )} · ${formatDuration(directions.durationSeconds)}`}
+                  reviewDirections?.distanceMeters ?? directions.distanceMeters,
+                )} · ${formatDuration(
+                  reviewDirections?.durationSeconds ??
+                    directions.durationSeconds,
+                )}`}
               />
             </Card>
           </>
@@ -1092,6 +1297,9 @@ export const PublishRideScreen: React.FC = () => {
                 : 'Publicar viaje'
             }
             onPress={submit}
+            disabled={
+              reviewRouteLoading || !reviewDirections || !!reviewRouteError
+            }
             loading={submitting || publishing || saving}
           />
         )}
@@ -1210,6 +1418,8 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     marginBottom: spacing.sm,
   },
+  corridorHelp: { fontSize: typography.size.sm, marginBottom: spacing.sm },
+  corridorOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center' },
   favoriteChip: {
     flexDirection: 'row',
     alignItems: 'center',

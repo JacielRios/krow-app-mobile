@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-07T20:42:59.2000521Z",
+  "apk": "artifacts/android/krow-trial.apk",
+  "sha256": "2658B2FAEF40E682422EBEACC2431904AD2DFE86D2F3FFF0E777C37FE146F241",
+  "bytes": 136764910,
+  "package": "com.krownmobileapp",
+  "versionCode": 4,
+  "versionName": "0.2.2-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3860336,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "embeddedFlowChecks": {
+    "driverCorridorCatalog": true,
+    "driverAvenueSelection": true,
+    "driverManualStops": true,
+    "passengerAnyEnabledStop": true,
+    "passengerRecommendedStop": true,
+    "deployedHttpsApi": true
+  }
+}
