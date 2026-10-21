@@ -69,7 +69,10 @@ export interface RideStopOptions {
 }
 
 export type PassengerStopRole = 'pickup' | 'dropoff';
-export type TransportStopType = 'general' | 'official_boarding_zone';
+export type TransportStopType =
+  | 'general'
+  | 'official_boarding_zone'
+  | 'dropoff_only';
 
 export interface PassengerStopCandidate {
   role: PassengerStopRole;

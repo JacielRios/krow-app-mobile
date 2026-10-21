@@ -278,3 +278,41 @@ test.each([
     );
   },
 );
+
+test('allows dropoff-only candidates as descents and rejects them as boarding points', async () => {
+  const stop = {
+    role: 'dropoff',
+    stopId: 'descent',
+    externalId: 'krow-itnl-descenso',
+    name: 'Descenso',
+    address: null,
+    municipality: null,
+    stopType: 'dropoff_only',
+    location: point,
+    distanceMeters: 25,
+    enabled: true,
+    rideCount: 1,
+  };
+  jest
+    .mocked(apiRequest)
+    .mockResolvedValueOnce({
+      pickupStops: [],
+      dropoffStops: [stop],
+      pairs: [],
+      radiusMeters: 3000,
+    });
+  expect(
+    (await rideApi.stopCandidates(point, point)).dropoffStops[0].stopType,
+  ).toBe('dropoff_only');
+  jest
+    .mocked(apiRequest)
+    .mockResolvedValueOnce({
+      pickupStops: [{ ...stop, role: 'pickup' }],
+      dropoffStops: [],
+      pairs: [],
+      radiusMeters: 3000,
+    });
+  await expect(rideApi.stopCandidates(point, point)).rejects.toThrow(
+    'paradas cercanas',
+  );
+});

@@ -273,6 +273,7 @@ export const rideApi = {
       !data ||
       !validStops(data.pickupStops) ||
       !validStops(data.dropoffStops) ||
+      data.pickupStops.some(stop => stop.stopType === 'dropoff_only') ||
       !Array.isArray(data.pairs) ||
       data.pairs.some(
         pair =>
