@@ -6,7 +6,10 @@ import Animated, {
   FadeInDown,
   LinearTransition,
 } from 'react-native-reanimated';
-import { colors } from '../../../shared/theme/colors';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../shared/theme/legacyTheme';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { StatusBadge, BadgeStatus } from '../../../shared/components/ui';
 import { SessionLoginMode } from '../../../app/sessionLoginMode';
@@ -42,6 +45,8 @@ const RideRow: React.FC<{
   onPress?: () => void;
   index: number;
 }> = ({ ride, index, onPress }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { theme, motionEnabled } = useTheme();
   return (
     <Animated.View
@@ -123,6 +128,8 @@ export const RecentRidesTable: React.FC<Props> = ({
   role,
   onPressItem,
 }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { theme } = useTheme();
   if (loading) {
     return (
@@ -187,89 +194,91 @@ export const RecentRidesTable: React.FC<Props> = ({
 };
 
 function RideSeparator() {
+  const { styles } = useThemedStyles(createStyles);
   return <View style={styles.separator} />;
 }
-const styles = StyleSheet.create({
-  row: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  rowHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  rowDate: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  routeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  routeIcon: {
-    marginRight: spacing.sm,
-  },
-  routeText: {
-    flex: 1,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  metaRow: {
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  priceText: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary,
-  },
-  separator: {
-    height: spacing.sm,
-  },
-  stateContainer: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    paddingVertical: spacing.lg,
-  },
-  stateText: {
-    marginTop: spacing.sm,
-    marginLeft: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  stateTextError: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.status.error,
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    row: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border.default,
+    },
+    rowHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    rowDate: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    routeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    routeIcon: {
+      marginRight: spacing.sm,
+    },
+    routeText: {
+      flex: 1,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    metaRow: {
+      marginTop: spacing.sm,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    metaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    priceText: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.semibold,
+      color: colors.primary,
+    },
+    separator: {
+      height: spacing.sm,
+    },
+    stateContainer: {
+      paddingVertical: spacing.xl,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border.default,
+    },
+    loadingContainer: {
+      flexDirection: 'row',
+      paddingVertical: spacing.lg,
+    },
+    stateText: {
+      marginTop: spacing.sm,
+      marginLeft: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+    stateTextError: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.status.error,
+      textAlign: 'center',
+    },
+  });

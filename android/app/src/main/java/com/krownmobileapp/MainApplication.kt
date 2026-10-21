@@ -24,6 +24,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    com.krownmobileapp.runtime.KrowDiagnostics.install(this)
     com.krownmobileapp.runtime.KrowNotificationsModule.initializeIfEnabled(this)
     loadReactNative(this)
   }

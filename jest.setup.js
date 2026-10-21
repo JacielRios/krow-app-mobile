@@ -53,6 +53,7 @@ jest.mock('react-native-maps', () => {
     default: component,
     Marker: component,
     Polyline: component,
+    Circle: component,
     PROVIDER_GOOGLE: 'google',
   };
 });

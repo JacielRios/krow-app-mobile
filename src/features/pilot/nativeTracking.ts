@@ -78,10 +78,8 @@ async function prepareTracking() {
     throw new Error(
       'Permite la ubicación precisa para compartir el GPS del viaje.',
     );
-  if (Number(Platform.Version) >= 33)
-    await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-    );
+  // Notification consent is handled at startup. GPS does not prompt again;
+  // Android permits its foreground service even when drawer alerts are denied.
 }
 export const pilotTracking = {
   prepare: prepareTracking,

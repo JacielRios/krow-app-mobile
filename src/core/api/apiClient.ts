@@ -25,10 +25,13 @@ const developmentUrl = Platform.select({
 const baseUrl = (
   Config.KROW_API_URL?.trim() || (__DEV__ ? developmentUrl : undefined)
 )?.replace(/\/$/, '');
+export interface ApiRequestOptions extends RequestInit {
+  expectedActorId?: string;
+}
 
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   return versionedApiRequest<T>('v1', path, options);
 }
@@ -41,11 +44,17 @@ export function apiBaseUrl(): string {
 export async function versionedApiRequest<T>(
   version: 'v1' | 'v2',
   path: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   if (!baseUrl) throw new Error('KROW_API_URL no está configurada en .env');
   const { data } = await sessionAdapter.getSession();
   const token = data.session?.access_token;
+  const { expectedActorId, ...requestOptions } = options;
+  if (expectedActorId && data.session?.user?.id !== expectedActorId)
+    throw new ApiError(401, {
+      code: 'ACCOUNT_CHANGED',
+      message: 'La cuenta cambió. Abre la pantalla de nuevo.',
+    });
   if (!token)
     throw new ApiError(401, {
       code: 'UNAUTHENTICATED',
@@ -63,15 +72,17 @@ export async function versionedApiRequest<T>(
   }, 15_000);
   try {
     const response = await fetch(`${baseUrl}/${version}${path}`, {
-      ...options,
+      ...requestOptions,
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
         ...options.headers,
+        ...(expectedActorId ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+    if (response.status === 204) return null as T;
     const body = await response.json().catch(error => {
       if (controller.signal.aborted) throw error;
       if (response.ok && response.status !== 204)

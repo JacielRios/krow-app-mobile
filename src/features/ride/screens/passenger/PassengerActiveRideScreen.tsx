@@ -1,10 +1,10 @@
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -19,7 +19,10 @@ import { Avatar } from '../../../../shared/components/ui/Avatar';
 import { Button } from '../../../../shared/components/ui/Button';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
 import { RideCancelledModal } from '../../../../shared/components/ui/RideCancelledModal';
-import { colors } from '../../../../shared/theme/colors';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../../shared/theme/legacyTheme';
 import { radii, spacing, typography } from '../../../../shared/theme/tokens';
 import { RoutePreviewMap } from '../../../maps';
 import { useActiveRideData } from '../../hooks';
@@ -54,6 +57,8 @@ const formatTime = (iso: string): string => {
 };
 
 export const PassengerActiveRideScreen: React.FC = () => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const navigation = useNavigation<PassengerActiveRideNav>();
   const route = useRoute<PassengerActiveRideRouteProp>();
   const insets = useSafeAreaInsets();
@@ -140,39 +145,44 @@ export const PassengerActiveRideScreen: React.FC = () => {
 const ScreenHeader: React.FC<{
   ride: RideHeader | null;
   onBack: () => void;
-}> = ({ ride, onBack }) => (
-  <View style={styles.header}>
-    <TouchableOpacity
-      onPress={onBack}
-      style={styles.backBtn}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
-    </TouchableOpacity>
-    <View style={styles.headerText}>
-      <Text style={styles.title}>Tu viaje</Text>
-      {ride && (
-        <Text style={styles.subtitle} numberOfLines={2}>
-          {(ride.originAddress ?? 'Origen') +
-            ' → ' +
-            (ride.destinationAddress ?? 'Destino')}
-        </Text>
-      )}
-      {ride && (
-        <View style={styles.headerMetaRow}>
-          <MaterialIcons
-            name="schedule"
-            size={14}
-            color={colors.text.secondary}
-          />
-          <Text style={styles.headerMetaText}>
-            Sale {formatTime(ride.departureTime)}
+}> = ({ ride, onBack }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.header}>
+      <IconButton
+        onPress={onBack}
+        style={styles.backBtn}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel="Volver a la pantalla anterior"
+        iconName="arrow-back"
+        variant="plain"
+        color={colors.text.primary}
+      />
+      <View style={styles.headerText}>
+        <Text style={styles.title}>Tu viaje</Text>
+        {ride && (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {(ride.originAddress ?? 'Origen') +
+              ' → ' +
+              (ride.destinationAddress ?? 'Destino')}
           </Text>
-        </View>
-      )}
+        )}
+        {ride && (
+          <View style={styles.headerMetaRow}>
+            <MaterialIcons
+              name="schedule"
+              size={14}
+              color={colors.text.secondary}
+            />
+            <Text style={styles.headerMetaText}>
+              Sale {formatTime(ride.departureTime)}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 // =====================================================================
 // Contenido principal del pasajero
@@ -181,6 +191,8 @@ const ScreenHeader: React.FC<{
 const PassengerContent: React.FC<{
   data: Extract<ActiveRideData, { role: 'pasajero' }>;
 }> = ({ data }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { ride, myBooking, driver } = data;
 
   const origin =
@@ -236,6 +248,8 @@ const PassengerContent: React.FC<{
 const DriverInfoBlock: React.FC<{ driver: ActiveRideDriver }> = ({
   driver,
 }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const name = driver.fullName ?? 'Conductor';
   const vehicleTitle =
     [driver.vehicleBrand, driver.vehicleModel].filter(Boolean).join(' ') ||
@@ -293,6 +307,8 @@ const DriverInfoBlock: React.FC<{ driver: ActiveRideDriver }> = ({
 // =====================================================================
 
 const BookingStatusCard: React.FC<{ status: BookingStatus }> = ({ status }) => {
+  const { styles } = useThemedStyles(createStyles);
+
   const message = statusMessageFor(status);
   return (
     <View style={styles.card}>
@@ -352,157 +368,157 @@ const statusMessageFor = (status: BookingStatus): string => {
 // Estilos
 // =====================================================================
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    paddingHorizontal: spacing.lg,
-    flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: typography.size.xxl,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  headerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  headerMetaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  mapWrap: {
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
-  },
-  centered: {
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centeredText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    paddingHorizontal: spacing.md,
-    lineHeight: 22,
-  },
-  centeredErrorText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.status.error,
-    textAlign: 'center',
-  },
-  retryWrap: {
-    marginTop: spacing.md,
-    width: '60%',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  cardLabel: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: spacing.sm,
-  },
-  driverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  driverRowText: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  driverName: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  ratingText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  vehicleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  vehicleIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  vehicleText: {
-    flex: 1,
-  },
-  vehicleTitle: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  vehicleSubtitle: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  statusMessage: {
-    fontSize: typography.size.md,
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    scroll: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      paddingHorizontal: spacing.lg,
+      flexGrow: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: spacing.lg,
+    },
+    backBtn: {
+      width: 48,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    headerText: {
+      flex: 1,
+    },
+    title: {
+      fontSize: typography.size.xxl,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+    },
+    subtitle: {
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    headerMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    headerMetaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    mapWrap: {
+      borderRadius: radii.lg,
+      overflow: 'hidden',
+      marginBottom: spacing.lg,
+    },
+    centered: {
+      paddingVertical: spacing.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centeredText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      paddingHorizontal: spacing.md,
+      lineHeight: 22,
+    },
+    centeredErrorText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.status.error,
+      textAlign: 'center',
+    },
+    retryWrap: {
+      marginTop: spacing.md,
+      width: '60%',
+    },
+    card: {
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border.default,
+      marginBottom: spacing.md,
+    },
+    cardHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    cardLabel: {
+      fontSize: typography.size.sm,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      marginBottom: spacing.sm,
+    },
+    driverRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    driverRowText: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    driverName: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 2,
+    },
+    ratingText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    vehicleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+    },
+    vehicleIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: radii.full,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    vehicleText: {
+      flex: 1,
+    },
+    vehicleTitle: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    vehicleSubtitle: {
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    statusMessage: {
+      fontSize: typography.size.md,
+      color: colors.text.primary,
+      lineHeight: 22,
+    },
+  });

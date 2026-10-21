@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeProvider';
+import { IconButton } from '../ui-v2/IconButton';
 
 export interface StarRatingProps {
   value?: number;
@@ -27,39 +28,45 @@ export const StarRating: React.FC<StarRatingProps> = ({
 }) => {
   const { theme } = useTheme();
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      accessible={readOnly}
+      accessibilityRole={readOnly ? 'text' : undefined}
+      accessibilityLabel={
+        readOnly ? `${value} de ${maxStars} estrellas` : undefined
+      }
+    >
       {Array.from({ length: maxStars }, (_, i) => {
         const starNumber = i + 1;
         const filled = starNumber <= value;
 
-        return (
-          <TouchableOpacity
+        const color = filled
+          ? activeColor ?? theme.colors.status.warning
+          : inactiveColor ?? theme.colors.textMuted;
+        return readOnly ? (
+          <MaterialIcons
             key={starNumber}
-            disabled={readOnly}
-            activeOpacity={0.7}
+            name={filled ? 'star' : 'star-border'}
+            size={size}
+            color={color}
+            accessible={false}
+            style={{ marginHorizontal: spacing.xs / 2 }}
+          />
+        ) : (
+          <IconButton
+            key={starNumber}
+            iconName={filled ? 'star' : 'star-border'}
+            iconSize={size}
+            color={color}
+            variant="plain"
             onPress={() => onChange?.(starNumber)}
-            accessibilityRole="button"
+            accessibilityRole="radio"
             accessibilityLabel={`${starNumber} de ${maxStars} estrellas`}
-            accessibilityState={{ selected: filled, disabled: readOnly }}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            accessibilityState={{ checked: starNumber === value }}
             style={{
               marginHorizontal: spacing.xs / 2,
-              minWidth: 48,
-              minHeight: 48,
-              alignItems: 'center',
-              justifyContent: 'center',
             }}
-          >
-            <MaterialIcons
-              name={filled ? 'star' : 'star-border'}
-              size={size}
-              color={
-                filled
-                  ? activeColor ?? theme.colors.status.warning
-                  : inactiveColor ?? theme.colors.textMuted
-              }
-            />
-          </TouchableOpacity>
+          />
         );
       })}
     </View>

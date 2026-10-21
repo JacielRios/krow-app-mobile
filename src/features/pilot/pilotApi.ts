@@ -42,8 +42,8 @@ export interface ActivityItem {
   rideId: string;
   status: string;
   departureTime: string;
-  originAddress: string;
-  destinationAddress: string;
+  originAddress: string | null;
+  destinationAddress: string | null;
   bookingId: string | null;
   bookingStatus: string | null;
   amountCents: number | null;
@@ -55,6 +55,41 @@ export interface Message {
   clientId: string;
   body: string;
   createdAt: string;
+}
+export interface BookingNotice {
+  bookingId: string;
+  rideId: string;
+  eventKey: string;
+  role: 'driver' | 'passenger';
+  status: string;
+  rideStatus: string;
+  createdAt: string;
+  departureTime: string;
+  passengerName: string | null;
+  driverName: string | null;
+  vehicle: string;
+  origin: string | null;
+  destination: string | null;
+  pickupAddress: string;
+  dropoffAddress: string;
+  seats: number;
+  amountCents: number;
+  canRespond: boolean;
+}
+export interface RideInvitation {
+  rideId: string;
+  status: string;
+  departureTime: string;
+  origin: string;
+  destination: string;
+  driverName: string;
+  vehicle: string;
+  availableSeats: number;
+  pricePerSeatCents: number;
+  owned: boolean;
+  bookingId: string | null;
+  canRequest: boolean;
+  stops: Array<{ stopId: string; order: number; address: string }>;
 }
 export interface History {
   role: 'driver' | 'passenger';
@@ -96,16 +131,36 @@ const post = <T>(path: string, body?: unknown) =>
     body: body ? JSON.stringify(body) : undefined,
   });
 export const pilotApi = {
+  invitation: (rideId: string, expectedActorId: string) =>
+    apiRequest<RideInvitation>(`/rides/${rideId}/invitation`, {
+      expectedActorId,
+    }),
+  inbox: (expectedActorId: string, signal?: AbortSignal) =>
+    apiRequest<BookingNotice[]>('/booking-inbox', { expectedActorId, signal }),
+  bookingNotice: (bookingId: string, expectedActorId: string) =>
+    apiRequest<BookingNotice>(`/booking-inbox/${bookingId}`, {
+      expectedActorId,
+    }),
   requestClosure: () =>
     post<{ status: 'access_closed'; dataProcessing: 'pending_policy' }>(
       '/me/closure',
     ),
-  activity: (context: 'driver' | 'passenger', group: string, offset = 0) =>
+  activity: (
+    context: 'driver' | 'passenger',
+    group: string,
+    offset = 0,
+    expectedActorId?: string,
+  ) =>
     apiRequest<ActivityItem[]>(
       `/activity?context=${context}&group=${group}&offset=${offset}&limit=30`,
+      { expectedActorId },
     ),
   tracking: (rideId: string) =>
     apiRequest<TrackingSnapshot>(`/rides/${rideId}/tracking`),
+  reroute: (rideId: string, expectedVersion: string) =>
+    post(`/rides/${rideId}/tracking/route`, { expectedVersion }),
+  report: (rideId: string, clientId: string, kind: string, details: string) =>
+    post(`/rides/${rideId}/incidents`, { clientId, kind, details }),
   session: (rideId: string, deviceId: string) =>
     post<{ sessionId: string; uploadToken: string; expiresAt: string }>(
       `/rides/${rideId}/tracking/sessions`,
@@ -118,7 +173,7 @@ export const pilotApi = {
     bookingId: string,
     action: 'board' | 'dropoff' | 'no-show',
   ) => post(`/rides/${rideId}/stops/${bookingId}/attend`, { action }),
-  messages: (bookingId: string, cursor?: string) =>
+  messages: (bookingId: string, cursor?: string, expectedActorId?: string) =>
     apiRequest<{
       messages: Message[];
       canWrite: boolean;
@@ -127,9 +182,19 @@ export const pilotApi = {
       `/bookings/${bookingId}/messages${
         cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
       }`,
+      { expectedActorId },
     ),
-  send: (bookingId: string, clientId: string, body: string) =>
-    post(`/bookings/${bookingId}/messages`, { clientId, body }),
+  send: (
+    bookingId: string,
+    clientId: string,
+    body: string,
+    expectedActorId?: string,
+  ) =>
+    apiRequest(`/bookings/${bookingId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ clientId, body }),
+      expectedActorId,
+    }),
   cash: (bookingId: string) =>
     apiRequest<{ amountCents: number; status: string }>(
       `/bookings/${bookingId}/cash`,

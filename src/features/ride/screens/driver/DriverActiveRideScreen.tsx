@@ -1,11 +1,11 @@
+import { KrowAlert as Alert } from '../../../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,7 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import { Button } from '../../../../shared/components/ui/Button';
-import { colors } from '../../../../shared/theme/colors';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../../shared/theme/legacyTheme';
 import { radii, spacing, typography } from '../../../../shared/theme/tokens';
 import { rideApi } from '../../api/rideApi';
 import { RoutePreviewMap } from '../../../maps';
@@ -53,6 +56,8 @@ const formatTime = (iso: string): string => {
 };
 
 export const DriverActiveRideScreen: React.FC = () => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const navigation = useNavigation<DriverActiveRideNav>();
   const route = useRoute<DriverActiveRideRouteProp>();
   const insets = useSafeAreaInsets();
@@ -61,9 +66,10 @@ export const DriverActiveRideScreen: React.FC = () => {
 
   const { data, loading, error, reload } = useActiveRideData(rideId);
 
-  const driverData = useMemo<
-    Extract<ActiveRideData, { role: 'conductor' }> | null
-  >(() => {
+  const driverData = useMemo<Extract<
+    ActiveRideData,
+    { role: 'conductor' }
+  > | null>(() => {
     if (!data) return null;
     return data.role === 'conductor' ? data : null;
   }, [data]);
@@ -116,10 +122,7 @@ export const DriverActiveRideScreen: React.FC = () => {
 
       {allArrived && driverData && (
         <View
-          style={[
-            styles.footer,
-            { paddingBottom: insets.bottom + spacing.md },
-          ]}
+          style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}
         >
           <Button
             title="Finalizar viaje"
@@ -128,6 +131,7 @@ export const DriverActiveRideScreen: React.FC = () => {
                 rideId: driverData.ride.rideId,
               })
             }
+            iconName="flag"
           />
         </View>
       )}
@@ -142,43 +146,44 @@ export const DriverActiveRideScreen: React.FC = () => {
 const ScreenHeader: React.FC<{
   ride: RideHeader | null;
   onBack: () => void;
-}> = ({ ride, onBack }) => (
-  <View style={styles.header}>
-    <TouchableOpacity
-      onPress={onBack}
-      style={styles.backBtn}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <MaterialIcons
-        name="arrow-back"
-        size={24}
+}> = ({ ride, onBack }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.header}>
+      <IconButton
+        onPress={onBack}
+        style={styles.backBtn}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel="Volver a la pantalla anterior"
+        iconName="arrow-back"
+        variant="plain"
         color={colors.text.primary}
       />
-    </TouchableOpacity>
-    <View style={styles.headerText}>
-      <Text style={styles.title}>Viaje en curso</Text>
-      {ride && (
-        <Text style={styles.subtitle} numberOfLines={2}>
-          {(ride.originAddress ?? 'Origen') +
-            ' → ' +
-            (ride.destinationAddress ?? 'Destino')}
-        </Text>
-      )}
-      {ride && (
-        <View style={styles.headerMetaRow}>
-          <MaterialIcons
-            name="schedule"
-            size={14}
-            color={colors.text.secondary}
-          />
-          <Text style={styles.headerMetaText}>
-            Sale {formatTime(ride.departureTime)}
+      <View style={styles.headerText}>
+        <Text style={styles.title}>Viaje en curso</Text>
+        {ride && (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {(ride.originAddress ?? 'Origen') +
+              ' → ' +
+              (ride.destinationAddress ?? 'Destino')}
           </Text>
-        </View>
-      )}
+        )}
+        {ride && (
+          <View style={styles.headerMetaRow}>
+            <MaterialIcons
+              name="schedule"
+              size={14}
+              color={colors.text.secondary}
+            />
+            <Text style={styles.headerMetaText}>
+              Sale {formatTime(ride.departureTime)}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 // =====================================================================
 // Contenido principal del conductor
@@ -188,6 +193,8 @@ const DriverContent: React.FC<{
   data: Extract<ActiveRideData, { role: 'conductor' }>;
   reload: () => void;
 }> = ({ data, reload }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { ride, passengers } = data;
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
 
@@ -203,15 +210,15 @@ const DriverContent: React.FC<{
       Alert.alert(
         'No se pudo completar la parada',
         e?.message ?? 'Inténtalo de nuevo.',
+        undefined,
+        { type: 'error' },
       );
     } finally {
       setActionBookingId(null);
     }
   };
 
-  const visibleOnMap = passengers.filter(
-    p => p.bookingStatus !== 'completed',
-  );
+  const visibleOnMap = passengers.filter(p => p.bookingStatus !== 'completed');
 
   const origin =
     ride.originLat != null && ride.originLng != null
@@ -241,9 +248,7 @@ const DriverContent: React.FC<{
         />
       </View>
 
-      <Text style={styles.sectionTitle}>
-        Pasajeros ({passengers.length})
-      </Text>
+      <Text style={styles.sectionTitle}>Pasajeros ({passengers.length})</Text>
 
       {passengers.length === 0 ? (
         <View style={styles.centered}>
@@ -277,94 +282,95 @@ const DriverContent: React.FC<{
 
 const FOOTER_HEIGHT = 88;
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    paddingHorizontal: spacing.lg,
-    flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: typography.size.xxl,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  headerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  headerMetaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  mapWrap: {
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  centered: {
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centeredText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    paddingHorizontal: spacing.md,
-    lineHeight: 22,
-  },
-  centeredErrorText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.status.error,
-    textAlign: 'center',
-  },
-  retryWrap: {
-    marginTop: spacing.md,
-    width: '60%',
-  },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    scroll: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      paddingHorizontal: spacing.lg,
+      flexGrow: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: spacing.lg,
+    },
+    backBtn: {
+      width: 48,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    headerText: {
+      flex: 1,
+    },
+    title: {
+      fontSize: typography.size.xxl,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+    },
+    subtitle: {
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    headerMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    headerMetaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    mapWrap: {
+      borderRadius: radii.lg,
+      overflow: 'hidden',
+      marginBottom: spacing.lg,
+    },
+    sectionTitle: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+      marginBottom: spacing.sm,
+    },
+    centered: {
+      paddingVertical: spacing.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centeredText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      paddingHorizontal: spacing.md,
+      lineHeight: 22,
+    },
+    centeredErrorText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.status.error,
+      textAlign: 'center',
+    },
+    retryWrap: {
+      marginTop: spacing.md,
+      width: '60%',
+    },
+    footer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+    },
+  });

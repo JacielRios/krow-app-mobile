@@ -111,6 +111,7 @@ beforeEach(async () => {
   } as Awaited<ReturnType<typeof PermissionsAndroid.requestMultiple>>;
   jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue(grants);
   jest.spyOn(PermissionsAndroid, 'request').mockResolvedValue('granted');
+  jest.mocked(PermissionsAndroid.check).mockResolvedValue(true);
   jest.mocked(Keychain.getGenericPassword).mockResolvedValue({
     username: 'device',
     password: 'device',
@@ -124,6 +125,38 @@ afterEach(async () => {
   await tracking.stop();
   await push.synchronizePilotPush(false);
   jest.restoreAllMocks();
+});
+
+test('granted OS permission registers automatically without a prior Profile opt-in', async () => {
+  jest.mocked(Keychain.getGenericPassword).mockResolvedValue(false);
+  await push.synchronizePilotPush(true);
+  expect(PermissionsAndroid.request).not.toHaveBeenCalled();
+  expect(apiRequest).toHaveBeenCalledWith(
+    '/devices',
+    expect.objectContaining({ method: 'POST' }),
+  );
+  expect(mockPush.setSessionActor).toHaveBeenCalledWith('driver');
+  expect(mockPush.setSessionActive).toHaveBeenCalledWith(true);
+});
+
+test('automatic synchronization respects denied permission and performs no registration', async () => {
+  jest.mocked(PermissionsAndroid.check).mockResolvedValue(false);
+  await expect(push.synchronizePilotPush(true)).rejects.toThrow(
+    'Permite las notificaciones',
+  );
+  expect(PermissionsAndroid.request).not.toHaveBeenCalled();
+  expect(apiRequest).not.toHaveBeenCalled();
+  expect(mockPush.setSessionActive).not.toHaveBeenCalledWith(true);
+});
+
+test('a network failure while refreshing the same account keeps its previous native registration usable', async () => {
+  await push.registerPilotPush();
+  mockPush.setSessionActive.mockClear();
+  jest.mocked(apiRequest).mockRejectedValueOnce(new Error('Offline'));
+  await expect(push.synchronizePilotPush(true)).rejects.toThrow('Offline');
+  expect(mockPush.setSessionActive).not.toHaveBeenCalledWith(false);
+  await push.synchronizePilotPush(false);
+  expect(mockPush.setSessionActive).toHaveBeenCalledWith(false);
 });
 test('logout during session creation prevents native capture and revokes only that session', async () => {
   const pending = deferred<typeof upload>();
@@ -228,17 +261,15 @@ test('serialized creation keeps a successor bound to its own account and ride', 
   while (!jest.mocked(pilotApi.session).mock.calls.length)
     await Promise.resolve();
   await tracking.stop();
-  jest
-    .mocked(sessionAdapter.getSession)
-    .mockResolvedValue({
-      ...session,
-      data: {
-        session: {
-          ...session.data.session!,
-          user: { ...session.data.session!.user, id: 'second-driver' },
-        },
+  jest.mocked(sessionAdapter.getSession).mockResolvedValue({
+    ...session,
+    data: {
+      session: {
+        ...session.data.session!,
+        user: { ...session.data.session!.user, id: 'second-driver' },
       },
-    });
+    },
+  });
   const second = tracking.start('ride-B');
   for (let step = 0; step < 20; step += 1) await Promise.resolve();
   expect(pilotApi.session).toHaveBeenCalledTimes(1);

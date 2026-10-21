@@ -1,11 +1,12 @@
+import { DialogHost } from '../src/shared/components/ui-v2/DialogHost';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button } from '../src/shared/components/ui-v2';
 import { TrackingScreen } from '../src/features/pilot/TrackingScreen';
 import { ScheduledScreen } from '../src/features/pilot/ScheduledScreen';
+import { HistoryScreen } from '../src/features/pilot/HistoryScreen';
 import { ReservationProgress } from '../src/features/pilot/ReservationProgress';
 import { RoutePreviewMap } from '../src/features/maps';
 import {
@@ -175,7 +176,10 @@ async function mount(screen: React.ReactNode, initialActive: unknown = active) {
   await act(async () => {
     tree = Renderer.create(
       <QueryClientProvider client={cache}>
-        <ThemeProvider>{screen}</ThemeProvider>
+        <ThemeProvider>
+          {screen}
+          <DialogHost />
+        </ThemeProvider>
       </QueryClientProvider>,
     );
   });
@@ -209,6 +213,7 @@ test('a rapid double tap confirms a passenger action only once', async () => {
       }),
   );
   await mount(<TrackingScreen />);
+  await act(() => button('Ver pasajeros y acciones').props.onPress());
   const confirm = button('Confirmar bajada de Ana');
   await act(() => {
     confirm.props.onPress();
@@ -254,13 +259,10 @@ test('does not start the trip when precise location preparation fails', async ()
   jest
     .mocked(pilotTracking.prepare)
     .mockRejectedValueOnce(new Error('Permite la ubicación precisa'));
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   await mount(<ScheduledScreen />);
   await act(() => button('Comenzar viaje').props.onPress());
-  const actions = alert.mock.calls[0][2]!;
-  await act(async () =>
-    actions.find(action => action.text === 'Comenzar')!.onPress?.(),
-  );
+  expect(rideApi.start).not.toHaveBeenCalled();
+  await act(async () => button('Comenzar').props.onPress());
   expect(pilotTracking.prepare).toHaveBeenCalledTimes(1);
   expect(rideApi.start).not.toHaveBeenCalled();
   expect(JSON.stringify(tree.toJSON())).toContain(
@@ -335,13 +337,10 @@ test('leaving during finalization never redirects the user after the request res
     }),
   );
   mockSnapshot.canComplete = true;
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   await mount(<TrackingScreen />);
   await act(() => button('Finalizar viaje').props.onPress());
-  const confirm = alert.mock.calls[0][2]!.find(
-    action => action.text === 'Finalizar',
-  )!;
-  await act(() => confirm.onPress?.());
+  expect(rideApi.complete).not.toHaveBeenCalled();
+  await act(() => button('Sí, finalizar').props.onPress());
   expect(rideApi.complete).toHaveBeenCalledTimes(1);
   await act(() => tree.unmount());
   await act(async () => resolve());
@@ -364,15 +363,81 @@ test('leaving during the GPS permission prompt cancels the trip start', async ()
       resolve = () => done();
     }),
   );
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   await mount(<ScheduledScreen />);
   await act(() => button('Comenzar viaje').props.onPress());
-  const confirm = alert.mock.calls[0][2]!.find(
-    action => action.text === 'Comenzar',
-  )!;
-  await act(() => confirm.onPress?.());
+  await act(() => button('Comenzar').props.onPress());
   await act(() => tree.unmount());
   await act(async () => resolve());
   expect(rideApi.start).not.toHaveBeenCalled();
+  expect(mockNavigation.replace).not.toHaveBeenCalled();
+});
+
+test('an ongoing history without reservations offers the actual tracking screen', async () => {
+  history.ride.status = 'in_progress';
+  await mount(<HistoryScreen />);
+  expect(JSON.stringify(tree.toJSON())).toContain('Viaje sin pasajeros');
+  expect(JSON.stringify(tree.toJSON())).not.toContain('0 reservas completadas');
+  await act(() => button('Volver al seguimiento').props.onPress());
+  expect(mockNavigation.navigate).toHaveBeenCalledWith('DriverActiveRide', {
+    rideId: 'ride',
+  });
+});
+
+test('a cancelled reservation in an ongoing ride never offers passenger tracking', async () => {
+  history.role = 'passenger';
+  history.ride.status = 'in_progress';
+  history.bookings = [
+    {
+      bookingId: 'cancelled',
+      status: 'cancelled',
+      name: 'Ana',
+      amountCents: 2000,
+      cashStatus: 'void',
+      pickupAddress: 'Encuentro',
+      dropoffAddress: 'Biblioteca',
+      pickupOrder: 1,
+      dropoffOrder: 2,
+      myReview: null,
+    },
+  ];
+  await mount(<HistoryScreen />);
+  expect(button('Volver al seguimiento')).toBeUndefined();
+  expect(button('Confirmar efectivo recibido')).toBeUndefined();
+  const output = JSON.stringify(tree.toJSON());
+  expect(output).toContain('Importe de la reserva');
+  expect(output).toContain('Anulado');
+});
+
+test('dismissing finish keeps GPS and the trip running, then double confirmation finishes once', async () => {
+  mockSnapshot.canComplete = true;
+  await mount(<TrackingScreen />);
+  await act(() => button('Finalizar viaje').props.onPress());
+  expect(rideApi.complete).not.toHaveBeenCalled();
+  await act(() => button('Volver').props.onPress());
+  expect(rideApi.complete).not.toHaveBeenCalled();
+  expect(pilotTracking.stop).not.toHaveBeenCalled();
+  await act(() => button('Finalizar viaje').props.onPress());
+  const confirm = button('Sí, finalizar');
+  await act(async () => {
+    confirm.props.onPress();
+    confirm.props.onPress();
+  });
+  expect(rideApi.complete).toHaveBeenCalledTimes(1);
+  expect(pilotTracking.stop).toHaveBeenCalledTimes(1);
+  expect(
+    jest.mocked(rideApi.complete).mock.invocationCallOrder[0],
+  ).toBeLessThan(jest.mocked(pilotTracking.stop).mock.invocationCallOrder[0]);
+});
+
+test('a failed finish exposes its error and leaves location sharing active', async () => {
+  mockSnapshot.canComplete = true;
+  jest
+    .mocked(rideApi.complete)
+    .mockRejectedValueOnce(new Error('No hay conexión'));
+  await mount(<TrackingScreen />);
+  await act(() => button('Finalizar viaje').props.onPress());
+  await act(async () => button('Sí, finalizar').props.onPress());
+  expect(JSON.stringify(tree.toJSON())).toContain('No hay conexión');
+  expect(pilotTracking.stop).not.toHaveBeenCalled();
   expect(mockNavigation.replace).not.toHaveBeenCalled();
 });

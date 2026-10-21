@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { rideApi } from '../api/rideApi';
+import { publicationRequestId } from '../api/publicationRequests';
 import type { PublishRidePayload, PublishRideResult } from '../types';
 
 interface UsePublishRideResult {
@@ -14,7 +15,7 @@ interface UsePublishRideResult {
  *
  * La pantalla decide qué hacer con el resultado (navegar, mostrar error, etc.).
  */
-export function usePublishRide(): UsePublishRideResult {
+export function usePublishRide(actorId?: string): UsePublishRideResult {
   const [loading, setLoading] = useState(false);
 
   async function publishRide(
@@ -22,7 +23,10 @@ export function usePublishRide(): UsePublishRideResult {
   ): Promise<PublishRideResult> {
     setLoading(true);
     try {
-      const data = await rideApi.create(payload);
+      if (!actorId)
+        throw new Error('Inicia sesión antes de publicar un viaje.');
+      const requestId = await publicationRequestId(actorId, payload);
+      const data = await rideApi.create(payload, { requestId, actorId });
       return { rideId: data.rideId, error: null };
     } catch (error: unknown) {
       return {

@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-16",
+  "versionName": "0.3.0-trial",
+  "versionCode": 5,
+  "packageName": "com.krownmobileapp",
+  "path": "artifacts/android/krow-trial.apk",
+  "bytes": 136989598,
+  "sha256": "7618CFA3948461E3B5C63BBDF089FD97F4265755286C64706F301A4711199CFB",
+  "minimumSdk": 24,
+  "targetSdk": 36,
+  "abis": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "signing": "Android Debug (private trial)",
+  "signatureVerified": true,
+  "privateDatabaseCredentialAbsent": true,
+  "apkEntriesChecked": 1490,
+  "reactNativeMaps": "1.29.11",
+  "newArchitecture": true,
+  "hermes": true,
+  "nativeBuild": "passed",
+  "typecheck": "passed",
+  "lint": "passed",
+  "tests": {
+    "passed": 172,
+    "suites": 28
+  },
+  "physicalDeviceTested": false,
+  "crashIncidentCertifiedResolved": false,
+  "api": "https://krow-api-production.up.railway.app/v1",
+  "digitalPaymentsImplemented": false,
+  "pushEnabled": false,
+  "diagnostics": "Local uncaught Java exception details, voluntarily exported from Profile; no remote telemetry",
+  "remaining": [
+    "Native maps and GPS physical acceptance",
+    "Password recovery and approved app links",
+    "Firebase delivery",
+    "iOS physical certification",
+    "Production signing and store release"
+  ]
+}

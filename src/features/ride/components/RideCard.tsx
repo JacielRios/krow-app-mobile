@@ -1,3 +1,4 @@
+import { TripFacts, TripRoute } from './TripPresentation';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -5,7 +6,11 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
 import { Avatar } from '../../../shared/components/ui/Avatar';
-import { Button, Card } from '../../../shared/components/ui-v2';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+} from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
 import type { AvailableRide } from '../types/rideSearch.types';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -60,133 +65,107 @@ export const RideCard: React.FC<RideCardProps> = ({
 
   return (
     <Card
-      variant="elevated"
+      variant="flat"
       padding="md"
       radius="lg"
-      onPress={onPress}
-      style={styles.card}
+      style={[
+        styles.card,
+        { borderBottomWidth: 0.5, borderBottomColor: theme.colors.border },
+      ]}
     >
-      <View style={styles.headerRow}>
-        <Avatar name={driverName} size="md" />
-        <View style={styles.headerText}>
-          <Text
-            style={[styles.driverName, { color: theme.colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {driverName}
-          </Text>
-          {ride.driverRating != null && (
-            <View style={styles.ratingRow}>
-              <MaterialIcons
-                name="star"
-                size={14}
-                color={theme.colors.status.warning}
-              />
-              <Text
-                style={[
-                  styles.ratingText,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                {ride.driverRating.toFixed(1)}
-              </Text>
-            </View>
-          )}
-        </View>
-        <StatusBadge tone="info" label="Programado" size="sm" />
-      </View>
-
-      <View
-        style={[
-          styles.routeBlock,
-          { backgroundColor: theme.colors.surfaceOverlay },
-        ]}
+      <AnimatedPressable
+        onPress={onPress}
+        feedback="opacity"
+        radius={0}
+        accessibilityLabel={`Ver detalles del viaje de ${driverName}`}
       >
-        <View style={styles.routeRow}>
-          <MaterialIcons
-            name="trip-origin"
-            size={14}
-            color={theme.colors.primary}
-            style={styles.routeIcon}
-          />
-          <Text
-            style={[styles.routeText, { color: theme.colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {ride.originAddress ?? 'Origen sin dirección'}
-          </Text>
+        <View style={styles.headerRow}>
+          <Avatar name={driverName} size="md" />
+          <View style={styles.headerText}>
+            <Text
+              style={[styles.driverName, { color: theme.colors.textPrimary }]}
+            >
+              {driverName}
+            </Text>
+            {ride.driverRating != null && (
+              <View style={styles.ratingRow}>
+                <MaterialIcons
+                  name="star"
+                  size={14}
+                  color={theme.colors.status.warning}
+                />
+                <Text
+                  style={[
+                    styles.ratingText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {ride.driverRating.toFixed(1)}
+                </Text>
+              </View>
+            )}
+          </View>
+          <StatusBadge tone="info" label="Programado" size="sm" />
         </View>
-        <View
-          style={[
-            styles.routeConnector,
-            { backgroundColor: theme.colors.border },
-          ]}
-        />
-        <View style={styles.routeRow}>
-          <MaterialIcons
-            name="place"
-            size={14}
-            color={colors.status.error}
-            style={styles.routeIcon}
-          />
-          <Text
-            style={[styles.routeText, { color: theme.colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {ride.destinationAddress ?? 'Destino sin dirección'}
-          </Text>
-        </View>
-      </View>
 
-      <View
-        style={[
-          styles.matchBlock,
-          { backgroundColor: theme.colors.primarySoft },
-        ]}
-      >
+        <View style={{ marginVertical: 12 }}>
+          <TripRoute
+            origin={ride.originAddress}
+            destination={ride.destinationAddress}
+            compact
+          />
+        </View>
+        <View style={{ marginBottom: 16 }}>
+          <TripFacts
+            items={[
+              {
+                icon: 'trip-origin',
+                label: 'Subida',
+                value: ride.bestPickupStop.name,
+              },
+              {
+                icon: 'place',
+                label: 'Bajada recomendada',
+                value: ride.bestDropoffStop.name,
+                detail: `${formatStopDistance(
+                  ride.match.dropoffDistanceMeters,
+                )} aprox. de tu destino`,
+              },
+            ]}
+          />
+        </View>
         {!!ride.corridorName && (
-          <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-            Por {ride.corridorName}
+          <Text style={{ color: theme.colors.textSecondary, marginBottom: 8 }}>
+            {ride.corridorName}
           </Text>
         )}
-        <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Sube en {ride.bestPickupStop.name}
-        </Text>
-        <Text style={[styles.matchText, { color: theme.colors.textPrimary }]}>
-          Bajada recomendada: {ride.bestDropoffStop.name} ·{' '}
-          {formatStopDistance(ride.match.dropoffDistanceMeters)} aprox. de tu
-          destino
-        </Text>
-      </View>
-
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <MaterialIcons
-            name="schedule"
-            size={14}
-            color={theme.colors.textSecondary}
-          />
-          <Text
-            style={[styles.metaText, { color: theme.colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {formatDepartureTime(ride.departureTime)}
-          </Text>
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <MaterialIcons
+              name="schedule"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            <Text
+              style={[styles.metaText, { color: theme.colors.textSecondary }]}
+            >
+              {formatDepartureTime(ride.departureTime)}
+            </Text>
+          </View>
+          <View style={styles.metaItem}>
+            <MaterialIcons
+              name="event-seat"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            <Text
+              style={[styles.metaText, { color: theme.colors.textSecondary }]}
+            >
+              {seatsLabel}
+            </Text>
+          </View>
         </View>
-        <View style={styles.metaItem}>
-          <MaterialIcons
-            name="event-seat"
-            size={14}
-            color={theme.colors.textSecondary}
-          />
-          <Text
-            style={[styles.metaText, { color: theme.colors.textSecondary }]}
-          >
-            {seatsLabel}
-          </Text>
-        </View>
-      </View>
-
+      </AnimatedPressable>
       <View style={styles.footer}>
         <View style={styles.priceWrap}>
           <Text style={[styles.price, { color: theme.colors.primary }]}>
@@ -206,7 +185,7 @@ export const RideCard: React.FC<RideCardProps> = ({
             loading={requesting}
             size="sm"
             fullWidth={false}
-            variant={alreadyRequested ? 'ghost' : 'primary'}
+            variant="ghost"
           />
         </View>
       </View>
@@ -217,6 +196,7 @@ export const RideCard: React.FC<RideCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
+    paddingBottom: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
@@ -295,6 +275,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.xs,

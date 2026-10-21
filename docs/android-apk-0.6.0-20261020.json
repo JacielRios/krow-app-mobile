@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-20T21:40:13.0047232Z",
+  "apk": "artifacts\\android\\krow-0.6.0-trial.apk",
+  "sha256": "ADBA4B1F475B830B0CE1D551CD6480AA5C6A452F78C9071B46311CF8246ECB33",
+  "bytes": 137048030,
+  "package": "com.krownmobileapp",
+  "versionCode": 11,
+  "versionName": "0.6.0-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3930236,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "firebase": {
+    "projectId": "krowapp",
+    "nativeResourcesVerified": true,
+    "pushEnabled": true,
+    "deliveryVerified": false
+  },
+  "requestInbox": true,
+  "linkOrigin": "https://krow-web-gamma.vercel.app",
+  "installed": false
+}

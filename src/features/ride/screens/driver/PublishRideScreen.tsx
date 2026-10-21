@@ -1,3 +1,6 @@
+import { KrowAlert as Alert } from '../../../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../../../shared/components/ui-v2';
+import { TripFacts, TripRoute } from '../../components/TripPresentation';
 import React, {
   useCallback,
   useEffect,
@@ -6,7 +9,6 @@ import React, {
   useState,
 } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -33,6 +35,7 @@ import {
   AmbientBackground,
   Button,
   Card,
+  Surface,
   FeedbackState,
   Input,
   Skeleton,
@@ -51,6 +54,7 @@ import { rideApi } from '../../api/rideApi';
 import { routeApi, type SaveFavoriteRoutePayload } from '../../api/routeApi';
 import { RideComfortControls } from '../../components/RideComfortControls';
 import { RideDateTimePicker } from '../../components/RideDateTimePicker';
+import { invalidateRideLists } from '../../hooks/invalidateRideLists';
 import { VehiclePicker } from '../../components/VehiclePicker';
 import { RideOriginSummary } from '../../components/RideOriginSummary';
 import {
@@ -65,6 +69,15 @@ import {
   useRideDetail,
 } from '../../hooks';
 import type { FavoriteRoute, PublishRidePayload } from '../../types';
+import { RecurrencePicker } from '../../components/RecurrencePicker';
+import { recurrenceDates, recurrenceWeekday } from '../../domain/recurrence';
+import {
+  batchPending,
+  finishPublicationBatch,
+  publishRideBatch,
+  readPublicationBatch,
+  type PublicationBatch,
+} from '../../api/publicationBatch';
 
 type Navigation = NativeStackNavigationProp<MainStackParamList, 'PublishRide'>;
 type ScreenRoute = RouteProp<MainStackParamList, 'PublishRide'>;
@@ -120,7 +133,7 @@ export const PublishRideScreen: React.FC = () => {
     error: rideError,
     reload: reloadRide,
   } = useRideDetail(editRideId);
-  const { publishRide, loading: publishing } = usePublishRide();
+  const { publishRide, loading: publishing } = usePublishRide(user?.userId);
   const corridorsQuery = useQuery({
     queryKey: ['route-corridors', user?.userId],
     queryFn: routeApi.corridors,
@@ -129,6 +142,7 @@ export const PublishRideScreen: React.FC = () => {
   const corridors = corridorsQuery.data ?? [];
 
   const [step, setStep] = useState<Step>(0);
+  const [reviewStopsExpanded, setReviewStopsExpanded] = useState(false);
   const scroll = useRef<ScrollView>(null);
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -144,6 +158,46 @@ export const PublishRideScreen: React.FC = () => {
   >(favoriteRouteId);
   const [vehicleId, setVehicleId] = useState('');
   const [departureTime, setDepartureTime] = useState<Date | null>(null);
+  const [repeat, setRepeat] = useState(false);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatWeeks, setRepeatWeeks] = useState(1);
+  const [pendingBatch, setPendingBatch] = useState<PublicationBatch | null>(
+    null,
+  );
+  const [batchError, setBatchError] = useState('');
+  const repeated = useMemo(() => {
+    if (!repeat || !departureTime)
+      return { dates: [] as string[], error: undefined as string | undefined };
+    try {
+      return {
+        dates: recurrenceDates(departureTime, repeatDays, repeatWeeks),
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        dates: [] as string[],
+        error: error instanceof Error ? error.message : 'Revisa las fechas.',
+      };
+    }
+  }, [repeat, departureTime, repeatDays, repeatWeeks]);
+  useEffect(() => {
+    let alive = true;
+    setPendingBatch(null);
+    if (user?.userId && !editing && !favoriteOnly)
+      void readPublicationBatch(user.userId)
+        .then(batch => {
+          if (alive && batch && batchPending(batch)) setPendingBatch(batch);
+        })
+        .catch(() => {
+          if (alive)
+            setBatchError(
+              'No pudimos recuperar las publicaciones pendientes. Vuelve a abrir esta pantalla.',
+            );
+        });
+    return () => {
+      alive = false;
+    };
+  }, [user?.userId, editing, favoriteOnly]);
   const [availableSeats, setAvailableSeats] = useState('');
   const [pricePerSeat, setPricePerSeat] = useState('');
   const [saveAsFavorite, setSaveAsFavorite] = useState(favoriteOnly);
@@ -245,6 +299,11 @@ export const PublishRideScreen: React.FC = () => {
   const selectedCorridor = corridors.find(
     item => item.corridorId === corridorId,
   );
+  const firstPublishedDeparture = useMemo(
+    () =>
+      repeat && repeated.dates[0] ? new Date(repeated.dates[0]) : departureTime,
+    [repeat, repeated.dates, departureTime],
+  );
   const {
     directions: reviewDirections,
     loading: reviewRouteLoading,
@@ -254,7 +313,7 @@ export const PublishRideScreen: React.FC = () => {
     origin.location,
     step === 2 ? destination?.location ?? null : null,
     {
-      departureTime,
+      departureTime: firstPublishedDeparture,
       corridorId: corridorId || undefined,
       transportStopIds: selectedStops.map(stop => stop.stopId),
     },
@@ -354,6 +413,8 @@ export const PublishRideScreen: React.FC = () => {
       Alert.alert(
         'Ruta desactualizada',
         'Algunas paradas ya no están activas. KROW recalculará la ruta y tendrás que elegir paradas vigentes.',
+        undefined,
+        { type: 'warning' },
       );
     }
     applyFavorite(favorite);
@@ -402,6 +463,8 @@ export const PublishRideScreen: React.FC = () => {
       Alert.alert(
         'Conductor pendiente',
         'Tu perfil debe estar aprobado antes de publicar viajes.',
+        undefined,
+        { type: 'warning' },
       );
       return false;
     }
@@ -448,6 +511,17 @@ export const PublishRideScreen: React.FC = () => {
     if ((saveAsFavorite || favoriteOnly) && !favoriteName.trim()) {
       return invalid('name', 'Escribe un nombre para la ruta favorita.', 1);
     }
+    if (
+      repeat &&
+      !editing &&
+      !favoriteOnly &&
+      (repeated.error || !repeated.dates.length)
+    )
+      return invalid(
+        'departure',
+        repeated.error ?? 'Selecciona al menos una salida.',
+        1,
+      );
     return true;
   };
 
@@ -502,6 +576,8 @@ export const PublishRideScreen: React.FC = () => {
         'Revisa el recorrido',
         reviewRouteError ??
           'Espera a que se calcule la ruta con tus paradas seleccionadas.',
+        undefined,
+        { type: 'warning' },
       );
       return;
     }
@@ -527,6 +603,8 @@ export const PublishRideScreen: React.FC = () => {
         Alert.alert(
           selectedFavoriteId ? 'Ruta actualizada' : 'Ruta guardada',
           'La ruta frecuente quedó lista para reutilizarse.',
+          undefined,
+          { type: 'success' },
         );
         navigation.goBack();
         return;
@@ -537,32 +615,67 @@ export const PublishRideScreen: React.FC = () => {
       };
       if (editRideId && ride) {
         const result = await rideApi.update(editRideId, ride.version, payload);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['driver-rides'] }),
+        saved.current = true;
+        await Promise.allSettled([
+          invalidateRideLists(queryClient),
           queryClient.invalidateQueries({
             queryKey: ['ride-detail', editRideId],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ['ride-context', user?.userId, editRideId],
           }),
         ]);
         Alert.alert(
           'Viaje actualizado',
           `Se guardó la versión ${result.version}.`,
+          undefined,
+          { type: 'success' },
         );
-        saved.current = true;
         navigation.replace('RideScheduled', { rideId: editRideId });
+        return;
+      }
+      if (repeat && user?.userId) {
+        const result = await publishRideBatch(
+          user.userId,
+          { payload, dates: repeated.dates },
+          setPendingBatch,
+        );
+        setPendingBatch(result.batch);
+        await invalidateRideLists(queryClient);
+        if (result.error)
+          throw new Error(
+            result.error +
+              ' Las salidas confirmadas se conservan; retoma las pendientes.',
+          );
+        saved.current = true;
+        Alert.alert(
+          'Publicación terminada',
+          `${
+            result.batch.entries.filter(e => e.rideId).length
+          } viajes publicados. Cada salida se administra por separado.${
+            result.batch.entries.some(e => e.skipped)
+              ? ' Algunas fechas quedaron fuera del plazo; revisa Mis viajes.'
+              : ''
+          }`,
+          undefined,
+          { type: 'success' },
+        );
+        navigation.replace('DriverTrips');
         return;
       }
       const result = await publishRide(payload);
       if (result.error || !result.rideId)
         throw new Error(result.error ?? 'No se pudo publicar.');
-      await queryClient.invalidateQueries({ queryKey: ['driver-rides'] });
       saved.current = true;
+      await invalidateRideLists(queryClient);
       navigation.replace('RideScheduled', { rideId: result.rideId });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'No se pudo guardar el viaje.';
       if (
-        (error instanceof ApiError && error.status === 409) ||
-        /conflicto|reservas activas/i.test(message)
+        editRideId &&
+        ((error instanceof ApiError && error.status === 409) ||
+          /conflicto|reservas activas/i.test(message))
       ) {
         Alert.alert(
           'El viaje cambió',
@@ -587,6 +700,8 @@ export const PublishRideScreen: React.FC = () => {
         Alert.alert(
           editing ? 'No se pudo actualizar' : 'No se pudo publicar',
           message,
+          undefined,
+          { type: 'error' },
         );
       }
     } finally {
@@ -695,20 +810,16 @@ export const PublishRideScreen: React.FC = () => {
         ]}
       >
         <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
+          <IconButton
             accessibilityLabel="Volver"
             onPress={() =>
               step === 0 ? navigation.goBack() : setStep((step - 1) as Step)
             }
             style={styles.back}
-          >
-            <MaterialIcons
-              name="arrow-back"
-              size={24}
-              color={theme.colors.textPrimary}
-            />
-          </Pressable>
+            iconName="arrow-back"
+            variant="plain"
+            color={theme.colors.textPrimary}
+          />
           <View style={styles.headerCopy}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
               {favoriteOnly
@@ -737,6 +848,95 @@ export const PublishRideScreen: React.FC = () => {
 
         <StepIndicator step={step} />
 
+        {!editing && !favoriteOnly && (
+          <View style={{ gap: 12 }}>
+            {!!batchError && (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{ color: theme.colors.status.error }}
+              >
+                {batchError}
+              </Text>
+            )}
+            {pendingBatch && batchPending(pendingBatch) && (
+              <Card>
+                <View style={{ gap: 12 }}>
+                  <Text style={{ color: theme.colors.textPrimary }}>
+                    Publicación pendiente:{' '}
+                    {pendingBatch.entries.filter(e => e.rideId).length} de{' '}
+                    {pendingBatch.entries.length} confirmadas
+                  </Text>
+                  <Button
+                    title="Retomar publicaciones pendientes"
+                    disabled={submitting}
+                    onPress={() => {
+                      if (sending.current || !user?.userId) return;
+                      sending.current = true;
+                      setSubmitting(true);
+                      setBatchError('');
+                      void publishRideBatch(
+                        user.userId,
+                        undefined,
+                        setPendingBatch,
+                      )
+                        .then(async result => {
+                          setPendingBatch(result.batch);
+                          await invalidateRideLists(queryClient);
+                          if (result.error) setBatchError(result.error);
+                          else {
+                            saved.current = true;
+                            navigation.replace('DriverTrips');
+                          }
+                        })
+                        .catch(error =>
+                          setBatchError(
+                            error instanceof Error
+                              ? error.message
+                              : 'No pudimos retomar el intento.',
+                          ),
+                        )
+                        .finally(() => {
+                          sending.current = false;
+                          setSubmitting(false);
+                        });
+                    }}
+                  />
+                  <Button
+                    title="Finalizar intento pendiente"
+                    variant="text"
+                    disabled={submitting}
+                    onPress={() =>
+                      Alert.alert(
+                        'Finalizar publicaciones pendientes',
+                        'Se conservarán los viajes ya creados. Las fechas restantes no se publicarán; si una respuesta se perdió, revisa Mis viajes antes de volver a publicar.',
+                        [
+                          { text: 'Volver', style: 'cancel' },
+                          {
+                            text: 'Finalizar intento',
+                            onPress: () => {
+                              if (user?.userId)
+                                void finishPublicationBatch(user.userId)
+                                  .then(() => {
+                                    setPendingBatch(null);
+                                    setBatchError('');
+                                  })
+                                  .catch(() =>
+                                    setBatchError(
+                                      'No pudimos finalizar el intento.',
+                                    ),
+                                  );
+                            },
+                          },
+                        ],
+                      )
+                    }
+                  />
+                </View>
+              </Card>
+            )}
+          </View>
+        )}
+
         {step === 0 && (
           <>
             {favorites.length > 0 && (
@@ -754,19 +954,27 @@ export const PublishRideScreen: React.FC = () => {
                     <Pressable
                       key={favorite.routeId}
                       onPress={() => selectFavorite(favorite)}
-                      style={[
-                        styles.favoriteChip,
-                        {
-                          backgroundColor:
-                            selectedFavoriteId === favorite.routeId
-                              ? theme.colors.primarySoft
-                              : theme.colors.surfaceRaised,
-                          borderColor:
-                            selectedFavoriteId === favorite.routeId
-                              ? theme.colors.primary
-                              : theme.colors.border,
-                        },
+                      style={({ pressed }) => [
+                        [
+                          styles.favoriteChip,
+                          {
+                            backgroundColor:
+                              selectedFavoriteId === favorite.routeId
+                                ? theme.colors.primarySoft
+                                : theme.colors.surfaceRaised,
+                            borderColor:
+                              selectedFavoriteId === favorite.routeId
+                                ? theme.colors.primary
+                                : theme.colors.border,
+                          },
+                        ],
+                        { opacity: pressed ? 0.72 : 1 },
                       ]}
+                      accessibilityRole="radio"
+                      accessibilityLabel={favorite.name}
+                      accessibilityState={{
+                        checked: selectedFavoriteId === favorite.routeId,
+                      }}
                     >
                       <MaterialIcons
                         name={
@@ -796,20 +1004,50 @@ export const PublishRideScreen: React.FC = () => {
               <Skeleton height={44} style={{ marginBottom: spacing.md }} />
             )}
 
-            <RideOriginSummary origin={origin} />
-            <PlacePicker
-              label="Destino"
-              error={fieldErrors.destination}
-              value={destination}
-              onChange={value => {
-                setDirty(true);
-                setFieldErrors({});
-                setDestination(value);
-                if (!favoriteOnly) setSelectedFavoriteId(undefined);
-                setSelectedStopIds([]);
+            <Surface
+              radius={20}
+              contentStyle={{
+                padding: 16,
+                backgroundColor: theme.colors.surface,
               }}
-              bias={origin?.location}
-            />
+            >
+              <RideOriginSummary origin={origin} compact />
+              <PlacePicker
+                compact
+                label="Destino"
+                error={fieldErrors.destination}
+                value={destination}
+                onChange={value => {
+                  setDirty(true);
+                  setFieldErrors({});
+                  setDestination(value);
+                  if (!favoriteOnly) setSelectedFavoriteId(undefined);
+                  setSelectedStopIds([]);
+                }}
+                bias={origin?.location}
+              />
+            </Surface>
+            {(!destination || !corridorId) && (
+              <View style={{ marginTop: 16, marginBottom: 20, gap: 8 }}>
+                <RoutePreviewMap
+                  origin={origin?.location ?? null}
+                  destination={destination?.location ?? null}
+                  interactive
+                  height={250}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.textSecondary,
+                    fontSize: 14,
+                    lineHeight: 20,
+                  }}
+                >
+                  {destination
+                    ? 'Elige una avenida para calcular el recorrido y sus paradas.'
+                    : 'Este es tu punto de salida. Elige un destino para trazar el recorrido.'}
+                </Text>
+              </View>
+            )}
             {destination && (
               <View style={styles.section}>
                 <Text
@@ -867,7 +1105,10 @@ export const PublishRideScreen: React.FC = () => {
                         setFocusedStopId(null);
                         if (!favoriteOnly) setSelectedFavoriteId(undefined);
                       }}
-                      style={styles.corridorOption}
+                      style={({ pressed }) => [
+                        styles.corridorOption,
+                        { opacity: pressed ? 0.72 : 1 },
+                      ]}
                     >
                       <MaterialIcons
                         name={
@@ -1003,13 +1244,13 @@ export const PublishRideScreen: React.FC = () => {
                       onPress={() => toggleStop(stop.stopId)}
                     >
                       <Card
-                        variant="filled"
+                        variant="flat"
                         padding="sm"
                         style={[
                           styles.stopCard,
-                          selected && {
-                            borderColor: theme.colors.primary,
-                            borderWidth: 1,
+                          {
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: theme.colors.border,
                           },
                         ]}
                       >
@@ -1070,10 +1311,31 @@ export const PublishRideScreen: React.FC = () => {
               <>
                 {!favoriteOnly && (
                   <RideDateTimePicker
-                    label="Fecha y hora de salida"
+                    label={
+                      repeat
+                        ? 'Fecha inicial y hora de las salidas'
+                        : 'Fecha y hora de salida'
+                    }
                     value={departureTime}
                     onChange={change(setDepartureTime)}
                     minimumDate={new Date()}
+                  />
+                )}
+                {!editing && !favoriteOnly && (
+                  <RecurrencePicker
+                    enabled={repeat}
+                    weekdays={repeatDays}
+                    weeks={repeatWeeks}
+                    onToggle={() => {
+                      setDirty(true);
+                      setRepeat(!repeat);
+                      if (!repeatDays.length && departureTime)
+                        setRepeatDays([recurrenceWeekday(departureTime)]);
+                    }}
+                    onDays={change(setRepeatDays)}
+                    onWeeks={change(setRepeatWeeks)}
+                    dates={repeated.dates}
+                    error={repeated.error}
                   />
                 )}
                 {!!fieldErrors.departure && (
@@ -1131,7 +1393,10 @@ export const PublishRideScreen: React.FC = () => {
                       setDirty(true);
                       setSaveAsFavorite(value => !value);
                     }}
-                    style={styles.checkRow}
+                    style={({ pressed }) => [
+                      styles.checkRow,
+                      { opacity: pressed ? 0.72 : 1 },
+                    ]}
                   >
                     <MaterialIcons
                       name={
@@ -1186,76 +1451,201 @@ export const PublishRideScreen: React.FC = () => {
                 onAction={() => void retryReviewRoute()}
               />
             )}
-            <RoutePreviewMap
-              origin={origin.location}
-              destination={destination.location}
-              encodedPolyline={reviewDirections?.encodedPolyline}
-              extraMarkers={selectedStops.map(stop => ({
-                id: stop.stopId,
-                point: stop.location,
-                selected: true,
-                iconName: 'check',
-              }))}
+            <Surface
+              radius={20}
+              contentStyle={{
+                padding: 16,
+                gap: 16,
+                backgroundColor: theme.colors.surface,
+              }}
+            >
+              <TripRoute
+                origin={origin.address}
+                destination={destination.address}
+                compact
+              />
+              {repeat && !editing && !favoriteOnly && (
+                <RecurrencePicker
+                  enabled
+                  weekdays={repeatDays}
+                  weeks={repeatWeeks}
+                  onToggle={() => undefined}
+                  onDays={() => undefined}
+                  onWeeks={() => undefined}
+                  dates={repeated.dates}
+                  error={repeated.error}
+                  previewOnly
+                />
+              )}
+              <View
+                style={{
+                  borderTopWidth: 0.5,
+                  borderColor: theme.colors.border,
+                  paddingTop: 16,
+                }}
+              >
+                <TripFacts
+                  items={[
+                    ...(!favoriteOnly && departureTime
+                      ? [
+                          {
+                            icon: 'schedule',
+                            label: repeat ? 'Primera salida' : 'Salida',
+                            value: rideDate(
+                              (
+                                firstPublishedDeparture ?? departureTime
+                              ).toISOString(),
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(availableSeats !== ''
+                      ? [
+                          {
+                            icon: 'event-seat',
+                            label: 'Cupo',
+                            value: `${availableSeats} asientos`,
+                          },
+                        ]
+                      : []),
+                    ...(pricePerSeat !== ''
+                      ? [
+                          {
+                            icon: 'payments',
+                            label: 'Por asiento',
+                            value: money(
+                              Math.round(Number(pricePerSeat) * 100),
+                            ),
+                          },
+                        ]
+                      : []),
+                    {
+                      icon: 'straighten',
+                      label: 'Recorrido',
+                      value: `${formatDistance(
+                        reviewDirections?.distanceMeters ??
+                          directions.distanceMeters,
+                      )} · ${formatDuration(
+                        reviewDirections?.durationSeconds ??
+                          directions.durationSeconds,
+                      )}`,
+                    },
+                  ]}
+                />
+              </View>
+            </Surface>
+            <View style={{ marginVertical: 20 }}>
+              <RoutePreviewMap
+                height={190}
+                origin={origin.location}
+                destination={destination.location}
+                encodedPolyline={reviewDirections?.encodedPolyline}
+                extraMarkers={selectedStops.map((stop, index) => ({
+                  id: stop.stopId,
+                  point: stop.location,
+                  selected: false,
+                  label: String(index + 1),
+                  accessibilityLabel: `Parada ${index + 1}: ${stop.name}`,
+                }))}
+              />
+            </View>
+            <TripFacts
+              items={[
+                {
+                  icon: 'alt-route',
+                  label: 'Avenida',
+                  value: selectedCorridor?.name ?? 'Sin elegir',
+                },
+                ...(selectedVehicle
+                  ? [
+                      {
+                        icon: 'directions-car',
+                        label: favoriteOnly
+                          ? 'Vehículo predeterminado'
+                          : 'Vehículo',
+                        value: `${selectedVehicle.brand} ${selectedVehicle.model}`,
+                        detail: selectedVehicle.license_plate,
+                      },
+                    ]
+                  : []),
+              ]}
             />
-            <Card variant="outlined" style={styles.reviewCard}>
-              <ReviewRow
-                icon="alt-route"
-                label="Avenida"
-                value={selectedCorridor?.name ?? ''}
-              />
-              <ReviewRow
-                icon="route"
-                label="Ruta"
-                value={`${origin.address} → ${destination.address}`}
-              />
-              <ReviewRow
-                icon="directions-bus"
-                label="Paradas"
-                value={selectedStops.map(stop => stop.name).join(' · ')}
-              />
-              {!favoriteOnly && (
-                <ReviewRow
-                  icon="schedule"
-                  label="Salida"
-                  value={
-                    departureTime ? rideDate(departureTime.toISOString()) : ''
+            <View style={{ marginTop: 24, gap: 8 }}>
+              <Text
+                accessibilityRole="header"
+                style={{
+                  color: theme.colors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: '600',
+                }}
+              >
+                Paradas de descenso · {selectedStops.length}
+              </Text>
+              {(reviewStopsExpanded
+                ? selectedStops
+                : selectedStops.slice(0, 2)
+              ).map((stop, index) => (
+                <View
+                  key={stop.stopId}
+                  style={{
+                    flexDirection: 'row',
+                    gap: 12,
+                    paddingVertical: 12,
+                    borderBottomWidth: 0.5,
+                    borderColor: theme.colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: theme.colors.surface,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{ color: theme.colors.primary, fontWeight: '600' }}
+                    >
+                      {index + 1}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text
+                      style={{
+                        color: theme.colors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {stop.name}
+                    </Text>
+                    <Text
+                      style={{
+                        color: theme.colors.textSecondary,
+                        fontSize: 14,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {stop.address ?? stop.municipality ?? 'Parada Krow'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {selectedStops.length > 2 && (
+                <Button
+                  title={
+                    reviewStopsExpanded
+                      ? 'Mostrar menos paradas'
+                      : `Ver las ${selectedStops.length} paradas`
                   }
+                  variant="text"
+                  onPress={() => setReviewStopsExpanded(value => !value)}
+                  accessibilityState={{ expanded: reviewStopsExpanded }}
                 />
               )}
-              {selectedVehicle && (
-                <ReviewRow
-                  icon="directions-car"
-                  label={favoriteOnly ? 'Vehículo predeterminado' : 'Vehículo'}
-                  value={`${selectedVehicle.brand} ${selectedVehicle.model} · ${selectedVehicle.license_plate}`}
-                />
-              )}
-              {availableSeats !== '' && (
-                <ReviewRow
-                  icon="event-seat"
-                  label="Cupo"
-                  value={`${availableSeats} asientos`}
-                />
-              )}
-              {pricePerSeat !== '' && (
-                <ReviewRow
-                  icon="payments"
-                  label="Precio"
-                  value={`${money(
-                    Math.round(Number(pricePerSeat) * 100),
-                  )} por asiento`}
-                />
-              )}
-              <ReviewRow
-                icon="straighten"
-                label="Recorrido"
-                value={`${formatDistance(
-                  reviewDirections?.distanceMeters ?? directions.distanceMeters,
-                )} · ${formatDuration(
-                  reviewDirections?.durationSeconds ??
-                    directions.durationSeconds,
-                )}`}
-              />
-            </Card>
+            </View>
           </>
         )}
       </ScrollView>
@@ -1267,11 +1657,11 @@ export const PublishRideScreen: React.FC = () => {
         ]}
       >
         {step > 0 && (
-          <Button
-            title="Atrás"
-            fullWidth={false}
-            variant="outline"
+          <IconButton
+            variant="tonal"
             onPress={() => setStep((step - 1) as Step)}
+            iconName="arrow-back"
+            accessibilityLabel="Volver al paso anterior"
           />
         )}
         {step < 2 ? (
@@ -1284,6 +1674,7 @@ export const PublishRideScreen: React.FC = () => {
               routeLoading ||
               (!favoriteOnly && step === 1 && vehicles.length === 0)
             }
+            iconName="arrow-forward"
           />
         ) : (
           <Button
@@ -1294,6 +1685,8 @@ export const PublishRideScreen: React.FC = () => {
                 ? 'Guardar ruta frecuente'
                 : editing
                 ? 'Guardar cambios'
+                : repeat
+                ? `Publicar ${repeated.dates.length} viajes`
                 : 'Publicar viaje'
             }
             onPress={submit}
@@ -1301,6 +1694,9 @@ export const PublishRideScreen: React.FC = () => {
               reviewRouteLoading || !reviewDirections || !!reviewRouteError
             }
             loading={submitting || publishing || saving}
+            iconName={
+              favoriteOnly ? 'bookmark-border' : editing ? 'check' : 'add-road'
+            }
           />
         )}
       </View>
@@ -1311,67 +1707,49 @@ export const PublishRideScreen: React.FC = () => {
 const StepIndicator: React.FC<{ step: Step }> = ({ step }) => {
   const { theme } = useTheme();
   return (
-    <View style={styles.steps}>
-      {['Ruta', 'Detalles', 'Revisión'].map((label, index) => (
-        <View key={label} style={styles.stepItem}>
+    <View
+      style={{ marginBottom: 20, gap: 8 }}
+      accessibilityRole="progressbar"
+      accessibilityValue={{
+        min: 1,
+        max: 3,
+        now: step + 1,
+        text: ['Ruta', 'Detalles', 'Revisión'][step],
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+          Paso {step + 1} de 3
+        </Text>
+        <Text
+          style={{
+            color: theme.colors.textPrimary,
+            fontSize: 14,
+            fontWeight: '600',
+          }}
+        >
+          {['Ruta', 'Detalles', 'Revisión'][step]}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {[0, 1, 2].map(index => (
           <View
-            style={[
-              styles.stepDot,
-              {
-                backgroundColor:
-                  index <= step ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.stepNumber,
-                {
-                  color:
-                    index <= step
-                      ? theme.colors.textInverse
-                      : theme.colors.textMuted,
-                },
-              ]}
-            >
-              {index + 1}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.stepLabel,
-              {
-                color:
-                  index === step
-                    ? theme.colors.textPrimary
-                    : theme.colors.textMuted,
-              },
-            ]}
-          >
-            {label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-};
-
-const ReviewRow: React.FC<{ icon: string; label: string; value: string }> = ({
-  icon,
-  label,
-  value,
-}) => {
-  const { theme } = useTheme();
-  return (
-    <View style={styles.reviewRow}>
-      <MaterialIcons name={icon} size={20} color={theme.colors.primary} />
-      <View style={styles.reviewCopy}>
-        <Text style={[styles.reviewLabel, { color: theme.colors.textMuted }]}>
-          {label}
-        </Text>
-        <Text style={[styles.reviewValue, { color: theme.colors.textPrimary }]}>
-          {value}
-        </Text>
+            key={index}
+            style={{
+              flex: 1,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor:
+                index <= step ? theme.colors.primary : theme.colors.border,
+            }}
+          />
+        ))}
       </View>
     </View>
   );
@@ -1388,8 +1766,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   back: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.xs,
@@ -1426,7 +1804,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.full,
     paddingHorizontal: spacing.md,
-    minHeight: 44,
+    minHeight: 48,
     marginRight: spacing.sm,
   },
   favoriteChipText: {
@@ -1442,7 +1820,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   stopList: { marginBottom: spacing.md },
-  stopCard: { marginBottom: spacing.sm },
+  stopCard: { paddingVertical: 12, marginBottom: spacing.sm },
   stopRow: { flexDirection: 'row', alignItems: 'center' },
   stopCopy: { flex: 1, marginLeft: spacing.sm },
   stopName: {

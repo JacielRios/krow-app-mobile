@@ -1,12 +1,15 @@
+import { KrowAlert as Alert } from '../src/shared/components/ui-v2/dialogService';
+import { IconButton } from '../src/shared/components/ui-v2';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { Alert, PermissionsAndroid } from 'react-native';
+import { PermissionsAndroid } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button } from '../src/shared/components/ui-v2';
 import { RequestRideScreen } from '../src/features/ride/screens/passenger/RequestRideScreen';
 import { PlacePicker, RoutePreviewMap } from '../src/features/maps';
 import { RideCard } from '../src/features/ride/components/RideCard';
+import { RideDateTimePicker } from '../src/features/ride/components/RideDateTimePicker';
 import { rideApi } from '../src/features/ride/api/rideApi';
 import { bookingApi } from '../src/features/ride/api/bookingApi';
 import { CAMPUS_ORIGIN } from '../src/features/ride/domain/driverRideRules';
@@ -113,7 +116,7 @@ let tree: Renderer.ReactTestRenderer;
 let cache: QueryClient;
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  jest.spyOn(Alert, 'alert').mockImplementation(() => 0);
   jest.mocked(rideApi.stopOptions).mockResolvedValue(options);
   jest.mocked(rideApi.search).mockResolvedValue([ride]);
   jest.mocked(bookingApi.activeRideIds).mockResolvedValue([]);
@@ -147,6 +150,116 @@ async function chooseRoute() {
     tree.root.findByType(PlacePicker).props.onChange(destination),
   );
 }
+async function chooseTimes(from: Date | null, to: Date | null) {
+  if (!tree.root.findAllByType(RideDateTimePicker).length)
+    await act(() => button('Filtrar por fecha y hora').props.onPress());
+  if (from)
+    await act(() =>
+      tree.root.findAllByType(RideDateTimePicker)[0].props.onChange(from),
+    );
+  if (to)
+    await act(() =>
+      tree.root.findAllByType(RideDateTimePicker)[1].props.onChange(to),
+    );
+}
+
+test.each(['both', 'from', 'to'])(
+  'keeps the selected %s time bounds when refreshing search results',
+  async bounds => {
+    await mount();
+    await chooseRoute();
+    const from = new Date(Date.now() + 3600000);
+    const to = new Date(from.getTime() + 3600000);
+    await chooseTimes(
+      bounds !== 'to' ? from : null,
+      bounds !== 'from' ? to : null,
+    );
+    await act(async () => button('Buscar viajes').props.onPress());
+    const expected = {
+      maxResults: 50,
+      destination: destination.location,
+      ...(bounds !== 'to' ? { fromTime: from } : {}),
+      ...(bounds !== 'from' ? { toTime: to } : {}),
+    };
+    expect(rideApi.search).toHaveBeenLastCalledWith(expected);
+    const refresh = tree.root.findAll(
+      node => node.props.refreshControl != null,
+    )[0].props.refreshControl;
+    await act(async () => refresh.props.onRefresh());
+    expect(rideApi.search).toHaveBeenLastCalledWith(expected);
+    expect(rideApi.search).toHaveBeenCalledTimes(2);
+  },
+);
+
+test.each(['reversed', 'expired', 'invalid'])(
+  'does not query or advance with a %s time range',
+  async invalid => {
+    await mount();
+    await chooseRoute();
+    const from = new Date(Date.now() + 7200000);
+    const to =
+      invalid === 'invalid'
+        ? new Date('invalid')
+        : new Date(Date.now() + (invalid === 'reversed' ? 3600000 : -60000));
+    await chooseTimes(invalid === 'reversed' ? from : null, to);
+    await act(() => button('Buscar viajes').props.onPress());
+    expect(rideApi.search).not.toHaveBeenCalled();
+    expect(
+      tree.root.findAllByType(RideDateTimePicker)[1].props.error,
+    ).toBeTruthy();
+    expect(button('Buscar viajes')).toBeDefined();
+  },
+);
+
+test('changing dates ignores a previous search and removing the filter restores unrestricted search', async () => {
+  let resolve!: (value: AvailableRide[]) => void;
+  jest
+    .mocked(rideApi.search)
+    .mockReturnValueOnce(
+      new Promise(yes => {
+        resolve = yes;
+      }),
+    )
+    .mockResolvedValueOnce([{ ...ride, rideId: 'new-time-window' }]);
+  await mount();
+  await chooseRoute();
+  await act(async () => button('Buscar viajes').props.onPress());
+  await act(() => button('Cambiar fecha y hora').props.onPress());
+  await chooseTimes(
+    new Date(Date.now() + 3600000),
+    new Date(Date.now() + 7200000),
+  );
+  await act(async () => button('Buscar viajes').props.onPress());
+  await act(async () => resolve([ride]));
+  expect(
+    tree.root.findAllByType(RideCard).map(card => card.props.ride.rideId),
+  ).toEqual(['new-time-window']);
+  await act(() => button('Cambiar fecha y hora').props.onPress());
+  await act(() => button('Quitar filtro de fechas').props.onPress());
+  await act(async () => button('Buscar viajes').props.onPress());
+  expect(rideApi.search).toHaveBeenLastCalledWith({
+    maxResults: 50,
+    destination: destination.location,
+  });
+});
+
+test('an elapsed search window returns to the filters and removes stale results on refresh', async () => {
+  await mount();
+  await chooseRoute();
+  const to = new Date(Date.now() + 3600000);
+  await chooseTimes(null, to);
+  await act(async () => button('Buscar viajes').props.onPress());
+  jest.spyOn(Date, 'now').mockReturnValue(to.getTime() + 1);
+  const refresh = tree.root.findAll(
+    node => node.props.refreshControl != null,
+  )[0].props.refreshControl;
+  await act(async () => refresh.props.onRefresh());
+  expect(rideApi.search).toHaveBeenCalledTimes(1);
+  expect(tree.root.findAllByType(RideCard)).toHaveLength(0);
+  expect(tree.root.findAllByType(RideDateTimePicker)[1].props.error).toContain(
+    'futuro',
+  );
+});
 test('searches from destination directly and reserves with automatic campus boarding', async () => {
   const permission = jest.spyOn(PermissionsAndroid, 'request');
   await mount();
@@ -316,7 +429,12 @@ test('ignores stop responses from a previously opened trip', async () => {
   await chooseRoute();
   await act(async () => button('Buscar viajes').props.onPress());
   await act(async () => tree.root.findAllByType(RideCard)[0].props.onRequest());
-  await act(() => button('Cerrar').props.onPress());
+  await act(() =>
+    tree.root
+      .findAllByType(IconButton)
+      .find(node => node.props.accessibilityLabel === 'Cerrar')!
+      .props.onPress(),
+  );
   await act(async () => tree.root.findAllByType(RideCard)[1].props.onRequest());
   await act(async () =>
     resolve({ ...options, pairs: [], recommendedDropoffStopId: null }),
@@ -370,6 +488,8 @@ test('a concurrent last-seat rejection reloads availability and never opens a re
   expect(Alert.alert).toHaveBeenCalledWith(
     'No se pudo solicitar',
     'El último asiento ya fue reservado.',
+    undefined,
+    { type: 'error' },
   );
   expect(rideApi.search).toHaveBeenCalledTimes(2);
   expect(tree.root.findAllByType(RideCard)).toHaveLength(0);

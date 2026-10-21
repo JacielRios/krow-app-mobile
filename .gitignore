@@ -3,6 +3,9 @@
 .env.local
 .env.*
 !.env.example
+**/google-services.json
+**/*service-account*.json
+**/*serviceAccount*.json
 
 # OSX
 #

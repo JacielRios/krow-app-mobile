@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../theme/ThemeProvider';
 import { depth } from '../../theme/materials';
-import { Button } from './Button';
+import { IconButton } from './IconButton';
 
 interface Props {
   label: string;
@@ -31,6 +31,7 @@ export const ValueSlider = ({
   const track = useRef<View>(null);
   const left = useRef(0);
   const gestureActive = useRef(false);
+  const lastGestureValue = useRef<number | null>(null);
   const current = Math.min(max, Math.max(min, value ?? min));
   const change = (next: number) => {
     if (!disabled)
@@ -42,7 +43,16 @@ export const ValueSlider = ({
       0,
       Math.min(1, (pageX - left.current - 22) / Math.max(1, width - 44)),
     );
-    change(min + Math.round((ratio * (max - min)) / step) * step);
+    const next = Number(
+      Math.min(
+        max,
+        Math.max(min, min + Math.round((ratio * (max - min)) / step) * step),
+      ).toFixed(2),
+    );
+    if (next !== lastGestureValue.current) {
+      lastGestureValue.current = next;
+      change(next);
+    }
   };
   const latest = useRef({ disabled, position });
   latest.current = { disabled, position };
@@ -53,6 +63,7 @@ export const ValueSlider = ({
         !latest.current.disabled && Math.abs(gesture.dx) > Math.abs(gesture.dy),
       onPanResponderGrant: () => {
         gestureActive.current = true;
+        lastGestureValue.current = null;
         track.current?.measureInWindow(x => {
           left.current = x;
         });
@@ -158,24 +169,28 @@ export const ValueSlider = ({
         </View>
       </View>
       <View style={styles.actions}>
-        <Button
-          title="−"
+        <IconButton
+          iconName="remove"
           accessibilityLabel={`Disminuir ${label}`}
-          fullWidth={false}
           size="sm"
-          variant="outline"
+          variant="tonal"
           disabled={disabled || (value != null && current <= min)}
           onPress={() => change(current - step)}
         />
-        <Text style={{ color: theme.colors.textSecondary }}>
+        <Text
+          style={{
+            flex: 1,
+            textAlign: 'center',
+            color: theme.colors.textSecondary,
+          }}
+        >
           {formatValue(min)} — {formatValue(max)}
         </Text>
-        <Button
-          title="+"
+        <IconButton
+          iconName="add"
           accessibilityLabel={`Aumentar ${label}`}
-          fullWidth={false}
           size="sm"
-          variant="outline"
+          variant="tonal"
           disabled={disabled || (value != null && current >= max)}
           onPress={() => change(value == null ? min : current + step)}
         />

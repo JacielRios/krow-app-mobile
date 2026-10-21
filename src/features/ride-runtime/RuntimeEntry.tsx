@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
 import Config from 'react-native-config';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../app/navigation/MainNavigator';
 import { ApiError } from '../../core/api/apiClient';
+import { recordScreenFailure } from '../../core/diagnostics';
 import { runtimeApi } from './runtimeApi';
 import { sessionAdapter } from '../../core/auth/sessionAdapter';
 import { sessionCache } from './sessionCache';
@@ -17,6 +17,8 @@ import {
   Button,
   FeedbackState,
   ScreenContainer,
+  Text,
+  Skeleton,
 } from '../../shared/components/ui-v2';
 import { ScreenHeader } from '../../shared/components/ui-v2/ScreenHeader';
 
@@ -30,6 +32,9 @@ class RideScreenBoundary extends React.Component<
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    recordScreenFailure(error);
   }
   render() {
     if (!this.state.failed) return this.props.children;
@@ -127,7 +132,12 @@ function RuntimeEntry({
         <Fallback />
       </RideScreenBoundary>
     );
-  return <View>{error ? <Text>{error}</Text> : <ActivityIndicator />}</View>;
+  return (
+    <ScreenContainer padded>
+      <ScreenHeader title="Abriendo tu viaje" />
+      {error ? <Text tone="error">{error}</Text> : <Skeleton height={180} />}
+    </ScreenContainer>
+  );
 }
 export const ScheduledRuntimeEntry = () => (
   <RuntimeEntry

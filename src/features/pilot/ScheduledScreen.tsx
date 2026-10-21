@@ -1,5 +1,14 @@
+import { Avatar } from '../../shared/components/ui/Avatar';
+import {
+  TripFacts,
+  TripNotice,
+  TripOverview,
+  TripRoute,
+  TripStatus,
+} from '../ride/components/TripPresentation';
+import { useConfirmation } from '../../shared/components/ui-v2/useConfirmation';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, Share, View } from 'react-native';
 import Config from 'react-native-config';
 import {
   useNavigation,
@@ -15,18 +24,24 @@ import { pilotTracking } from './nativeTracking';
 import { ReservationProgress } from './ReservationProgress';
 import { rideApi } from '../ride/api/rideApi';
 import { bookingApi } from '../ride/api/bookingApi';
+import { invalidateRideLists } from '../ride/hooks/invalidateRideLists';
 import {
   ScreenContainer,
   Text,
   Button,
   Card,
   Skeleton,
-  StatusBadge,
   FeedbackState,
 } from '../../shared/components/ui-v2';
 import { ScreenHeader } from '../../shared/components/ui-v2/ScreenHeader';
-import { money, rideDate, statusText } from '../../shared/format';
+import { money } from '../../shared/format';
+import { useTheme } from '../../shared/theme/ThemeProvider';
+import { invitationLink } from '../ride-runtime/deepLinks';
 export function ScheduledScreen() {
+  const { confirm: confirmAction, dialog: confirmationDialog } =
+    useConfirmation();
+
+  const { theme } = useTheme();
   const { rideId } = useRoute().params as { rideId: string };
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const {
@@ -90,8 +105,7 @@ export function ScheduledScreen() {
         setFeedback(success);
         await q.refetch();
       }
-      await cache.invalidateQueries({ queryKey: ['activity'] });
-      await cache.invalidateQueries({ queryKey: ['active-ride'] });
+      await invalidateRideLists(cache);
     } catch (e) {
       if (screenActive.current)
         setFeedback(
@@ -129,7 +143,7 @@ export function ScheduledScreen() {
   return (
     <ScreenContainer padded>
       <ScrollView
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 24, gap: 16 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 24, gap: 20 }}
       >
         <ScreenHeader
           title={driver ? 'Tu viaje publicado' : 'Tu próximo viaje'}
@@ -149,34 +163,70 @@ export function ScheduledScreen() {
           )
         ) : (
           <>
-            <Card>
-              <View style={{ gap: 12 }}>
-                <StatusBadge label={statusText(data.ride.status)} tone="info" />
-                <Text variant="title">
-                  {data.ride.origin_address} → {data.ride.destination_address}
-                </Text>
-                <Text tone="secondary">
-                  {rideDate(data.ride.departure_time)}
-                </Text>
-                <Text>
-                  {data.ride.driver_name ?? 'Conductor'} ·{' '}
-                  {[
-                    data.ride.vehicle_brand,
-                    data.ride.vehicle_model,
-                    data.ride.license_plate,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                </Text>
-              </View>
-            </Card>
-            <Text variant="title">
-              {driver ? 'Pasajeros por parada' : 'Tu punto de encuentro'}
+            <TripOverview
+              status={data.ride.status}
+              origin={data.ride.origin_address}
+              destination={data.ride.destination_address}
+              departure={data.ride.departure_time}
+              driver={data.ride.driver_name}
+              vehicle={[
+                data.ride.vehicle_brand,
+                data.ride.vehicle_model,
+                data.ride.license_plate,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            />
+            {driver &&
+              ['scheduled', 'full'].includes(data.ride.status) &&
+              Date.parse(data.ride.departure_time) > Date.now() && (
+                <Button
+                  title="Invitar a este viaje"
+                  variant="tonal"
+                  onPress={() => {
+                    void Promise.resolve()
+                      .then(() =>
+                        Share.share({
+                          message: `Te invito a viajar en KROW. Elige tus paradas y solicita un lugar; la confirmación depende del conductor.\n${invitationLink(
+                            rideId,
+                            Config.KROW_LINK_ORIGIN,
+                          )}`,
+                        }),
+                      )
+                      .catch(() =>
+                        setFeedback(
+                          'No pudimos abrir las opciones para compartir.',
+                        ),
+                      );
+                  }}
+                  iconName="share"
+                />
+              )}
+            {driver && (
+              <TripFacts
+                items={[
+                  {
+                    icon: 'people-outline',
+                    label: 'Confirmados',
+                    value: String(
+                      bookings.filter(b => b.status === 'confirmed').length,
+                    ),
+                  },
+                  {
+                    icon: 'mark-email-unread',
+                    label: 'Por revisar',
+                    value: String(pendingCount),
+                  },
+                ]}
+              />
+            )}
+            <Text variant="title" accessibilityRole="header">
+              {driver ? 'Pasajeros por parada' : 'Tu reserva'}
             </Text>
             {!bookings.length && (
-              <FeedbackState
-                title="Todavía no hay solicitudes"
-                description="Las reservas se mostrarán aquí cuando alguien solicite viajar."
+              <TripNotice
+                title="Aún sin reservas"
+                description="Las solicitudes aparecerán aquí. Revísalas antes de comenzar el viaje."
               />
             )}
             {!driver && bookings[0] && (
@@ -191,22 +241,44 @@ export function ScheduledScreen() {
                   </View>
                 )}
                 {group.bookings.map(b => (
-                  <Card key={b.bookingId}>
+                  <Card
+                    key={b.bookingId}
+                    style={{
+                      paddingVertical: 20,
+                      borderBottomWidth: 0.5,
+                      borderBottomColor: theme.colors.border,
+                    }}
+                  >
                     <View style={{ gap: 12 }}>
-                      {driver && <Text variant="title">{b.name}</Text>}
-                      <StatusBadge
-                        label={statusText(b.status)}
-                        tone={b.status === 'confirmed' ? 'success' : 'info'}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <Avatar name={b.name} size="md" />
+                        <Text style={{ flex: 1, fontWeight: '600' }}>
+                          {driver ? b.name : 'Tu reserva'}
+                        </Text>
+                      </View>
+                      <TripStatus status={b.status} />
+                      <TripRoute
+                        origin={b.pickupAddress}
+                        destination={b.dropoffAddress}
+                        originLabel="Subida"
+                        destinationLabel="Bajada"
+                        compact
                       />
-                      <Text tone="secondary">
-                        Subida · Parada {b.pickupOrder}
-                      </Text>
-                      <Text>{b.pickupAddress ?? 'Parada de subida'}</Text>
-                      <Text tone="secondary">
-                        Bajada · Parada {b.dropoffOrder}
-                      </Text>
-                      <Text>{b.dropoffAddress ?? 'Parada de descenso'}</Text>
-                      <Text variant="title">{money(b.amountCents)}</Text>
+                      <TripFacts
+                        items={[
+                          {
+                            icon: 'payments',
+                            label: 'Aportación',
+                            value: money(b.amountCents),
+                          },
+                        ]}
+                      />
                       {driver && b.status === 'pending' && (
                         <>
                           <Button
@@ -225,29 +297,25 @@ export function ScheduledScreen() {
                           />
                           <Button
                             title="Rechazar"
-                            variant="outline"
+                            variant="text"
                             disabled={busy}
                             onPress={() =>
-                              Alert.alert(
-                                'Rechazar solicitud',
-                                'El pasajero recibirá el nuevo estado.',
-                                [
-                                  { text: 'Volver', style: 'cancel' },
-                                  {
-                                    text: 'Rechazar',
-                                    style: 'destructive',
-                                    onPress: () =>
-                                      void run(
-                                        () =>
-                                          bookingApi.updateStatus(
-                                            b.bookingId,
-                                            'rejected',
-                                          ),
-                                        'Solicitud rechazada',
+                              confirmAction({
+                                title: 'Rechazar solicitud',
+                                message:
+                                  'El pasajero recibirá el nuevo estado.',
+                                confirmLabel: 'Rechazar',
+                                onConfirm: () =>
+                                  void run(
+                                    () =>
+                                      bookingApi.updateStatus(
+                                        b.bookingId,
+                                        'rejected',
                                       ),
-                                  },
-                                ],
-                              )
+                                    'Solicitud rechazada',
+                                  ),
+                                destructive: true,
+                              })
                             }
                           />
                         </>
@@ -259,10 +327,11 @@ export function ScheduledScreen() {
                               ? 'Hablar con el pasajero'
                               : 'Hablar con el conductor'
                           }
-                          variant="outline"
+                          variant="tonal"
                           onPress={() =>
                             nav.navigate('Chat', { bookingId: b.bookingId })
                           }
+                          iconName="chat-bubble-outline"
                         />
                       )}
                       {!driver &&
@@ -272,26 +341,21 @@ export function ScheduledScreen() {
                             variant="ghost"
                             disabled={busy}
                             onPress={() =>
-                              Alert.alert(
-                                'Cancelar reserva',
-                                'Tu lugar dejará de estar reservado.',
-                                [
-                                  { text: 'Volver', style: 'cancel' },
-                                  {
-                                    text: 'Cancelar reserva',
-                                    style: 'destructive',
-                                    onPress: () =>
-                                      void run(
-                                        () =>
-                                          bookingApi.updateStatus(
-                                            b.bookingId,
-                                            'cancelled',
-                                          ),
-                                        'Reserva cancelada',
+                              confirmAction({
+                                title: 'Cancelar reserva',
+                                message: 'Tu lugar dejará de estar reservado.',
+                                confirmLabel: 'Cancelar reserva',
+                                onConfirm: () =>
+                                  void run(
+                                    () =>
+                                      bookingApi.updateStatus(
+                                        b.bookingId,
+                                        'cancelled',
                                       ),
-                                  },
-                                ],
-                              )
+                                    'Reserva cancelada',
+                                  ),
+                                destructive: true,
+                              })
                             }
                           />
                         )}
@@ -300,67 +364,6 @@ export function ScheduledScreen() {
                 ))}
               </View>
             ))}
-            {driver && (
-              <>
-                {pendingCount > 0 && (
-                  <FeedbackState
-                    title={`${pendingCount} ${
-                      pendingCount === 1
-                        ? 'solicitud pendiente'
-                        : 'solicitudes pendientes'
-                    }`}
-                    description="Acepta o rechaza las solicitudes antes de comenzar. Las subidas se confirman al llegar a cada parada."
-                  />
-                )}
-                <Button
-                  title="Comenzar viaje"
-                  loading={busy}
-                  disabled={pendingCount > 0}
-                  onPress={() =>
-                    Alert.alert(
-                      'Comenzar viaje',
-                      'Comparte tu ubicación durante el recorrido y confirma las subidas al llegar a cada parada.',
-                      [
-                        { text: 'Volver', style: 'cancel' },
-                        {
-                          text: 'Comenzar',
-                          onPress: () =>
-                            void run(async () => {
-                              if (Config.KROW_TRACKING_ENABLED === 'true')
-                                await pilotTracking.prepare();
-                              if (!screenActive.current) return;
-                              await rideApi.start(rideId);
-                            }, 'Viaje iniciado'),
-                        },
-                      ],
-                    )
-                  }
-                />
-                <Button
-                  title="Cancelar viaje"
-                  variant="destructive"
-                  disabled={busy}
-                  onPress={() =>
-                    Alert.alert(
-                      'Cancelar viaje',
-                      'Se cancelarán las reservas de este viaje.',
-                      [
-                        { text: 'Volver', style: 'cancel' },
-                        {
-                          text: 'Cancelar viaje',
-                          style: 'destructive',
-                          onPress: () =>
-                            void run(
-                              () => rideApi.cancel(rideId),
-                              'Viaje cancelado',
-                            ),
-                        },
-                      ],
-                    )
-                  }
-                />
-              </>
-            )}
           </>
         )}
         {!!feedback && <Text accessibilityLiveRegion="polite">{feedback}</Text>}
@@ -370,6 +373,61 @@ export function ScheduledScreen() {
           </Text>
         )}
       </ScrollView>
+      {driver && data && (
+        <View
+          style={{
+            paddingTop: 12,
+            gap: 4,
+            borderTopWidth: 0.5,
+            borderColor: theme.colors.border,
+          }}
+        >
+          {pendingCount > 0 && (
+            <Text variant="caption" tone="secondary">
+              Acepta o rechaza las solicitudes antes de comenzar.
+            </Text>
+          )}
+          <Button
+            title="Comenzar viaje"
+            loading={busy}
+            disabled={pendingCount > 0}
+            onPress={() =>
+              confirmAction({
+                title: 'Comenzar viaje',
+                message:
+                  'Comparte tu ubicación durante el recorrido y confirma las subidas al llegar a cada parada.',
+                confirmLabel: 'Comenzar',
+                onConfirm: () =>
+                  void run(async () => {
+                    if (Config.KROW_TRACKING_ENABLED === 'true')
+                      await pilotTracking.prepare();
+                    if (!screenActive.current) return;
+                    await rideApi.start(rideId);
+                  }, 'Viaje iniciado'),
+                destructive: false,
+              })
+            }
+            iconName="play-arrow"
+          />
+          <Button
+            title="Cancelar viaje"
+            variant="text"
+            labelStyle={{ color: theme.colors.status.error }}
+            disabled={busy}
+            onPress={() =>
+              confirmAction({
+                title: 'Cancelar viaje',
+                message: 'Se cancelarán las reservas de este viaje.',
+                confirmLabel: 'Cancelar viaje',
+                onConfirm: () =>
+                  void run(() => rideApi.cancel(rideId), 'Viaje cancelado'),
+                destructive: true,
+              })
+            }
+          />
+        </View>
+      )}
+      {confirmationDialog}
     </ScreenContainer>
   );
 }

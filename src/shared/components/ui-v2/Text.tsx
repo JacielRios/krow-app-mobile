@@ -1,5 +1,10 @@
 import React from 'react';
-import { StyleProp, Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
+import {
+  StyleProp,
+  Text as RNText,
+  TextProps as RNTextProps,
+  TextStyle,
+} from 'react-native';
 import { useTheme } from '../../theme/ThemeProvider';
 
 export interface TextProps extends RNTextProps {
@@ -8,13 +13,34 @@ export interface TextProps extends RNTextProps {
   style?: StyleProp<TextStyle>;
 }
 
-export const Text: React.FC<TextProps> = ({ variant = 'body', tone = 'primary', style, ...props }) => {
+export const Text: React.FC<TextProps> = ({
+  variant = 'body',
+  tone = 'primary',
+  style,
+  ...props
+}) => {
   const { theme } = useTheme();
   const variants = {
-    display: { fontSize: theme.typography.size.xxxl, fontWeight: theme.typography.weight.bold, lineHeight: 40 },
-    title: { fontSize: theme.typography.size.xl, fontWeight: theme.typography.weight.bold, lineHeight: 28 },
-    body: { fontSize: theme.typography.size.md, fontWeight: theme.typography.weight.regular, lineHeight: 21 },
-    caption: { fontSize: theme.typography.size.sm, fontWeight: theme.typography.weight.regular, lineHeight: 17 },
+    display: {
+      fontSize: theme.typography.size.xxxl,
+      fontWeight: theme.typography.weight.bold,
+      lineHeight: 38,
+    },
+    title: {
+      fontSize: theme.typography.size.xl,
+      fontWeight: theme.typography.weight.semibold,
+      lineHeight: 26,
+    },
+    body: {
+      fontSize: theme.typography.size.lg,
+      fontWeight: theme.typography.weight.regular,
+      lineHeight: 24,
+    },
+    caption: {
+      fontSize: theme.typography.size.sm,
+      fontWeight: theme.typography.weight.regular,
+      lineHeight: 20,
+    },
   } as const;
   const tones = {
     primary: theme.colors.textPrimary,
@@ -23,5 +49,10 @@ export const Text: React.FC<TextProps> = ({ variant = 'body', tone = 'primary', 
     inverse: theme.colors.textInverse,
     error: theme.colors.status.error,
   };
-  return <RNText {...props} style={[variants[variant], { color: tones[tone] }, style]} />;
+  return (
+    <RNText
+      {...props}
+      style={[variants[variant], { color: tones[tone] }, style]}
+    />
+  );
 };

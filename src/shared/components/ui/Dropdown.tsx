@@ -1,220 +1,115 @@
+import { IconButton } from '../ui-v2';
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  TouchableWithoutFeedback,
-} from 'react-native';
-import { colors } from '../../theme/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlatList, View, useWindowDimensions } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/ThemeProvider';
-import { createShadow } from '../../theme/elevation';
+import { AnimatedModal, AnimatedPressable, ListRow, Text } from '../ui-v2';
 
 interface DropdownProps {
   label?: string;
   options: string[];
   value: string;
-  onSelect: (value: string) => void;
+  onSelect: (option: string) => void;
   placeholder?: string;
   error?: string;
   icon?: React.ReactNode;
 }
-
-export const Dropdown: React.FC<DropdownProps> = ({
+export const Dropdown = ({
   label,
   options,
   value,
   onSelect,
-  placeholder = 'Select an option',
+  placeholder = 'Seleccionar opción',
   error,
   icon,
-}) => {
-  const { theme, motionEnabled } = useTheme();
+}: DropdownProps) => {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const [visible, setVisible] = useState(false);
-
-  const toggleDropdown = () => setVisible(!visible);
-
-  const handleSelect = (option: string) => {
-    onSelect(option);
-    setVisible(false);
-  };
-
   return (
-    <View style={styles.container}>
-      {label && (
-        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+    <View style={{ marginBottom: 16 }}>
+      {label ? (
+        <Text style={{ fontSize: 16, marginBottom: 6 }} tone="secondary">
           {label}
         </Text>
-      )}
-
-      <TouchableOpacity
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: theme.colors.surfaceRaised,
-            borderColor: error
-              ? theme.colors.status.error
-              : theme.colors.border,
-          },
-        ]}
-        onPress={toggleDropdown}
-        activeOpacity={0.8}
-        accessibilityRole="button"
+      ) : null}
+      <AnimatedPressable
+        onPress={() => setVisible(true)}
+        feedback="opacity"
         accessibilityLabel={`${label ?? placeholder}: ${
           value || 'Sin selección'
         }`}
         accessibilityState={{ expanded: visible }}
+        contentStyle={{
+          minHeight: 52,
+          padding: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          borderWidth: 1,
+          borderColor: error
+            ? theme.colors.status.error
+            : theme.colors.controlBorder,
+          backgroundColor: theme.colors.surface,
+        }}
       >
-        {icon && <View style={styles.iconContainer}>{icon}</View>}
-        <Text
-          style={[
-            styles.input,
-            {
-              color: value ? theme.colors.textPrimary : theme.colors.textMuted,
-            },
-          ]}
-        >
+        {icon}
+        <Text tone={value ? 'primary' : 'muted'} style={{ flex: 1 }}>
           {value || placeholder}
         </Text>
-      </TouchableOpacity>
-
-      {error && (
-        <Text style={[styles.errorText, { color: theme.colors.status.error }]}>
+        <Icon name="expand-more" size={24} color={theme.colors.textSecondary} />
+      </AnimatedPressable>
+      {error ? (
+        <Text tone="error" variant="caption" accessibilityLiveRegion="polite">
           {error}
         </Text>
-      )}
-
-      <Modal
+      ) : null}
+      <AnimatedModal
         visible={visible}
-        transparent
-        animationType={motionEnabled ? 'fade' : 'none'}
-        onRequestClose={() => setVisible(false)}
+        onDismissRequest={() => setVisible(false)}
+        sheetStyle={{
+          padding: 20,
+          paddingBottom: Math.max(32, insets.bottom + 16),
+        }}
       >
-        <TouchableWithoutFeedback onPress={() => setVisible(false)}>
-          <View
-            style={[
-              styles.modalOverlay,
-              { backgroundColor: theme.colors.backdrop },
-            ]}
-          >
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.dropdownContainer,
-                  { backgroundColor: theme.colors.surfaceRaised },
-                  createShadow(3, theme.colors.shadow),
-                ]}
-              >
-                <FlatList
-                  data={options}
-                  keyExtractor={(item, index) => index.toString()}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[
-                        styles.optionItem,
-                        { borderBottomColor: theme.colors.border },
-                      ]}
-                      onPress={() => handleSelect(item)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: value === item }}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          {
-                            color:
-                              value === item
-                                ? theme.colors.primary
-                                : theme.colors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {item}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <Text variant="title" style={{ flex: 1 }} accessibilityRole="header">
+            {label ?? placeholder}
+          </Text>
+          <IconButton
+            variant="plain"
+            onPress={() => setVisible(false)}
+            iconName="close"
+            accessibilityLabel="Cerrar"
+          />
+        </View>
+        <FlatList
+          data={options}
+          keyExtractor={(item, index) => `${index}:${item}`}
+          style={{ maxHeight: height * 0.6, flexGrow: 0 }}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => (
+            <ListRow
+              title={item}
+              accessibilityRole="radio"
+              selected={item === value}
+              onPress={() => {
+                onSelect(item);
+                setVisible(false);
+              }}
+            />
+          )}
+        />
+      </AnimatedModal>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  label: {
-    color: colors.text.secondary,
-    marginBottom: 6,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border.default,
-    borderRadius: 8,
-    backgroundColor: colors.background,
-    minHeight: 50,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  iconContainer: {
-    paddingLeft: 12,
-  },
-  input: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  placeholder: {
-    color: colors.text.placeholder,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownContainer: {
-    width: '80%',
-    maxHeight: '50%',
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  optionItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  optionText: {
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  optionTextSelected: {
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-});

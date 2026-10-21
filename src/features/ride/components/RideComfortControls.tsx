@@ -5,7 +5,6 @@ import {
   AnimatedPressable,
   Button,
   Input,
-  Surface,
 } from '../../../shared/components/ui-v2';
 import { ValueSlider } from '../../../shared/components/ui-v2/ValueSlider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -42,7 +41,7 @@ export const RideComfortControls = ({
     );
   return (
     <>
-      <Surface contentStyle={styles.panel} style={styles.space}>
+      <View style={[styles.panel, styles.space]}>
         <View style={styles.heading}>
           <View style={styles.copy}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
@@ -72,7 +71,7 @@ export const RideComfortControls = ({
           {Array.from({ length: maxSeats }, (_, i) => i + 1).map(count => (
             <AnimatedPressable
               key={count}
-              elevation={Number(seats) === count ? 2 : 0}
+              elevation={0}
               accessibilityRole="radio"
               accessibilityState={{ selected: Number(seats) === count }}
               accessibilityLabel={`${count} asientos`}
@@ -134,8 +133,8 @@ export const RideComfortControls = ({
             onPress={() => onSeatsChange('')}
           />
         )}
-      </Surface>
-      <Surface contentStyle={styles.panel} style={styles.space}>
+      </View>
+      <View style={[styles.panel, styles.space]}>
         <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
           Aportación por asiento
         </Text>
@@ -161,7 +160,7 @@ export const RideComfortControls = ({
               title={`$${amount}`}
               size="sm"
               fullWidth={false}
-              variant={Number(price) === amount ? 'primary' : 'outline'}
+              variant={Number(price) === amount ? 'primary' : 'ghost'}
               accessibilityLabel={`${amount} pesos por asiento`}
               accessibilityState={{ selected: Number(price) === amount }}
               onPress={() => onPriceChange(String(amount))}
@@ -197,17 +196,17 @@ export const RideComfortControls = ({
             onPress={() => onPriceChange('')}
           />
         )}
-      </Surface>
+      </View>
     </>
   );
 };
 const styles = StyleSheet.create({
-  panel: { padding: 20, gap: 12 },
+  panel: { gap: 12 },
   space: { marginBottom: 20 },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   copy: { flex: 1 },
   title: { fontSize: 18, fontWeight: '700' },
-  hint: { fontSize: 13, lineHeight: 20, marginTop: 4 },
+  hint: { fontSize: 14, lineHeight: 20, marginTop: 4 },
   dial: {
     width: 84,
     height: 84,
@@ -220,7 +219,7 @@ const styles = StyleSheet.create({
   quickAmounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   seat: {
     width: 56,
-    minHeight: 66,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,

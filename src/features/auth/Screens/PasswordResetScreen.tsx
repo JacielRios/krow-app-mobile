@@ -1,5 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+} from 'react-native';
 import {
   ScreenContainer,
   Text,
@@ -13,6 +18,7 @@ export function PasswordResetScreen({ onDone }: { onDone: () => void }) {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const actionPending = useRef(false);
+  const confirmRef = useRef<TextInput>(null);
   const [feedback, setFeedback] = useState('');
   const save = async () => {
     if (actionPending.current) return;
@@ -52,39 +58,53 @@ export function PasswordResetScreen({ onDone }: { onDone: () => void }) {
   };
   return (
     <ScreenContainer padded>
-      <ScrollView contentContainerStyle={{ paddingVertical: 24, gap: 16 }}>
-        <ScreenHeader title="Elige una contraseña nueva" />
-        <Input
-          label="Nueva contraseña"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          autoComplete="new-password"
-        />
-        <Input
-          label="Confirmar contraseña"
-          secureTextEntry
-          value={confirm}
-          onChangeText={setConfirm}
-          autoComplete="new-password"
-        />
-        <Button
-          title="Guardar contraseña"
-          loading={busy}
-          onPress={() => void save()}
-        />
-        <Button
-          title="Cancelar y cerrar sesión"
-          variant="ghost"
-          disabled={busy}
-          onPress={() => void cancel()}
-        />
-        {!!feedback && (
-          <Text tone="error" accessibilityLiveRegion="polite">
-            {feedback}
-          </Text>
-        )}
-      </ScrollView>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingVertical: 24, gap: 16 }}
+        >
+          <ScreenHeader title="Elige una contraseña nueva" />
+          <Input
+            label="Nueva contraseña"
+            returnKeyType="next"
+            onSubmitEditing={() => confirmRef.current?.focus()}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            autoComplete="new-password"
+          />
+          <Input
+            label="Confirmar contraseña"
+            ref={confirmRef}
+            returnKeyType="done"
+            onSubmitEditing={() => void save()}
+            secureTextEntry
+            value={confirm}
+            onChangeText={setConfirm}
+            autoComplete="new-password"
+          />
+          <Button
+            title="Guardar contraseña"
+            loading={busy}
+            onPress={() => void save()}
+            iconName="lock-outline"
+          />
+          <Button
+            title="Cancelar y cerrar sesión"
+            variant="ghost"
+            disabled={busy}
+            onPress={() => void cancel()}
+          />
+          {!!feedback && (
+            <Text tone="error" accessibilityLiveRegion="polite">
+              {feedback}
+            </Text>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

@@ -8,7 +8,7 @@ import {
   ViewStyle,
   ImageStyle,
 } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeProvider';
 import { typography } from '../../theme/tokens';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -43,28 +43,39 @@ export const Avatar: React.FC<AvatarProps> = ({
   uri,
   name,
   size = 'md',
-  backgroundColor = colors.primary,
-  textColor = colors.text.inverse,
+  backgroundColor,
+  textColor,
   style,
   imageStyle,
   onPress,
 }) => {
+  const { theme } = useTheme();
   const sizeValue = typeof size === 'number' ? size : SIZE_MAP[size].container;
-  const fontSize = typeof size === 'number' ? Math.round(size * 0.38) : SIZE_MAP[size].fontSize;
+  const fontSize =
+    typeof size === 'number'
+      ? Math.round(size * 0.38)
+      : SIZE_MAP[size].fontSize;
   const borderRadius = sizeValue / 2;
 
   const containerStyle: ViewStyle = {
     width: sizeValue,
     height: sizeValue,
     borderRadius,
-    backgroundColor,
+    backgroundColor: backgroundColor ?? theme.colors.surface,
     overflow: 'hidden',
   };
 
   const content = uri ? (
     <Image source={{ uri }} style={[styles.image, imageStyle]} />
   ) : (
-    <Text style={[styles.initials, { fontSize, color: textColor }]}>{getInitials(name)}</Text>
+    <Text
+      style={[
+        styles.initials,
+        { fontSize, color: textColor ?? theme.colors.textPrimary },
+      ]}
+    >
+      {getInitials(name)}
+    </Text>
   );
 
   if (onPress) {
@@ -72,6 +83,9 @@ export const Avatar: React.FC<AvatarProps> = ({
       <TouchableOpacity
         style={[styles.base, containerStyle, style]}
         onPress={onPress}
+        hitSlop={Math.max(0, (48 - sizeValue) / 2)}
+        accessibilityRole="button"
+        accessibilityLabel={name ? `Perfil de ${name}` : 'Ver perfil'}
         activeOpacity={0.8}
       >
         {content}

@@ -1,37 +1,49 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Image } from 'react-native';
-import { colors } from '../../../shared/theme/colors';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export default function SplashScreen({ navigation }: any) {
+  const { theme, motionEnabled } = useTheme();
   const scaleValue = useRef(new Animated.Value(0.9)).current;
   const opacityValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.timing(opacityValue, {
         toValue: 1,
-        duration: 1000,
+        duration: motionEnabled ? 220 : 0,
         useNativeDriver: true,
       }),
       Animated.timing(scaleValue, {
         toValue: 1,
-        duration: 1000,
+        duration: motionEnabled ? 220 : 0,
         useNativeDriver: true,
-      })
-    ]).start();
+      }),
+    ]);
+    animation.start();
 
     const timer = setTimeout(() => {
       navigation.replace('Login');
     }, 2500);
 
-    return () => clearTimeout(timer);
-  }, [navigation, opacityValue, scaleValue]);
+    return () => {
+      clearTimeout(timer);
+      animation.stop();
+    };
+  }, [navigation, opacityValue, scaleValue, motionEnabled]);
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.logoContainer, { opacity: opacityValue, transform: [{ scale: scaleValue }] }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          { opacity: opacityValue, transform: [{ scale: scaleValue }] },
+        ]}
+      >
         <Image
-          source={require('../../../assets/Krow Logo White.png')}
+          source={require('../../../assets/Krow Logo Icon.png')}
           resizeMode="contain"
           style={styles.logoImage}
         />
@@ -43,7 +55,6 @@ export default function SplashScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -51,7 +62,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoImage: {
-    width: 400,
-    height: 400,
+    width: 180,
+    height: 180,
   },
 });

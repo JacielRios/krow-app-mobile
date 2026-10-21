@@ -1,3 +1,4 @@
+import { IconButton } from '../../../shared/components/ui-v2';
 import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ interface Props {
   bias?: LatLng | null;
   placeholder?: string;
   error?: string;
+  compact?: boolean;
 }
 
 /** A committed location changes only after confirmation; stale geocodes cannot overwrite it. */
@@ -33,6 +35,7 @@ export const PlacePicker = ({
   bias,
   placeholder,
   error: fieldError,
+  compact = false,
 }: Props) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -43,6 +46,7 @@ export const PlacePicker = ({
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
+  const titleRef = useRef<Text>(null);
   const active = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -88,7 +92,7 @@ export const PlacePicker = ({
   return (
     <>
       <AnimatedPressable
-        elevation={1}
+        elevation={0}
         onPress={() => {
           setDraft(value);
           setPin(value?.location ?? null);
@@ -102,17 +106,31 @@ export const PlacePicker = ({
             backgroundColor: theme.colors.surfaceOverlay,
             borderColor: fieldError
               ? theme.colors.status.error
-              : theme.colors.border,
+              : theme.colors.controlBorder,
             borderWidth: 1,
           },
+          compact && {
+            paddingHorizontal: 0,
+            borderWidth: 0,
+            backgroundColor: 'transparent',
+            minHeight: 64,
+          },
         ]}
-        style={styles.spacing}
+        style={[styles.spacing, compact && { marginBottom: 0 }]}
         accessibilityLabel={`${label}. ${
           value?.address ?? 'Elegir en el mapa'
         }`}
       >
         <View
-          style={[styles.pin, { backgroundColor: theme.colors.surfaceRaised }]}
+          style={[
+            styles.pin,
+            { backgroundColor: theme.colors.surfaceRaised },
+            compact && {
+              width: 24,
+              height: 32,
+              backgroundColor: 'transparent',
+            },
+          ]}
         >
           <MaterialIcons name="place" size={22} color={theme.colors.primary} />
         </View>
@@ -141,148 +159,149 @@ export const PlacePicker = ({
           {fieldError}
         </Text>
       )}
-      {open && (
-        <AnimatedModal
-          visible={open}
-          onDismissRequest={dismiss}
-          sheetStyle={[
-            { paddingBottom: insets.bottom + 16 },
-            searching && styles.searchSheet,
+      <AnimatedModal
+        visible={open}
+        initialFocusRef={titleRef}
+        onDismissRequest={dismiss}
+        sheetStyle={[
+          { paddingBottom: insets.bottom + 16 },
+          searching && styles.searchSheet,
+        ]}
+      >
+        <View
+          style={[styles.handle, { backgroundColor: theme.colors.border }]}
+        />
+        <View style={styles.header}>
+          <Text
+            ref={titleRef}
+            accessibilityRole="header"
+            style={[styles.title, { color: theme.colors.textPrimary }]}
+          >
+            {label}
+          </Text>
+          <IconButton
+            variant="plain"
+            onPress={dismiss}
+            iconName="close"
+            accessibilityLabel="Cerrar"
+          />
+        </View>
+        <View
+          style={[
+            styles.tabs,
+            { backgroundColor: theme.colors.surfaceOverlay },
           ]}
         >
-          <View
-            style={[styles.handle, { backgroundColor: theme.colors.border }]}
-          />
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-              {label}
-            </Text>
+          {[
+            { title: 'Mapa', search: false, icon: 'map' },
+            { title: 'Buscar lugar', search: true, icon: 'search' },
+          ].map(tab => (
             <Button
-              title="Cerrar"
-              size="sm"
-              variant="text"
+              key={tab.title}
+              title={tab.title}
               fullWidth={false}
-              onPress={dismiss}
+              size="sm"
+              style={styles.tab}
+              variant={searching === tab.search ? 'primary' : 'text'}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: searching === tab.search }}
+              leftIcon={
+                <MaterialIcons
+                  name={tab.icon}
+                  size={18}
+                  color={
+                    searching === tab.search
+                      ? theme.colors.textInverse
+                      : theme.colors.primary
+                  }
+                />
+              }
+              onPress={() => {
+                if (searching === tab.search) return;
+                request.current += 1;
+                active.current?.abort();
+                setResolving(false);
+                setError(null);
+                Keyboard.dismiss();
+                setSearching(tab.search);
+              }}
+            />
+          ))}
+        </View>
+        {searching ? (
+          <View style={styles.searchContent}>
+            <PlacesAutocompleteInput
+              label="Buscar lugar"
+              autoFocus
+              scrollResults
+              value={draft}
+              bias={bias}
+              onChange={next => {
+                request.current += 1;
+                active.current?.abort();
+                setResolving(false);
+                setError(null);
+                setDraft(next);
+                setPin(next?.location ?? null);
+              }}
             />
           </View>
-          <View
-            style={[
-              styles.tabs,
-              { backgroundColor: theme.colors.surfaceOverlay },
-            ]}
+        ) : (
+          <ScrollView
+            keyboardShouldPersistTaps="always"
+            style={styles.scroll}
+            contentContainerStyle={styles.sheet}
           >
-            {[
-              { title: 'Mapa', search: false, icon: 'map' },
-              { title: 'Buscar lugar', search: true, icon: 'search' },
-            ].map(tab => (
-              <Button
-                key={tab.title}
-                title={tab.title}
-                fullWidth={false}
-                size="sm"
-                style={styles.tab}
-                variant={searching === tab.search ? 'primary' : 'text'}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: searching === tab.search }}
-                leftIcon={
-                  <MaterialIcons
-                    name={tab.icon}
-                    size={18}
-                    color={
-                      searching === tab.search
-                        ? theme.colors.textInverse
-                        : theme.colors.primary
-                    }
-                  />
-                }
-                onPress={() => {
-                  if (searching === tab.search) return;
-                  request.current += 1;
-                  active.current?.abort();
-                  setResolving(false);
-                  setError(null);
-                  Keyboard.dismiss();
-                  setSearching(tab.search);
-                }}
-              />
-            ))}
-          </View>
-          {searching ? (
-            <View style={styles.searchContent}>
-              <PlacesAutocompleteInput
-                label="Buscar lugar"
-                autoFocus
-                scrollResults
-                value={draft}
-                bias={bias}
-                onChange={next => {
-                  request.current += 1;
-                  active.current?.abort();
-                  setResolving(false);
-                  setError(null);
-                  setDraft(next);
-                  setPin(next?.location ?? null);
-                }}
-              />
-            </View>
-          ) : (
-            <ScrollView
-              keyboardShouldPersistTaps="always"
-              style={styles.scroll}
-              contentContainerStyle={styles.sheet}
-            >
+            <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>
+              Toca el mapa o mantén presionado el pin para arrastrarlo.
+            </Text>
+            <RoutePreviewMap
+              origin={pin ?? bias ?? null}
+              destination={null}
+              interactive
+              height={280}
+              onOriginDrag={point => {
+                void pickPoint(point);
+              }}
+              onMapPress={point => {
+                void pickPoint(point);
+              }}
+            />
+            <Surface contentStyle={styles.selection} style={styles.spacing}>
               <Text
-                style={[styles.hint, { color: theme.colors.textSecondary }]}
+                style={[styles.address, { color: theme.colors.textPrimary }]}
               >
-                Toca el mapa o mantén presionado el pin para arrastrarlo.
+                {resolving
+                  ? 'Ubicando punto…'
+                  : draft?.address ?? 'Elige un punto del mapa'}
               </Text>
-              <RoutePreviewMap
-                origin={pin ?? bias ?? null}
-                destination={null}
-                interactive
-                height={280}
-                onOriginDrag={point => {
-                  void pickPoint(point);
-                }}
-                onMapPress={point => {
-                  void pickPoint(point);
-                }}
-              />
-              <Surface contentStyle={styles.selection} style={styles.spacing}>
+              {error && (
                 <Text
-                  style={[styles.address, { color: theme.colors.textPrimary }]}
+                  accessibilityRole="alert"
+                  style={{ color: theme.colors.status.error }}
                 >
-                  {resolving
-                    ? 'Ubicando punto…'
-                    : draft?.address ?? 'Elige un punto del mapa'}
+                  {error}
                 </Text>
-                {error && (
-                  <Text
-                    accessibilityRole="alert"
-                    style={{ color: theme.colors.status.error }}
-                  >
-                    {error}
-                  </Text>
-                )}
-              </Surface>
-            </ScrollView>
-          )}
-          {(!searching || draft) && (
-            <View style={[styles.footer, { borderColor: theme.colors.border }]}>
-              <Button
-                title="Usar este punto"
-                loading={resolving}
-                disabled={!draft || resolving || Boolean(error)}
-                onPress={() => {
-                  if (!draft || resolving || error) return;
-                  onChange(draft);
-                  dismiss();
-                }}
-              />
-            </View>
-          )}
-        </AnimatedModal>
-      )}
+              )}
+            </Surface>
+          </ScrollView>
+        )}
+        {(!searching || draft) && (
+          <View style={[styles.footer, { borderColor: theme.colors.border }]}>
+            <Button
+              title="Usar este punto"
+              loading={resolving}
+              disabled={!draft || resolving || Boolean(error)}
+              onPress={() => {
+                if (!draft || resolving || error) return;
+                onChange(draft);
+                dismiss();
+              }}
+              iconName="check"
+            />
+          </View>
+        )}
+      </AnimatedModal>
     </>
   );
 };
@@ -304,7 +323,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   copy: { flex: 1 },
-  label: { fontSize: 12, marginBottom: 4 },
+  label: { fontSize: 14, marginBottom: 4 },
   address: { fontSize: 15, fontWeight: '600', lineHeight: 22 },
   sheet: { padding: 20, gap: 8 },
   searchSheet: { height: '92%' },
@@ -340,6 +359,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: { flex: 1, fontSize: 22, fontWeight: '700' },
-  hint: { fontSize: 13, lineHeight: 20, marginBottom: 8 },
+  hint: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
   selection: { padding: 16, gap: 8 },
 });

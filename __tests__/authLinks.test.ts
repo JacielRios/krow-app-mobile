@@ -58,6 +58,18 @@ test('only exchanges codes for the configured HTTPS host and path', async () => 
   expect(mockExchange).not.toHaveBeenCalled();
 });
 
+test.each([
+  'not-a-url',
+  'https://user@krow.example/auth/callback?code=a',
+  'https://krow.example/auth/callback?code=a&code=b',
+  'https://krow.example/auth/callback?code=a&token_hash=b&type=recovery',
+  'https://krow.example/auth/callback?token_hash=a&type=signup&type=recovery',
+])('does not exchange an ambiguous or malformed access link: %s', async url => {
+  expect(await sessionAdapter.acceptAuthLink(url)).toBe(false);
+  expect(mockExchange).not.toHaveBeenCalled();
+  expect(mockVerify).not.toHaveBeenCalled();
+});
+
 test('does not accept an expired recovery token', async () => {
   mockVerify.mockResolvedValue({ error: new Error('Expired link') });
   await expect(

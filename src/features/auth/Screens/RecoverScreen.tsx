@@ -75,6 +75,7 @@ export function RecoverScreen() {
             title="Recuperar contraseña"
             loading={busy}
             onPress={() => void send()}
+            iconName="mail-outline"
           />
           <Button
             title="Reenviar confirmación de cuenta"

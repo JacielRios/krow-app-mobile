@@ -26,6 +26,15 @@ class KrowNotificationsModule(private val context: ReactApplicationContext) : Re
         }
     }
     override fun getName() = "KrowNotifications"
+    @ReactMethod fun areNotificationsEnabled(promise: Promise) {
+        val allowed = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val manager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val channel = if (android.os.Build.VERSION.SDK_INT >= 26) manager.getNotificationChannel(KrowMessagingService.CHANNEL) else null
+        val channelAllowed = android.os.Build.VERSION.SDK_INT < 26 || channel == null || channel.importance != android.app.NotificationManager.IMPORTANCE_NONE
+        val group = if (android.os.Build.VERSION.SDK_INT >= 28) channel?.group?.let { manager.getNotificationChannelGroup(it) } else null
+        val groupAllowed = android.os.Build.VERSION.SDK_INT < 28 || group?.isBlocked != true
+        promise.resolve(allowed && channelAllowed && groupAllowed)
+    }
     @ReactMethod fun setSessionActor(actor: String) {
         context.getSharedPreferences("krow_push", 0).edit().putString("actor_id",actor).apply()
     }

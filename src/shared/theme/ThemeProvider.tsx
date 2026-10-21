@@ -38,7 +38,7 @@ export const ThemeProvider: React.FC<React.PropsWithChildren> = ({
   const [systemScheme, setSystemScheme] = useState<ColorSchemeName | null>(
     Appearance.getColorScheme() ?? null,
   );
-  const [motionEnabled, setMotionEnabled] = useState(true);
+  const [motionEnabled, setMotionEnabled] = useState(false);
   const preferenceEdited = useRef(false);
 
   useEffect(() => {

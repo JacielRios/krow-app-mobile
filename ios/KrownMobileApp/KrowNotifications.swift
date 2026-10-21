@@ -8,6 +8,22 @@ class KrowNotifications: NSObject {
   private static var requests: [UUID: (RCTPromiseResolveBlock, RCTPromiseRejectBlock)] = [:]
   static var pendingRide: String?
   @objc static func requiresMainQueueSetup() -> Bool { true }
+  @objc func getNotificationPermissionStatus(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: RCTPromiseRejectBlock) {
+    UNUserNotificationCenter.current().getNotificationSettings { settings in
+      switch settings.authorizationStatus {
+      case .authorized, .provisional, .ephemeral: resolve("granted")
+      case .denied: resolve("denied")
+      case .notDetermined: resolve("notDetermined")
+      @unknown default: resolve("unavailable")
+      }
+    }
+  }
+  @objc func requestPermission(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { allowed, error in
+      if let error = error { reject("PUSH_PERMISSION", "No se pudo consultar el permiso de notificaciones", error) }
+      else { resolve(allowed) }
+    }
+  }
   @objc func setSessionActive(_ active: Bool) {
     DispatchQueue.main.async {
       UserDefaults.standard.set(active, forKey: "krow.push.sessionActive")

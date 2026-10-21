@@ -1,0 +1,1406 @@
+{
+  "date": "2026-10-21",
+  "screens": [
+    "src/features/auth/Screens/LoginScreen.tsx",
+    "src/features/auth/Screens/PasswordResetScreen.tsx",
+    "src/features/auth/Screens/RecoverScreen.tsx",
+    "src/features/auth/Screens/RegisterScreen.tsx",
+    "src/features/auth/Screens/SplashScreen.tsx",
+    "src/features/home/screens/HomeScreen.tsx",
+    "src/features/pilot/ActivityScreen.tsx",
+    "src/features/pilot/BookingRequestsScreen.tsx",
+    "src/features/pilot/ChatScreen.tsx",
+    "src/features/pilot/DriverMetricsScreen.tsx",
+    "src/features/pilot/HistoryScreen.tsx",
+    "src/features/pilot/ProfileScreen.tsx",
+    "src/features/pilot/ReportIncidentScreen.tsx",
+    "src/features/pilot/RideInvitationScreen.tsx",
+    "src/features/pilot/ScheduledScreen.tsx",
+    "src/features/pilot/TrackingScreen.tsx",
+    "src/features/ride/screens/ChatScreen.tsx",
+    "src/features/ride/screens/driver/DriverActiveRideScreen.tsx",
+    "src/features/ride/screens/driver/DriverFinishedRideScreen.tsx",
+    "src/features/ride/screens/driver/DriverTripsScreen.tsx",
+    "src/features/ride/screens/driver/FavoriteRoutesScreen.tsx",
+    "src/features/ride/screens/driver/PublishRideScreen.tsx",
+    "src/features/ride/screens/passenger/PassengerActiveRideScreen.tsx",
+    "src/features/ride/screens/passenger/PassengerFinishedRideScreen.tsx",
+    "src/features/ride/screens/passenger/RequestRideScreen.tsx",
+    "src/features/ride/screens/shared/RideScheduledScreen.tsx",
+    "src/features/ride-runtime/RuntimeRideScreen.tsx"
+  ],
+  "filesReviewed": 87,
+  "textActions": 97,
+  "iconActions": 28,
+  "invalid": [],
+  "inventory": [
+    {
+      "file": "src/app/navigation/RootNavigator.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 258,
+          "type": "Button",
+          "label": "\"Volver a iniciar sesión\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/auth/Screens/LoginScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 215,
+          "type": "TouchableOpacity",
+          "label": "\"Viajar como pasajero\"",
+          "role": "\"tab\""
+        },
+        {
+          "line": 236,
+          "type": "TouchableOpacity",
+          "label": "\"Viajar como conductor\"",
+          "role": "\"tab\""
+        },
+        {
+          "line": 286,
+          "type": "IconButton",
+          "label": "{\n                      showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'\n                    }",
+          "role": null
+        },
+        {
+          "line": 314,
+          "type": "Button",
+          "label": "\"Iniciar Sesión\"",
+          "role": null
+        },
+        {
+          "line": 322,
+          "type": "TouchableOpacity",
+          "label": null,
+          "role": "\"button\""
+        },
+        {
+          "line": 362,
+          "type": "Button",
+          "label": "\"Crear cuenta\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/auth/Screens/PasswordResetScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 89,
+          "type": "Button",
+          "label": "\"Guardar contraseña\"",
+          "role": null
+        },
+        {
+          "line": 95,
+          "type": "Button",
+          "label": "\"Cancelar y cerrar sesión\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/auth/Screens/RecoverScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 74,
+          "type": "Button",
+          "label": "\"Recuperar contraseña\"",
+          "role": null
+        },
+        {
+          "line": 80,
+          "type": "Button",
+          "label": "\"Reenviar confirmación de cuenta\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/auth/Screens/RegisterScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 336,
+          "type": "Button",
+          "label": "\"Registrarse\"",
+          "role": null
+        },
+        {
+          "line": 353,
+          "type": "TouchableOpacity",
+          "label": "\"Iniciar sesión\"",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/features/home/components/RecentRidesTable.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 61,
+          "type": "Pressable",
+          "label": null,
+          "role": "{onPress ? 'button' : undefined}"
+        }
+      ]
+    },
+    {
+      "file": "src/features/home/screens/HomeScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 154,
+          "type": "Button",
+          "label": "\"Mi perfil y ajustes\"",
+          "role": null
+        },
+        {
+          "line": 178,
+          "type": "Button",
+          "label": "{\n                driver && pending ? 'Revisar solicitudes' : 'Abrir solicitudes'\n              }",
+          "role": null
+        },
+        {
+          "line": 209,
+          "type": "Button",
+          "label": "{\n                    active.activeRide.status === 'in_progress'\n                      ? 'Continuar viaje'\n                      : 'Ver mi próximo viaje'\n                  }",
+          "role": null
+        },
+        {
+          "line": 253,
+          "type": "Button",
+          "label": "{driver ? 'Publicar viaje' : 'Buscar viaje'}",
+          "role": null
+        },
+        {
+          "line": 274,
+          "type": "ListRow",
+          "label": "\"Rutas favoritas\"",
+          "role": null
+        },
+        {
+          "line": 287,
+          "type": "ListRow",
+          "label": "\"Solicitudes\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/maps/components/PlacePicker.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 94,
+          "type": "AnimatedPressable",
+          "label": "{`${label}. ${\n          value?.address ?? 'Elegir en el mapa'\n        }`}",
+          "role": null
+        },
+        {
+          "line": 182,
+          "type": "IconButton",
+          "label": "\"Cerrar\"",
+          "role": null
+        },
+        {
+          "line": 199,
+          "type": "Button",
+          "label": "{tab.title}",
+          "role": "\"tab\""
+        },
+        {
+          "line": 291,
+          "type": "Button",
+          "label": "\"Usar este punto\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/maps/components/PlacesAutocompleteInput.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 190,
+          "type": "IconButton",
+          "label": "\"Borrar dirección\"",
+          "role": null
+        },
+        {
+          "line": 239,
+          "type": "Pressable",
+          "label": null,
+          "role": "\"button\""
+        },
+        {
+          "line": 259,
+          "type": "Pressable",
+          "label": "{s.description}",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/features/maps/components/RoutePreviewMap.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 596,
+          "type": "Button",
+          "label": "\"Reintentar mapa\"",
+          "role": null
+        },
+        {
+          "line": 607,
+          "type": "IconButton",
+          "label": "\"Centrar recorrido\"",
+          "role": null
+        },
+        {
+          "line": 624,
+          "type": "IconButton",
+          "label": "{\n            following ? 'Siguiendo vehículo' : 'Seguir vehículo'\n          }",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/ActivityScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 126,
+          "type": "Button",
+          "label": "\"Actualizar viajes\"",
+          "role": null
+        },
+        {
+          "line": 172,
+          "type": "Button",
+          "label": "\"Cargar más\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/BookingEventsHost.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 92,
+          "type": "Button",
+          "label": "\"Revisar después\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/BookingNoticeCard.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 128,
+          "type": "Button",
+          "label": "\"Aceptar solicitud\"",
+          "role": null
+        },
+        {
+          "line": 134,
+          "type": "Button",
+          "label": "\"Rechazar solicitud\"",
+          "role": null
+        },
+        {
+          "line": 147,
+          "type": "Button",
+          "label": "\"Ver detalle del viaje\"",
+          "role": null
+        },
+        {
+          "line": 167,
+          "type": "Button",
+          "label": "\"Entendido\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/BookingRequestsScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 116,
+          "type": "Button",
+          "label": "\"Todas las solicitudes\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/ChatScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 155,
+          "type": "Button",
+          "label": "\"Cargar mensajes anteriores\"",
+          "role": null
+        },
+        {
+          "line": 237,
+          "type": "IconButton",
+          "label": "{\n                pending ? 'Reintentar envío' : 'Enviar mensaje'\n              }",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/DriverMetricsScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 46,
+          "type": "IconButton",
+          "label": "\"Actualizar métricas\"",
+          "role": null
+        },
+        {
+          "line": 83,
+          "type": "ListRow",
+          "label": "{label}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/HistoryScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 116,
+          "type": "Button",
+          "label": "\"Confirmar efectivo recibido\"",
+          "role": null
+        },
+        {
+          "line": 151,
+          "type": "Button",
+          "label": "\"Enviar calificación\"",
+          "role": null
+        },
+        {
+          "line": 165,
+          "type": "Button",
+          "label": "\"Ver conversación\"",
+          "role": null
+        },
+        {
+          "line": 332,
+          "type": "Button",
+          "label": "\"Volver al seguimiento\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/ProfileScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 201,
+          "type": "Button",
+          "label": "\"Cerrar sesión\"",
+          "role": null
+        },
+        {
+          "line": 248,
+          "type": "IconButton",
+          "label": "\"Editar perfil\"",
+          "role": null
+        },
+        {
+          "line": 307,
+          "type": "Button",
+          "label": "\"Guardar cambios\"",
+          "role": null
+        },
+        {
+          "line": 313,
+          "type": "Button",
+          "label": "\"Cancelar edición\"",
+          "role": null
+        },
+        {
+          "line": 327,
+          "type": "ListRow",
+          "label": "\"Ver mis métricas\"",
+          "role": null
+        },
+        {
+          "line": 336,
+          "type": "ListRow",
+          "label": "\"Como pasajero\"",
+          "role": "\"radio\""
+        },
+        {
+          "line": 349,
+          "type": "ListRow",
+          "label": "\"Como conductor\"",
+          "role": "\"radio\""
+        },
+        {
+          "line": 369,
+          "type": "ListRow",
+          "label": "{['Seguir al dispositivo', 'Claro', 'Oscuro'][i]}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 388,
+          "type": "Button",
+          "label": "\"Activar notificaciones\"",
+          "role": null
+        },
+        {
+          "line": 412,
+          "type": "Button",
+          "label": "\"Abrir ajustes de notificaciones\"",
+          "role": null
+        },
+        {
+          "line": 427,
+          "type": "ListRow",
+          "label": "\"Compartir diagnóstico\"",
+          "role": null
+        },
+        {
+          "line": 441,
+          "type": "ListRow",
+          "label": "\"Contactar soporte\"",
+          "role": null
+        },
+        {
+          "line": 451,
+          "type": "ListRow",
+          "label": "\"Aviso de privacidad\"",
+          "role": null
+        },
+        {
+          "line": 472,
+          "type": "Button",
+          "label": "\"Solicitar cierre de cuenta\"",
+          "role": null
+        },
+        {
+          "line": 480,
+          "type": "Button",
+          "label": "\"Cerrar sesión\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/ReportIncidentScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 88,
+          "type": "ListRow",
+          "label": "{label}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 109,
+          "type": "Button",
+          "label": "{sent ? 'Reporte enviado' : 'Enviar reporte'}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/RideInvitationScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 174,
+          "type": "ListRow",
+          "label": "{`Subir en ${stop.address}`}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 196,
+          "type": "ListRow",
+          "label": "{`Bajar en ${stop.address}`}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 210,
+          "type": "Button",
+          "label": "\"Solicitar un lugar\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/ScheduledScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 183,
+          "type": "Button",
+          "label": "\"Invitar a este viaje\"",
+          "role": null
+        },
+        {
+          "line": 284,
+          "type": "Button",
+          "label": "\"Aceptar solicitud\"",
+          "role": null
+        },
+        {
+          "line": 298,
+          "type": "Button",
+          "label": "\"Rechazar\"",
+          "role": null
+        },
+        {
+          "line": 324,
+          "type": "Button",
+          "label": "{\n                            driver\n                              ? 'Hablar con el pasajero'\n                              : 'Hablar con el conductor'\n                          }",
+          "role": null
+        },
+        {
+          "line": 339,
+          "type": "Button",
+          "label": "\"Cancelar reserva\"",
+          "role": null
+        },
+        {
+          "line": 390,
+          "type": "Button",
+          "label": "\"Comenzar viaje\"",
+          "role": null
+        },
+        {
+          "line": 412,
+          "type": "Button",
+          "label": "\"Cancelar viaje\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/pilot/TrackingScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 335,
+          "type": "IconButton",
+          "label": "\"Volver\"",
+          "role": null
+        },
+        {
+          "line": 357,
+          "type": "IconButton",
+          "label": "\"Reportar un problema\"",
+          "role": null
+        },
+        {
+          "line": 499,
+          "type": "IconButton",
+          "label": "{`Abrir chat con ${p.name}`}",
+          "role": null
+        },
+        {
+          "line": 511,
+          "type": "Button",
+          "label": "{`Confirmar subida de ${p.name}`}",
+          "role": null
+        },
+        {
+          "line": 526,
+          "type": "Button",
+          "label": "\"No se presentó\"",
+          "role": null
+        },
+        {
+          "line": 571,
+          "type": "Button",
+          "label": "{`Confirmar bajada de ${p.name}`}",
+          "role": null
+        },
+        {
+          "line": 586,
+          "type": "Button",
+          "label": "\"Ver cobro y reserva\"",
+          "role": null
+        },
+        {
+          "line": 603,
+          "type": "Button",
+          "label": "\"Reanudar GPS\"",
+          "role": null
+        },
+        {
+          "line": 623,
+          "type": "Button",
+          "label": "\"Actualizar recorrido\"",
+          "role": null
+        },
+        {
+          "line": 698,
+          "type": "ListRow",
+          "label": "\"Estado de conexión\"",
+          "role": null
+        },
+        {
+          "line": 738,
+          "type": "Button",
+          "label": "\"Finalizar viaje\"",
+          "role": null
+        },
+        {
+          "line": 745,
+          "type": "Button",
+          "label": "{expanded ? 'Ver más mapa' : 'Ver pasajeros y acciones'}",
+          "role": null
+        },
+        {
+          "line": 755,
+          "type": "Button",
+          "label": "\"Contactar al conductor\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/PassengerStopCard.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 96,
+          "type": "Button",
+          "label": "{busy ? 'Procesando…' : 'Llegamos'}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/RecurrencePicker.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 46,
+          "type": "Switch",
+          "label": "\"Repetir en varias fechas\"",
+          "role": null
+        },
+        {
+          "line": 63,
+          "type": "Button",
+          "label": "{`${day}${weekdays.includes(index) ? ' ✓' : ''}`}",
+          "role": "\"checkbox\""
+        },
+        {
+          "line": 84,
+          "type": "Button",
+          "label": "{`${value} ${value === 1 ? 'semana' : 'semanas'}${\n                      weeks === value ? ' ✓' : ''\n                    }`}",
+          "role": "\"radio\""
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/RideCard.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 76,
+          "type": "AnimatedPressable",
+          "label": "{`Ver detalles del viaje de ${driverName}`}",
+          "role": null
+        },
+        {
+          "line": 181,
+          "type": "Button",
+          "label": "{alreadyRequested ? 'Solicitado' : 'Ver ruta y paradas'}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/RideComfortControls.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 72,
+          "type": "AnimatedPressable",
+          "label": "{`${count} asientos`}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 130,
+          "type": "Button",
+          "label": "\"Sin cupo predeterminado\"",
+          "role": null
+        },
+        {
+          "line": 158,
+          "type": "Button",
+          "label": "{`${amount} pesos por asiento`}",
+          "role": null
+        },
+        {
+          "line": 170,
+          "type": "Button",
+          "label": "{precise ? 'Ocultar monto exacto' : 'Ingresar otro monto'}",
+          "role": null
+        },
+        {
+          "line": 193,
+          "type": "Button",
+          "label": "\"Sin precio predeterminado\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/RideDateTimePicker.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 111,
+          "type": "Button",
+          "label": "{\n              minutes === 30\n                ? 'En 30 min'\n                : minutes === 60\n                ? 'En 1 hora'\n                : 'En 2 horas'\n            }",
+          "role": null
+        },
+        {
+          "line": 145,
+          "type": "TouchableOpacity",
+          "label": "{`${label ?? 'Fecha y hora'}. ${\n          value ? formatDateTime(value) : placeholder\n        }`}",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/TripPresentation.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 125,
+          "type": "Button",
+          "label": "{details ? 'Ocultar direcciones' : 'Ver direcciones completas'}",
+          "role": null
+        },
+        {
+          "line": 274,
+          "type": "AnimatedPressable",
+          "label": "{`${statusText(status)}. ${\n        placeLabel(origin, 'Punto de salida').title\n      } a ${placeLabel(destination, 'Destino guardado').title}. ${rideDate(\n        departure,\n      )}. Ver viaje`}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/components/VehiclePicker.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 36,
+          "type": "ListRow",
+          "label": "{`${vehicle.brand} ${vehicle.model}`}",
+          "role": "\"radio\""
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/driver/DriverActiveRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 115,
+          "type": "Button",
+          "label": "\"Reintentar\"",
+          "role": null
+        },
+        {
+          "line": 127,
+          "type": "Button",
+          "label": "\"Finalizar viaje\"",
+          "role": null
+        },
+        {
+          "line": 153,
+          "type": "IconButton",
+          "label": "\"Volver a la pantalla anterior\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/driver/DriverFinishedRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 39,
+          "type": "IconButton",
+          "label": "\"Volver al inicio\"",
+          "role": null
+        },
+        {
+          "line": 97,
+          "type": "Button",
+          "label": "\"Enviar calificaciones\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/driver/DriverTripsScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 139,
+          "type": "Button",
+          "label": "\"Ver viaje\"",
+          "role": null
+        },
+        {
+          "line": 147,
+          "type": "IconButton",
+          "label": "{\n                    trip.canEdit\n                      ? 'Editar viaje'\n                      : 'Edición bloqueada por reservas activas'\n                  }",
+          "role": null
+        },
+        {
+          "line": 202,
+          "type": "Button",
+          "label": "\"Cargar más\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/driver/FavoriteRoutesScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 76,
+          "type": "Button",
+          "label": "\"Crear ruta frecuente\"",
+          "role": null
+        },
+        {
+          "line": 166,
+          "type": "Button",
+          "label": "\"Usar para publicar\"",
+          "role": null
+        },
+        {
+          "line": 178,
+          "type": "IconButton",
+          "label": "{`Editar ruta ${favorite.name}`}",
+          "role": null
+        },
+        {
+          "line": 192,
+          "type": "IconButton",
+          "label": "{`Eliminar ruta ${favorite.name}`}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/driver/PublishRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 728,
+          "type": "Button",
+          "label": "\"Volver\"",
+          "role": null
+        },
+        {
+          "line": 799,
+          "type": "IconButton",
+          "label": "\"Volver\"",
+          "role": null
+        },
+        {
+          "line": 855,
+          "type": "Button",
+          "label": "\"Retomar publicaciones pendientes\"",
+          "role": null
+        },
+        {
+          "line": 890,
+          "type": "Button",
+          "label": "\"Finalizar intento pendiente\"",
+          "role": null
+        },
+        {
+          "line": 940,
+          "type": "Pressable",
+          "label": "{favorite.name}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 1078,
+          "type": "Pressable",
+          "label": "{`Avenida: ${corridor.name}`}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 1221,
+          "type": "Pressable",
+          "label": "{`Parada ${index + 1}: ${stop.name}. ${\n                        selected ? 'Seleccionada' : 'Disponible'\n                      }`}",
+          "role": "\"checkbox\""
+        },
+        {
+          "line": 1375,
+          "type": "Pressable",
+          "label": null,
+          "role": "\"checkbox\""
+        },
+        {
+          "line": 1623,
+          "type": "Button",
+          "label": "{\n                    reviewStopsExpanded\n                      ? 'Mostrar menos paradas'\n                      : `Ver las ${selectedStops.length} paradas`\n                  }",
+          "role": null
+        },
+        {
+          "line": 1646,
+          "type": "IconButton",
+          "label": "\"Volver al paso anterior\"",
+          "role": null
+        },
+        {
+          "line": 1654,
+          "type": "Button",
+          "label": "\"Continuar\"",
+          "role": null
+        },
+        {
+          "line": 1666,
+          "type": "Button",
+          "label": "{\n              favoriteOnly\n                ? 'Guardar ruta frecuente'\n                : editing\n                ? 'Guardar cambios'\n                : repeat\n                ? `Publicar ${repeated.dates.length} viajes`\n                : 'Publicar viaje'\n            }",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/passenger/PassengerActiveRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 125,
+          "type": "Button",
+          "label": "\"Reintentar\"",
+          "role": null
+        },
+        {
+          "line": 152,
+          "type": "IconButton",
+          "label": "\"Volver a la pantalla anterior\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/passenger/PassengerFinishedRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 27,
+          "type": "IconButton",
+          "label": "\"Volver al inicio\"",
+          "role": null
+        },
+        {
+          "line": 74,
+          "type": "Button",
+          "label": "\"Enviar y Finalizar\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/passenger/RequestRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 406,
+          "type": "Button",
+          "label": "\"Filtrar por fecha y hora\"",
+          "role": null
+        },
+        {
+          "line": 438,
+          "type": "Button",
+          "label": "\"Quitar filtro de fechas\"",
+          "role": null
+        },
+        {
+          "line": 454,
+          "type": "Button",
+          "label": "\"Buscar viajes\"",
+          "role": null
+        },
+        {
+          "line": 482,
+          "type": "Button",
+          "label": "\"Cambiar destino\"",
+          "role": null
+        },
+        {
+          "line": 487,
+          "type": "Button",
+          "label": "\"Cambiar fecha y hora\"",
+          "role": null
+        },
+        {
+          "line": 658,
+          "type": "IconButton",
+          "label": "\"Cerrar\"",
+          "role": null
+        },
+        {
+          "line": 888,
+          "type": "TouchableOpacity",
+          "label": "{`Bajada ${index + 1}: ${\n                      pair.dropoff.name\n                    }, ${formatStopDistance(\n                      pair.dropoff.distanceMeters,\n                    )} aproximadamente de tu destino${\n                      pair.dropoff.stopId === recommendedDropoffId\n                        ? ', recomendada'\n                        : ''\n                    }`}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 970,
+          "type": "Button",
+          "label": "{\n                alreadyRequested\n                  ? 'Ya solicitaste este viaje'\n                  : requesting\n                  ? 'Enviando solicitud...'\n                  : 'Solicitar unirse'\n              }",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride/screens/shared/RideScheduledScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 153,
+          "type": "Button",
+          "label": "\"Preparar navegación del viaje\"",
+          "role": null
+        },
+        {
+          "line": 215,
+          "type": "IconButton",
+          "label": "\"Volver a la pantalla anterior\"",
+          "role": null
+        },
+        {
+          "line": 451,
+          "type": "Button",
+          "label": "{rideAction === 'starting' ? 'Iniciando…' : 'Iniciar viaje'}",
+          "role": null
+        },
+        {
+          "line": 458,
+          "type": "Button",
+          "label": "{rideAction === 'cancelling' ? 'Cancelando…' : 'Cancelar viaje'}",
+          "role": null
+        },
+        {
+          "line": 573,
+          "type": "Button",
+          "label": "\"Rechazar\"",
+          "role": null
+        },
+        {
+          "line": 581,
+          "type": "Button",
+          "label": "{busy ? 'Procesando...' : 'Aceptar'}",
+          "role": null
+        },
+        {
+          "line": 681,
+          "type": "Button",
+          "label": "{cancelling ? 'Cancelando…' : 'Cancelar reserva'}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride-runtime/RuntimeEntry.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 51,
+          "type": "Button",
+          "label": "\"Volver a mis viajes\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/features/ride-runtime/RuntimeRideScreen.tsx",
+      "screen": true,
+      "actions": [
+        {
+          "line": 85,
+          "type": "Button",
+          "label": "{title}",
+          "role": null
+        },
+        {
+          "line": 258,
+          "type": "IconButton",
+          "label": "\"Volver a la pantalla anterior\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/Avatar.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 83,
+          "type": "TouchableOpacity",
+          "label": "{name ? `Perfil de ${name}` : 'Ver perfil'}",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/CustomAlert.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 126,
+          "type": "Button",
+          "label": "{shown.confirmText}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/Dropdown.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 36,
+          "type": "AnimatedPressable",
+          "label": "{`${label ?? placeholder}: ${\n          value || 'Sin selección'\n        }`}",
+          "role": null
+        },
+        {
+          "line": 83,
+          "type": "IconButton",
+          "label": "\"Cerrar\"",
+          "role": null
+        },
+        {
+          "line": 96,
+          "type": "ListRow",
+          "label": "{item}",
+          "role": "\"radio\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/DropdownInput.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 76,
+          "type": "TouchableOpacity",
+          "label": "{`${label ?? placeholder}: ${\n          selectedOption?.label ?? 'Sin selección'\n        }`}",
+          "role": "\"button\""
+        },
+        {
+          "line": 135,
+          "type": "TouchableOpacity",
+          "label": "{item.label}",
+          "role": "\"radio\""
+        },
+        {
+          "line": 147,
+          "type": "TouchableOpacity",
+          "label": "{item.label}",
+          "role": "\"radio\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/SectionHeader.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 28,
+          "type": "Button",
+          "label": "{actionLabel}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui/StarRating.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 56,
+          "type": "IconButton",
+          "label": "{`${starNumber} de ${maxStars} estrellas`}",
+          "role": "\"radio\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/AnimatedModal.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 88,
+          "type": "Pressable",
+          "label": "\"Cerrar modal\"",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/Button.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 100,
+          "type": "AnimatedPressable",
+          "label": "{props.accessibilityLabel ?? title}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/Card.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 53,
+          "type": "AnimatedPressable",
+          "label": "{accessibilityLabel}",
+          "role": "\"button\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/FeedbackState.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 55,
+          "type": "Button",
+          "label": "{actionLabel}",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/IconButton.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 42,
+          "type": "AnimatedPressable",
+          "label": null,
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/ListRow.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 83,
+          "type": "AnimatedPressable",
+          "label": "{\n        accessibilityLabel ?? [title, subtitle].filter(Boolean).join('. ')\n      }",
+          "role": "{accessibilityRole}"
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/PanelHandle.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 33,
+          "type": "AnimatedPressable",
+          "label": "{\n          expanded\n            ? 'Contraer detalles del viaje'\n            : 'Expandir detalles del viaje'\n        }",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/ScreenHeader.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 22,
+          "type": "IconButton",
+          "label": "\"Volver a la pantalla anterior\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/SegmentedControl.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 28,
+          "type": "AnimatedPressable",
+          "label": "{option.label}",
+          "role": "\"tab\""
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/useConfirmation.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 73,
+          "type": "Button",
+          "label": "{choice.confirmLabel}",
+          "role": null
+        },
+        {
+          "line": 78,
+          "type": "Button",
+          "label": "\"Volver\"",
+          "role": null
+        }
+      ]
+    },
+    {
+      "file": "src/shared/components/ui-v2/ValueSlider.tsx",
+      "screen": false,
+      "actions": [
+        {
+          "line": 172,
+          "type": "IconButton",
+          "label": "{`Disminuir ${label}`}",
+          "role": null
+        },
+        {
+          "line": 189,
+          "type": "IconButton",
+          "label": "{`Aumentar ${label}`}",
+          "role": null
+        }
+      ]
+    }
+  ]
+}

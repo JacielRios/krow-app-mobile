@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { depth, glass } from '../../../shared/theme/materials';
 
 export const SeatDial = ({
   value,
@@ -15,6 +14,7 @@ export const SeatDial = ({
   const { theme } = useTheme();
   const dial = useRef<View>(null);
   const center = useRef({ x: 0, y: 0 });
+  const lastGestureValue = useRef<number | null>(null);
   const adjust = (x: number, y: number) => {
     if (max < 1) return;
     const dx = x - center.current.x,
@@ -24,7 +24,11 @@ export const SeatDial = ({
       -135,
       Math.min(135, (Math.atan2(dx, -dy) * 180) / Math.PI),
     );
-    onChange(1 + Math.round(((angle + 135) / 270) * (max - 1)));
+    const next = 1 + Math.round(((angle + 135) / 270) * (max - 1));
+    if (next !== lastGestureValue.current) {
+      lastGestureValue.current = next;
+      onChange(next);
+    }
   };
   const latest = useRef({ max, adjust });
   latest.current = { max, adjust };
@@ -37,6 +41,7 @@ export const SeatDial = ({
           event.nativeEvent.locationY - 50,
         ) > 20,
       onPanResponderGrant: event => {
+        lastGestureValue.current = null;
         const { pageX, pageY } = event.nativeEvent;
         dial.current?.measureInWindow((x, y, width, height) => {
           center.current = { x: x + width / 2, y: y + height / 2 };
@@ -45,7 +50,7 @@ export const SeatDial = ({
       },
       onPanResponderMove: event =>
         latest.current.adjust(event.nativeEvent.pageX, event.nativeEvent.pageY),
-      onPanResponderTerminationRequest: () => false,
+      onPanResponderTerminationRequest: () => true,
     }),
   ).current;
   const angle =
@@ -59,8 +64,7 @@ export const SeatDial = ({
       {...responder.panHandlers}
       style={[
         styles.dial,
-        glass(theme),
-        depth(theme, 2),
+        { backgroundColor: theme.colors.surface },
         max < 1 && { opacity: 0.45 },
       ]}
       accessible
@@ -117,7 +121,7 @@ export const SeatDial = ({
       </Text>
       <Text
         pointerEvents="none"
-        style={{ color: theme.colors.textSecondary, fontSize: 10 }}
+        style={{ color: theme.colors.textSecondary, fontSize: 12 }}
       >
         ASIENTOS
       </Text>

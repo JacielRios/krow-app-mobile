@@ -1,4 +1,4 @@
-import { Button, Surface } from '../../../shared/components/ui-v2';
+import { Button } from '../../../shared/components/ui-v2';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import React, { useState } from 'react';
 import {
@@ -93,7 +93,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
   const placeholder = 'Selecciona fecha y hora';
 
   return (
-    <Surface style={styles.container} contentStyle={{ padding: 18 }}>
+    <View style={styles.container}>
       {label && (
         <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
           {label}
@@ -147,8 +147,8 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           styles.inputContainer,
           {
             backgroundColor: theme.colors.surfaceOverlay,
-            borderColor: theme.colors.border,
-            borderRadius: 18,
+            borderColor: theme.colors.controlBorder,
+            borderRadius: 12,
           },
           error ? { borderColor: theme.colors.status.error } : null,
         ]}
@@ -238,7 +238,7 @@ export const RideDateTimePicker: React.FC<RideDateTimePickerProps> = ({
           is24Hour={false}
         />
       )}
-    </Surface>
+    </View>
   );
 };
 
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderRadius: 8,
     minHeight: 50,
     paddingHorizontal: 12,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 4,
   },
   iosPickerWrapper: {

@@ -217,6 +217,7 @@ export default function RegisterScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -257,7 +258,7 @@ export default function RegisterScreen({
             />
 
             <Input
-              label="ej. alumno@campus.tecnm.mx"
+              label="Correo institucional"
               placeholder="ej. alumno@campus.tecnm.mx"
               value={formData.correo}
               onChangeText={text => handleChange('correo', text)}
@@ -337,6 +338,7 @@ export default function RegisterScreen({
               onPress={handleRegister}
               loading={loading}
               style={styles.registerButton}
+              iconName="person-add"
             />
 
             <View style={styles.loginContainer}>
@@ -348,7 +350,12 @@ export default function RegisterScreen({
               >
                 ¿Ya tienes una cuenta?{' '}
               </Text>
-              <TouchableOpacity onPress={() => navigation.goBack()}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Iniciar sesión"
+                style={{ minHeight: 48, justifyContent: 'center' }}
+                onPress={() => navigation.goBack()}
+              >
                 <Text
                   style={[styles.loginLink, { color: theme.colors.primary }]}
                 >
@@ -381,11 +388,13 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    alignItems: 'center',
-    marginVertical: 30,
+    alignItems: 'flex-start',
+    marginTop: 16,
+    marginBottom: 32,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: 'bold',
     color: colors.primary,
   },
@@ -397,6 +406,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   loginContainer: {
+    minHeight: 48,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

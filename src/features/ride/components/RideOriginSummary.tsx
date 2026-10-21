@@ -9,8 +9,10 @@ import type { PlacesAutocompleteValue } from '../../maps';
 /** Un origen visible y sin controles de edición; respeta los viajes históricos. */
 export function RideOriginSummary({
   origin = CAMPUS_ORIGIN,
+  compact = false,
 }: {
   origin?: PlacesAutocompleteValue;
+  compact?: boolean;
 }) {
   const { theme } = useTheme();
   const isCampus =
@@ -30,7 +32,7 @@ export function RideOriginSummary({
         <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
           {origin.address}
         </Text>
-        {isCampus && (
+        {isCampus && !compact && (
           <Text style={[styles.address, { color: theme.colors.textSecondary }]}>
             {CAMPUS_ADDRESS}
           </Text>

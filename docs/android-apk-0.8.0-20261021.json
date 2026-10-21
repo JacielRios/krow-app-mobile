@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-21T17:44:43.8572494Z",
+  "apk": "artifacts/android/krow-0.8.0-trial.apk",
+  "sha256": "1C9C36262FE5E938981D07AFC70B00AF4CED649FE014757AC10A5DC09F13687B",
+  "bytes": 137099458,
+  "package": "com.krownmobileapp",
+  "versionCode": 13,
+  "versionName": "0.8.0-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3981660,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "firebase": {
+    "projectId": "krowapp",
+    "nativeResourcesVerified": true,
+    "pushEnabled": true,
+    "deliveryVerified": false
+  },
+  "updatedUiBundleVerified": true,
+  "features": [
+    "material-icons-and-shared-actions",
+    "requests-shortcut-with-pending-badge",
+    "real-device-notification-permission-state",
+    "shared-themed-dialogs",
+    "startup-notification-permission",
+    "automatic-registration-after-login",
+    "recurrence-batch",
+    "shared-invitations",
+    "departure-reminders",
+    "fresh-invitation-after-cancellation"
+  ],
+  "installed": false
+}

@@ -2,7 +2,11 @@ import { rideApi } from '../src/features/ride/api/rideApi';
 import { apiRequest } from '../src/core/api/apiClient';
 import { CAMPUS_ORIGIN } from '../src/features/ride/domain/driverRideRules';
 import { routeApi } from '../src/features/ride/api/routeApi';
+import { sessionAdapter } from '../src/core/auth/sessionAdapter';
 jest.mock('../src/core/api/apiClient', () => ({ apiRequest: jest.fn() }));
+jest.mock('../src/core/auth/sessionAdapter', () => ({
+  sessionAdapter: { getSession: jest.fn() },
+}));
 
 const point = { lat: 25.67, lng: -100.3 };
 const pickup = {
@@ -42,6 +46,26 @@ const search = () =>
     dropoffTransportStopId: 'catalog-dropoff',
   });
 beforeEach(() => jest.clearAllMocks());
+test('serializes date bounds as UTC instants across a local midnight', async () => {
+  jest.mocked(apiRequest).mockResolvedValue([]);
+  await rideApi.search({
+    destination: point,
+    fromTime: new Date('2030-01-02T23:30:00-06:00'),
+    toTime: new Date('2030-01-03T01:00:00-06:00'),
+  });
+  expect(
+    JSON.parse(jest.mocked(apiRequest).mock.calls[0][1]!.body as string),
+  ).toMatchObject({
+    fromTime: '2030-01-03T05:30:00.000Z',
+    toTime: '2030-01-03T07:00:00.000Z',
+  });
+  await rideApi.search({ destination: point, fromTime: null, toTime: null });
+  const unfiltered = JSON.parse(
+    jest.mocked(apiRequest).mock.calls[1][1]!.body as string,
+  );
+  expect(unfiltered).not.toHaveProperty('fromTime');
+  expect(unfiltered).not.toHaveProperty('toTime');
+});
 test('preserves cents and ride stop IDs while querying with catalog IDs', async () => {
   jest.mocked(apiRequest).mockResolvedValueOnce([result]);
   expect(await search()).toEqual([
@@ -116,6 +140,40 @@ test('search defaults to the campus but keeps a selected intermediate pickup', a
   expect(
     JSON.parse(jest.mocked(apiRequest).mock.calls[1][1]!.body as string).origin,
   ).toEqual(point);
+});
+
+test('binds an idempotent publication to its initiating account', async () => {
+  const payload = {
+    vehicle_id: 'vehicle',
+    origin_lat: 25.66,
+    origin_lng: -100.24,
+    destination_lat: 25.67,
+    destination_lng: -100.2,
+    transport_stop_ids: ['a'],
+    departure_time: '2026-10-21T18:00:00Z',
+    available_seats: 2,
+    price_per_seat: 12.34,
+  };
+  const session = { user: { id: 'driver' }, access_token: 'original-token' };
+  jest
+    .mocked(sessionAdapter.getSession)
+    .mockResolvedValue({ data: { session }, error: null } as Awaited<
+      ReturnType<typeof sessionAdapter.getSession>
+    >);
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  await rideApi.create(payload, { requestId, actorId: 'driver' });
+  expect(apiRequest).toHaveBeenCalledWith(
+    '/rides',
+    expect.objectContaining({
+      headers: { Authorization: 'Bearer original-token' },
+      body: expect.stringContaining(requestId),
+    }),
+  );
+  jest.mocked(apiRequest).mockClear();
+  await expect(
+    rideApi.create(payload, { requestId, actorId: 'another-actor' }),
+  ).rejects.toThrow('cuenta cambió');
+  expect(apiRequest).not.toHaveBeenCalled();
 });
 
 test('destination search leaves the matching tolerance to the backend configuration', async () => {

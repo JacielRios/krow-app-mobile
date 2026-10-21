@@ -1,11 +1,7 @@
 import React from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
 import { CommonActions, useNavigation } from '@react-navigation/native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-import { colors } from '../../theme/colors';
-import { radii, spacing, typography } from '../../theme/tokens';
-import { Button } from './Button';
+import { CustomAlert } from './CustomAlert';
 
 export interface RideCancelledModalProps {
   visible: boolean;
@@ -44,77 +40,13 @@ export const RideCancelledModal: React.FC<RideCancelledModalProps> = ({
   };
 
   return (
-    <Modal
+    <CustomAlert
       visible={visible}
-      transparent
-      animationType="fade"
-      // No-op: bloqueamos el back de Android para que no se cierre solo.
-      onRequestClose={() => undefined}
-      statusBarTranslucent
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <MaterialIcons
-              name="warning-amber"
-              size={32}
-              color={colors.status.warning}
-            />
-          </View>
-          <Text style={styles.title}>Viaje cancelado</Text>
-          <Text style={styles.message}>
-            El conductor canceló este viaje. Serás redirigido al inicio.
-          </Text>
-          <View style={styles.actionWrap}>
-            <Button title="Entendido" onPress={handleAcknowledge} />
-          </View>
-        </View>
-      </View>
-    </Modal>
+      type="warning"
+      title="Viaje cancelado"
+      message="El conductor canceló este viaje. Serás redirigido al inicio."
+      dismissOnBack={false}
+      onClose={handleAcknowledge}
+    />
   );
 };
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: colors.background,
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.full,
-    backgroundColor: '#FFF8E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: typography.size.xl,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  message: {
-    fontSize: typography.size.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  actionWrap: {
-    marginTop: spacing.lg,
-    width: '100%',
-  },
-});

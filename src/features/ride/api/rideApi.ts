@@ -1,4 +1,5 @@
 import { apiRequest } from '../../../core/api/apiClient';
+import { sessionAdapter } from '../../../core/auth/sessionAdapter';
 import { readActiveRideView } from './activeRideView';
 import type {
   AvailableRide,
@@ -168,10 +169,26 @@ const fromApi = (ride: ApiRide): AvailableRide => {
 };
 
 export const rideApi = {
-  async create(payload: PublishRidePayload): Promise<{ rideId: string }> {
+  async create(
+    payload: PublishRidePayload,
+    publication?: { requestId: string; actorId: string },
+  ): Promise<{ rideId: string }> {
+    let authorization: string | undefined;
+    if (publication) {
+      const { data, error } = await sessionAdapter.getSession();
+      if (
+        error ||
+        !data.session ||
+        data.session.user.id !== publication.actorId
+      )
+        throw new Error('La cuenta cambió. Abre el formulario de nuevo.');
+      authorization = `Bearer ${data.session.access_token}`;
+    }
     return apiRequest('/rides', {
       method: 'POST',
+      ...(authorization ? { headers: { Authorization: authorization } } : {}),
       body: JSON.stringify({
+        requestId: publication?.requestId,
         vehicleId: payload.vehicle_id,
         favoriteRouteId: payload.favorite_route_id,
         corridorId: payload.corridor_id,
@@ -276,9 +293,13 @@ export const rideApi = {
     apiRequest<RecentRideApiView[]>(
       `/rides/mine/recent?limit=${limit}&context=${context}`,
     ),
-  active: (context: 'driver' | 'passenger' = 'passenger') =>
+  active: (
+    context: 'driver' | 'passenger' = 'passenger',
+    expectedActorId?: string,
+  ) =>
     apiRequest<ActiveRideApiView | null>(
       '/rides/mine/active?context=' + context,
+      { expectedActorId },
     ),
   mine: (
     status?: RideStatus,

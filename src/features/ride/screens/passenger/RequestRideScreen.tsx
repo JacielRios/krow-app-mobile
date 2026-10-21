@@ -1,8 +1,10 @@
+import { KrowAlert as Alert } from '../../../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   RefreshControl,
   ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,7 +27,6 @@ import {
   Card,
   FeedbackState,
   Skeleton,
-  Surface,
 } from '../../../../shared/components/ui-v2';
 import { ScreenHeader } from '../../../../shared/components/ui-v2/ScreenHeader';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
@@ -33,6 +34,7 @@ import { bookingApi } from '../../api/bookingApi';
 import { rideApi } from '../../api/rideApi';
 import { RideCard } from '../../components/RideCard';
 import { RideOriginSummary } from '../../components/RideOriginSummary';
+import { RideDateTimePicker } from '../../components/RideDateTimePicker';
 import { CAMPUS_ORIGIN } from '../../domain/driverRideRules';
 import { formatStopDistance } from '../../domain/formatStopDistance';
 import { useRequestBooking, useSearchRides } from '../../hooks';
@@ -64,12 +66,25 @@ const formatPriceMxn = (value: number): string =>
     maximumFractionDigits: 2,
   }).format(value);
 
+const searchTimeError = (from: Date | null, to: Date | null) => {
+  if (
+    (from && !Number.isFinite(from.getTime())) ||
+    (to && !Number.isFinite(to.getTime()))
+  )
+    return 'Selecciona una fecha y hora válidas.';
+  if (from && to && from > to)
+    return 'La fecha hasta debe ser igual o posterior a la fecha desde.';
+  if (to && to.getTime() <= Date.now())
+    return 'La fecha hasta debe estar en el futuro.';
+  return undefined;
+};
+
 export const RequestRideScreen: React.FC = () => {
   const { theme } = useTheme();
   const navigation = useNavigation<RequestRideNav>();
   const insets = useSafeAreaInsets();
   const cache = useQueryClient();
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<FlatList<AvailableRide>>(null);
   const mounted = useRef(true);
   const bookingsRequest = useRef(0);
   const sendingRequest = useRef(false);
@@ -78,6 +93,10 @@ export const RequestRideScreen: React.FC = () => {
   const [destination, setDestination] =
     useState<PlacesAutocompleteValue | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showTimeFilters, setShowTimeFilters] = useState(false);
+  const [fromTime, setFromTime] = useState<Date | null>(null);
+  const [toTime, setToTime] = useState<Date | null>(null);
+  const [timeError, setTimeError] = useState<string>();
   const [requestedRideIds, setRequestedRideIds] = useState<Set<string>>(
     new Set(),
   );
@@ -111,7 +130,7 @@ export const RequestRideScreen: React.FC = () => {
     };
   }, []);
   useEffect(() => {
-    scroll.current?.scrollTo({ y: 0, animated: false });
+    scroll.current?.scrollToOffset({ offset: 0, animated: false });
   }, [stage]);
 
   const loadActiveBookings = useCallback(async () => {
@@ -141,14 +160,36 @@ export const RequestRideScreen: React.FC = () => {
 
   const loadAll = useCallback(
     async (forceSearch = false) => {
+      const error = searchTimeError(fromTime, toTime);
+      if (error) {
+        setTimeError(error);
+        setShowTimeFilters(true);
+        setStage('route');
+        setSelectedRide(null);
+        reset();
+        return;
+      }
       await Promise.all([
         destination && (hasSearched || forceSearch)
-          ? search({ maxResults: 50, destination: destination.location })
+          ? search({
+              maxResults: 50,
+              destination: destination.location,
+              ...(fromTime ? { fromTime } : {}),
+              ...(toTime ? { toTime } : {}),
+            })
           : Promise.resolve([]),
         loadActiveBookings(),
       ]);
     },
-    [destination, hasSearched, search, loadActiveBookings],
+    [
+      destination,
+      hasSearched,
+      fromTime,
+      toTime,
+      search,
+      loadActiveBookings,
+      reset,
+    ],
   );
 
   useFocusEffect(
@@ -207,9 +248,22 @@ export const RequestRideScreen: React.FC = () => {
 
   const handleSearch = () => {
     if (!destination) return;
+    const error = searchTimeError(fromTime, toTime);
+    setTimeError(error);
+    if (error) {
+      setShowTimeFilters(true);
+      return;
+    }
     setHasSearched(true);
     setStage('results');
     void loadAll(true);
+  };
+  const resetSearchResults = () => {
+    setSelectedRide(null);
+    setHasSearched(false);
+    setFeedback('');
+    setTimeError(undefined);
+    reset();
   };
   const retryStopOptions = () => {
     setStopOptionsLoading(true);
@@ -259,6 +313,8 @@ export const RequestRideScreen: React.FC = () => {
         Alert.alert(
           'No se pudo solicitar',
           error ?? 'Inténtalo de nuevo en un momento.',
+          undefined,
+          { type: 'error' },
         );
         // Recheck capacity and stop availability after concurrent ride changes.
         retryStopOptions();
@@ -287,7 +343,7 @@ export const RequestRideScreen: React.FC = () => {
     (searchLoading || bookingsLoading) && rides.length === 0 && !refreshing;
   return (
     <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <ScrollView
+      <FlatList
         ref={scroll}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
@@ -305,145 +361,220 @@ export const RequestRideScreen: React.FC = () => {
             tintColor={theme.colors.primary}
           />
         }
-      >
-        <ScreenHeader
-          title={stage === 'route' ? '¿A dónde vamos?' : 'Viajes para ti'}
-          subtitle={
-            stage === 'route'
-              ? 'Salimos del Tecnológico. Elige tu destino.'
-              : 'Primero verás las paradas más cercanas a tu destino.'
-          }
-          onBack={() =>
-            stage === 'route' ? navigation.goBack() : setStage('route')
-          }
-        />
-        <Text
-          style={{ color: theme.colors.textSecondary }}
-          accessibilityLiveRegion="polite"
-        >
-          {stage === 'route'
-            ? '1 de 2 · Tu destino'
-            : '2 de 2 · Elige viaje y bajada'}
-        </Text>
-        {stage === 'route' ? (
-          <Surface contentStyle={{ padding: 16, gap: 16 }}>
-            <RideOriginSummary />
-            <PlacePicker
-              label="Destino"
-              value={destination}
-              bias={CAMPUS_ORIGIN.location}
-              onChange={value => {
-                setDestination(value);
-                setSelectedRide(null);
-                setHasSearched(false);
-                setFeedback('');
-                reset();
-              }}
-            />
-            <Text style={{ color: theme.colors.textSecondary }}>
-              Buscaremos viajes con alguna parada conveniente. Después podrás
-              elegir dónde bajar.
-            </Text>
-            <Button
-              title="Buscar viajes"
-              disabled={!destination}
-              onPress={handleSearch}
-              loading={searchLoading}
-            />
-          </Surface>
-        ) : (
-          <Card>
-            <View style={{ gap: 12 }}>
-              <RideOriginSummary />
-              <Text style={{ color: theme.colors.textPrimary, fontSize: 16 }}>
-                Tu destino: {destination?.address}
-              </Text>
-              <Button
-                title="Cambiar destino"
-                variant="ghost"
-                onPress={() => setStage('route')}
-              />
-            </View>
-          </Card>
+        data={stage === 'results' ? rides : []}
+        keyExtractor={ride => ride.rideId}
+        renderItem={({ item: ride }) => (
+          <RideCard
+            ride={ride}
+            alreadyRequested={requestedRideIds.has(ride.rideId)}
+            requesting={requestingRideId === ride.rideId}
+            onPress={() => openRide(ride)}
+            onRequest={() => openRide(ride)}
+          />
         )}
-        {stage === 'results' && (
-          <>
-            {!!bookingsError && (
-              <FeedbackState
-                kind="error"
-                title="Revisa tus reservas"
-                description={bookingsError}
-                actionLabel="Reintentar reservas"
-                onAction={() => void loadActiveBookings()}
-              />
-            )}
-            {isInitialLoading ? (
-              <View style={{ gap: 16 }} accessibilityLabel="Cargando viajes">
-                <Skeleton height={200} />
-                <Skeleton height={200} />
-              </View>
-            ) : searchError && !rides.length ? (
-              <FeedbackState
-                kind="error"
-                title="No pudimos cargar los viajes"
-                description={searchError}
-                actionLabel="Reintentar"
-                onAction={() => void loadAll(true)}
-              />
-            ) : !rides.length ? (
-              <FeedbackState
-                title="No encontramos viajes compatibles"
-                description="Todavía no hay viajes con paradas convenientes para ese destino. Prueba otra ubicación o vuelve más tarde."
-                actionLabel="Cambiar destino"
-                onAction={() => setStage('route')}
-              />
-            ) : (
-              <>
-                <Text
-                  style={{
-                    color: theme.colors.textPrimary,
-                    fontSize: 22,
-                    fontWeight: '600',
+        ListHeaderComponent={
+          <View style={{ gap: 16 }}>
+            <ScreenHeader
+              title={stage === 'route' ? '¿A dónde vamos?' : 'Viajes para ti'}
+              subtitle={
+                stage === 'route'
+                  ? 'Salimos del Tecnológico. Elige tu destino.'
+                  : 'Primero verás las paradas más cercanas a tu destino.'
+              }
+              onBack={() =>
+                stage === 'route' ? navigation.goBack() : setStage('route')
+              }
+            />
+            <Text
+              style={{ color: theme.colors.textSecondary }}
+              accessibilityLiveRegion="polite"
+            >
+              {stage === 'route'
+                ? '1 de 2 · Tu destino'
+                : '2 de 2 · Elige viaje y bajada'}
+            </Text>
+            {stage === 'route' ? (
+              <View style={{ gap: 16 }}>
+                <RideOriginSummary />
+                <PlacePicker
+                  label="Destino"
+                  value={destination}
+                  bias={CAMPUS_ORIGIN.location}
+                  onChange={value => {
+                    setDestination(value);
+                    resetSearchResults();
                   }}
-                  accessibilityRole="header"
-                >
-                  {rides.length}{' '}
-                  {rides.length === 1
-                    ? 'viaje disponible'
-                    : 'viajes disponibles'}
-                </Text>
-                <Text style={{ color: theme.colors.textSecondary }}>
-                  Ordenados por la parada más cercana. Las distancias son
-                  aproximadas en línea recta.
-                </Text>
-                {!!searchError && (
-                  <Text style={{ color: theme.colors.status.error }}>
-                    No pudimos actualizar. Se conserva la última información.
-                  </Text>
+                />
+                <Button
+                  title="Filtrar por fecha y hora"
+                  variant="ghost"
+                  accessibilityState={{ expanded: showTimeFilters }}
+                  onPress={() => setShowTimeFilters(value => !value)}
+                />
+                {showTimeFilters && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ color: theme.colors.textSecondary }}>
+                      Opcional. Usa la hora local de tu dispositivo. Se muestran
+                      únicamente viajes publicados con salida futura.
+                    </Text>
+                    <RideDateTimePicker
+                      label="Desde (opcional)"
+                      value={fromTime}
+                      minimumDate={new Date()}
+                      onChange={value => {
+                        setFromTime(value);
+                        resetSearchResults();
+                      }}
+                    />
+                    <RideDateTimePicker
+                      label="Hasta (opcional)"
+                      value={toTime}
+                      minimumDate={fromTime ?? new Date()}
+                      error={timeError}
+                      onChange={value => {
+                        setToTime(value);
+                        resetSearchResults();
+                      }}
+                    />
+                    {(fromTime || toTime) && (
+                      <Button
+                        title="Quitar filtro de fechas"
+                        variant="text"
+                        onPress={() => {
+                          setFromTime(null);
+                          setToTime(null);
+                          resetSearchResults();
+                        }}
+                      />
+                    )}
+                  </View>
                 )}
-                {rides.map(ride => (
-                  <RideCard
-                    key={ride.rideId}
-                    ride={ride}
-                    alreadyRequested={requestedRideIds.has(ride.rideId)}
-                    requesting={requestingRideId === ride.rideId}
-                    onPress={() => openRide(ride)}
-                    onRequest={() => openRide(ride)}
+                <Text style={{ color: theme.colors.textSecondary }}>
+                  Buscaremos viajes con alguna parada conveniente. Después
+                  podrás elegir dónde bajar.
+                </Text>
+                <Button
+                  title="Buscar viajes"
+                  disabled={!destination}
+                  onPress={handleSearch}
+                  loading={searchLoading}
+                  iconName="search"
+                />
+              </View>
+            ) : (
+              <Card>
+                <View style={{ gap: 12 }}>
+                  <RideOriginSummary />
+                  <Text
+                    style={{ color: theme.colors.textPrimary, fontSize: 16 }}
+                  >
+                    Tu destino: {destination?.address}
+                  </Text>
+                  <Text style={{ color: theme.colors.textSecondary }}>
+                    {fromTime || toTime
+                      ? [
+                          fromTime &&
+                            `Desde ${fromTime.toLocaleString('es-MX')}`,
+                          toTime && `Hasta ${toTime.toLocaleString('es-MX')}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : 'Próximas salidas, sin filtro de fechas'}
+                  </Text>
+                  <Button
+                    title="Cambiar destino"
+                    variant="ghost"
+                    onPress={() => setStage('route')}
                   />
-                ))}
+                  <Button
+                    title="Cambiar fecha y hora"
+                    variant="text"
+                    onPress={() => {
+                      setShowTimeFilters(true);
+                      setStage('route');
+                    }}
+                  />
+                </View>
+              </Card>
+            )}
+            {stage === 'results' && (
+              <>
+                {!!bookingsError && (
+                  <FeedbackState
+                    kind="error"
+                    title="Revisa tus reservas"
+                    description={bookingsError}
+                    actionLabel="Reintentar reservas"
+                    onAction={() => void loadActiveBookings()}
+                  />
+                )}
+                {isInitialLoading ? (
+                  <View
+                    style={{ gap: 16 }}
+                    accessibilityLabel="Cargando viajes"
+                  >
+                    <Skeleton height={200} />
+                    <Skeleton height={200} />
+                  </View>
+                ) : searchError && !rides.length ? (
+                  <FeedbackState
+                    kind="error"
+                    title="No pudimos cargar los viajes"
+                    description={searchError}
+                    actionLabel="Reintentar"
+                    onAction={() => void loadAll(true)}
+                  />
+                ) : !rides.length ? (
+                  <FeedbackState
+                    title="No encontramos viajes compatibles"
+                    description={
+                      fromTime || toTime
+                        ? 'No hay viajes publicados con paradas convenientes dentro de ese horario. Prueba otro rango de fechas o destino.'
+                        : 'Todavía no hay viajes con paradas convenientes para ese destino. Prueba otra ubicación o vuelve más tarde.'
+                    }
+                    actionLabel="Cambiar destino"
+                    onAction={() => setStage('route')}
+                  />
+                ) : (
+                  <>
+                    <Text
+                      style={{
+                        color: theme.colors.textPrimary,
+                        fontSize: 22,
+                        fontWeight: '600',
+                      }}
+                      accessibilityRole="header"
+                    >
+                      {rides.length}{' '}
+                      {rides.length === 1
+                        ? 'viaje disponible'
+                        : 'viajes disponibles'}
+                    </Text>
+                    <Text style={{ color: theme.colors.textSecondary }}>
+                      Ordenados por la parada más cercana. Las distancias son
+                      aproximadas en línea recta.
+                    </Text>
+                    {!!searchError && (
+                      <Text style={{ color: theme.colors.status.error }}>
+                        No pudimos actualizar. Se conserva la última
+                        información.
+                      </Text>
+                    )}
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
-        {!!feedback && (
-          <Text
-            style={{ color: theme.colors.textPrimary }}
-            accessibilityLiveRegion="polite"
-          >
-            {feedback}
-          </Text>
-        )}
-      </ScrollView>
+            {!!feedback && (
+              <Text
+                style={{ color: theme.colors.textPrimary }}
+                accessibilityLiveRegion="polite"
+              >
+                {feedback}
+              </Text>
+            )}
+          </View>
+        }
+      />
       <RideDetailModal
         ride={selectedRide}
         requestedDestination={destination}
@@ -518,328 +649,349 @@ const RideDetailModal: React.FC<{
     >
       <View style={styles.modalHandle} />
       {ride && (
-        <ScrollView
-          style={styles.modalScroll}
-          contentContainerStyle={styles.modalContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.modalHeader}>
-            <Avatar name={ride.driverName ?? 'Conductor'} size="lg" />
-            <View style={styles.modalHeaderText}>
-              <Text
-                style={[
-                  styles.modalDriver,
-                  { color: theme.colors.textPrimary },
-                ]}
-              >
-                {ride.driverName ?? 'Conductor'}
-              </Text>
-              {ride.driverRating != null && (
-                <View style={styles.ratingRow}>
-                  <MaterialIcons
-                    name="star"
-                    size={14}
-                    color={theme.colors.status.warning}
-                  />
-                  <Text
-                    style={[
-                      styles.ratingText,
-                      { color: theme.colors.textSecondary },
-                    ]}
-                  >
-                    {ride.driverRating.toFixed(1)}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <StatusBadge tone="info" label="Programado" size="sm" />
-          </View>
-
-          <View style={styles.modalMapWrap}>
-            <RoutePreviewMap
-              origin={ride.origin}
-              destination={ride.destination}
-              encodedPolyline={ride.routePolyline}
-              height={200}
-              interactive
-              extraMarkers={[
-                ...(stopPairs[0]
-                  ? [
-                      {
-                        id: 'campus-pickup',
-                        point: stopPairs[0].pickup.location,
-                        color: theme.colors.status.success,
-                        iconName: 'login',
-                        accessibilityLabel:
-                          'Subida en el Tecnológico: ' +
-                          stopPairs[0].pickup.name,
-                      },
-                    ]
-                  : []),
-                ...(requestedDestination
-                  ? [
-                      {
-                        id: 'requested-destination',
-                        point: requestedDestination.location,
-                        color: theme.colors.status.warning,
-                        iconName: 'flag',
-                        accessibilityLabel:
-                          'Tu destino: ' + requestedDestination.address,
-                      },
-                    ]
-                  : []),
-                ...stopPairs.map((pair, index) => ({
-                  id: 'dropoff-' + pair.dropoff.stopId,
-                  point: pair.dropoff.location,
-                  color:
-                    index === selectedPairIndex
-                      ? theme.colors.status.success
-                      : theme.colors.primary,
-                  iconName: 'directions-bus',
-                  selected: index === selectedPairIndex,
-                  label: String(index + 1),
-                  accessibilityLabel: `Bajada ${index + 1}: ${
-                    pair.dropoff.name
-                  }. ${formatStopDistance(
-                    pair.dropoff.distanceMeters,
-                  )} aproximadamente de tu destino`,
-                  onPress: () => {
-                    if (!requesting && !stopOptionsLoading) onSelectPair(index);
-                  },
-                })),
-              ]}
-            />
-          </View>
-
+        <>
           <View
-            style={[
-              styles.modalRouteBlock,
-              { backgroundColor: theme.colors.surfaceOverlay },
-            ]}
+            style={{
+              paddingHorizontal: 20,
+              paddingBottom: 8,
+              alignItems: 'flex-end',
+            }}
           >
-            <View style={styles.modalRouteRow}>
-              <MaterialIcons
-                name="trip-origin"
-                size={16}
-                color={theme.colors.primary}
-              />
-              <Text
-                style={[
-                  styles.modalRouteText,
-                  { color: theme.colors.textPrimary },
-                ]}
-              >
-                {ride.originAddress ?? 'Origen sin dirección'}
-              </Text>
-            </View>
-            <View style={styles.modalRouteRow}>
-              <MaterialIcons
-                name="place"
-                size={16}
-                color={colors.status.error}
-              />
-              <Text
-                style={[
-                  styles.modalRouteText,
-                  { color: theme.colors.textPrimary },
-                ]}
-              >
-                {ride.destinationAddress ?? 'Destino sin dirección'}
-              </Text>
-            </View>
+            <IconButton
+              variant="plain"
+              disabled={requesting}
+              onPress={onClose}
+              iconName="close"
+              accessibilityLabel="Cerrar"
+            />
           </View>
-
-          <View style={styles.modalDetailGrid}>
-            <DetailItem
-              iconName="flag"
-              label="Tu destino"
-              value={requestedDestination?.address ?? 'Destino seleccionado'}
-            />
-            {!!ride.corridorName && (
-              <DetailItem
-                iconName="alt-route"
-                label="Avenida principal"
-                value={ride.corridorName}
-              />
-            )}
-            <DetailItem
-              iconName="login"
-              label="Subida en el Tecnológico"
-              value={
-                stopPairs[selectedPairIndex]?.pickup.name ??
-                ride.bestPickupStop.name
-              }
-            />
-            <DetailItem
-              iconName="schedule"
-              label="Salida"
-              value={formatDeparture(ride.departureTime)}
-            />
-            <DetailItem
-              iconName="event-seat"
-              label="Asientos"
-              value={`${ride.availableSeats} disponible${
-                ride.availableSeats === 1 ? '' : 's'
-              }`}
-            />
-            <DetailItem
-              iconName="payments"
-              label="Precio"
-              value={`${formatPriceMxn(ride.pricePerSeat)} / asiento`}
-            />
-            {ride.vehicle && (
-              <DetailItem
-                iconName="directions-car"
-                label="Vehículo"
-                value={[
-                  ride.vehicle.brand,
-                  ride.vehicle.model,
-                  ride.vehicle.licensePlate,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
-            )}
-          </View>
-
-          <Text
-            style={[
-              styles.stopOptionsTitle,
-              { color: theme.colors.textPrimary },
-            ]}
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalContent}
+            keyboardShouldPersistTaps="handled"
           >
-            Elige dónde bajar
-          </Text>
-          <Text
-            style={[
-              styles.stopOptionsHint,
-              { color: theme.colors.textSecondary },
-            ]}
-          >
-            Puedes elegir cualquier parada habilitada de este viaje.
-            Recomendamos la más cercana; las distancias son aproximadas en línea
-            recta.
-          </Text>
-          {stopOptionsLoading ? (
-            <Skeleton height={84} style={styles.stopOptionSkeleton} />
-          ) : stopOptionsError ? (
-            <FeedbackState
-              kind="error"
-              title="No pudimos cargar las paradas"
-              description={stopOptionsError}
-              actionLabel="Reintentar paradas"
-              onAction={onRetry}
-            />
-          ) : stopPairs.length === 0 ? (
-            <FeedbackState
-              title="No hay bajadas disponibles"
-              description="El conductor actualizó este viaje. Cierra el detalle y consulta otros viajes."
-            />
-          ) : (
-            stopPairs.map((pair, index) => {
-              const selected = index === selectedPairIndex;
-              return (
-                <TouchableOpacity
-                  key={`${pair.pickup.stopId}-${pair.dropoff.stopId}`}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`Bajada ${index + 1}: ${
-                    pair.dropoff.name
-                  }, ${formatStopDistance(
-                    pair.dropoff.distanceMeters,
-                  )} aproximadamente de tu destino${
-                    pair.dropoff.stopId === recommendedDropoffId
-                      ? ', recomendada'
-                      : ''
-                  }`}
-                  accessibilityState={{ selected, disabled: requesting }}
-                  disabled={requesting}
-                  onPress={() => {
-                    if (!stopOptionsLoading) onSelectPair(index);
-                  }}
+            <View style={styles.modalHeader}>
+              <Avatar name={ride.driverName ?? 'Conductor'} size="lg" />
+              <View style={styles.modalHeaderText}>
+                <Text
                   style={[
-                    styles.stopOption,
-                    {
-                      borderColor: selected
-                        ? theme.colors.primary
-                        : theme.colors.border,
-                      backgroundColor: selected
-                        ? theme.colors.primarySoft
-                        : theme.colors.surfaceRaised,
-                    },
+                    styles.modalDriver,
+                    { color: theme.colors.textPrimary },
                   ]}
                 >
-                  <MaterialIcons
-                    name={
-                      selected
-                        ? 'radio-button-checked'
-                        : 'radio-button-unchecked'
-                    }
-                    size={22}
-                    color={
-                      selected ? theme.colors.primary : theme.colors.textMuted
-                    }
-                  />
-                  <View style={styles.stopOptionCopy}>
+                  {ride.driverName ?? 'Conductor'}
+                </Text>
+                {ride.driverRating != null && (
+                  <View style={styles.ratingRow}>
+                    <MaterialIcons
+                      name="star"
+                      size={14}
+                      color={theme.colors.status.warning}
+                    />
                     <Text
                       style={[
-                        styles.stopOptionName,
-                        { color: theme.colors.textPrimary },
-                      ]}
-                    >
-                      {index + 1}. {pair.dropoff.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.stopOptionName,
-                        { color: theme.colors.textPrimary },
-                      ]}
-                    >
-                      {pair.dropoff.stopId === recommendedDropoffId
-                        ? 'Recomendada · la más cercana'
-                        : pair.dropoff.address}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.stopOptionDistance,
+                        styles.ratingText,
                         { color: theme.colors.textSecondary },
                       ]}
                     >
-                      {formatStopDistance(pair.dropoff.distanceMeters)} aprox.
-                      de tu destino
+                      {ride.driverRating.toFixed(1)}
                     </Text>
                   </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
+                )}
+              </View>
+              <StatusBadge tone="info" label="Programado" size="sm" />
+            </View>
 
-          <Button
-            title={
-              alreadyRequested
-                ? 'Ya solicitaste este viaje'
-                : requesting
-                ? 'Enviando solicitud...'
-                : 'Solicitar unirse'
-            }
-            onPress={onRequest}
-            disabled={
-              alreadyRequested ||
-              requesting ||
-              stopOptionsLoading ||
-              !!stopOptionsError ||
-              stopPairs.length === 0
-            }
-            loading={requesting}
-            variant={alreadyRequested ? 'ghost' : 'primary'}
-            style={styles.modalCta}
-          />
-          <Button
-            title="Cerrar"
-            variant="outline"
-            disabled={requesting}
-            onPress={onClose}
-          />
-        </ScrollView>
+            <View style={styles.modalMapWrap}>
+              <RoutePreviewMap
+                origin={ride.origin}
+                destination={ride.destination}
+                encodedPolyline={ride.routePolyline}
+                height={200}
+                interactive
+                extraMarkers={[
+                  ...(stopPairs[0]
+                    ? [
+                        {
+                          id: 'campus-pickup',
+                          point: stopPairs[0].pickup.location,
+                          color: theme.colors.status.success,
+                          iconName: 'login',
+                          accessibilityLabel:
+                            'Subida en el Tecnológico: ' +
+                            stopPairs[0].pickup.name,
+                        },
+                      ]
+                    : []),
+                  ...(requestedDestination
+                    ? [
+                        {
+                          id: 'requested-destination',
+                          point: requestedDestination.location,
+                          color: theme.colors.status.warning,
+                          iconName: 'flag',
+                          accessibilityLabel:
+                            'Tu destino: ' + requestedDestination.address,
+                        },
+                      ]
+                    : []),
+                  ...stopPairs.map((pair, index) => ({
+                    id: 'dropoff-' + pair.dropoff.stopId,
+                    point: pair.dropoff.location,
+                    color:
+                      index === selectedPairIndex
+                        ? theme.colors.status.success
+                        : theme.colors.primary,
+                    iconName: 'directions-bus',
+                    selected: index === selectedPairIndex,
+                    label: String(index + 1),
+                    accessibilityLabel: `Bajada ${index + 1}: ${
+                      pair.dropoff.name
+                    }. ${formatStopDistance(
+                      pair.dropoff.distanceMeters,
+                    )} aproximadamente de tu destino`,
+                    onPress: () => {
+                      if (!requesting && !stopOptionsLoading)
+                        onSelectPair(index);
+                    },
+                  })),
+                ]}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.modalRouteBlock,
+                { backgroundColor: theme.colors.surfaceOverlay },
+              ]}
+            >
+              <View style={styles.modalRouteRow}>
+                <MaterialIcons
+                  name="trip-origin"
+                  size={16}
+                  color={theme.colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.modalRouteText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  {ride.originAddress ?? 'Origen sin dirección'}
+                </Text>
+              </View>
+              <View style={styles.modalRouteRow}>
+                <MaterialIcons
+                  name="place"
+                  size={16}
+                  color={colors.status.error}
+                />
+                <Text
+                  style={[
+                    styles.modalRouteText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  {ride.destinationAddress ?? 'Destino sin dirección'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalDetailGrid}>
+              <DetailItem
+                iconName="flag"
+                label="Tu destino"
+                value={requestedDestination?.address ?? 'Destino seleccionado'}
+              />
+              {!!ride.corridorName && (
+                <DetailItem
+                  iconName="alt-route"
+                  label="Avenida principal"
+                  value={ride.corridorName}
+                />
+              )}
+              <DetailItem
+                iconName="login"
+                label="Subida en el Tecnológico"
+                value={
+                  stopPairs[selectedPairIndex]?.pickup.name ??
+                  ride.bestPickupStop.name
+                }
+              />
+              <DetailItem
+                iconName="schedule"
+                label="Salida"
+                value={formatDeparture(ride.departureTime)}
+              />
+              <DetailItem
+                iconName="event-seat"
+                label="Asientos"
+                value={`${ride.availableSeats} disponible${
+                  ride.availableSeats === 1 ? '' : 's'
+                }`}
+              />
+              <DetailItem
+                iconName="payments"
+                label="Precio"
+                value={`${formatPriceMxn(ride.pricePerSeat)} / asiento`}
+              />
+              {ride.vehicle && (
+                <DetailItem
+                  iconName="directions-car"
+                  label="Vehículo"
+                  value={[
+                    ride.vehicle.brand,
+                    ride.vehicle.model,
+                    ride.vehicle.licensePlate,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
+              )}
+            </View>
+
+            <Text
+              style={[
+                styles.stopOptionsTitle,
+                { color: theme.colors.textPrimary },
+              ]}
+            >
+              Elige dónde bajar
+            </Text>
+            <Text
+              style={[
+                styles.stopOptionsHint,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              Puedes elegir cualquier parada habilitada de este viaje.
+              Recomendamos la más cercana; las distancias son aproximadas en
+              línea recta.
+            </Text>
+            {stopOptionsLoading ? (
+              <Skeleton height={84} style={styles.stopOptionSkeleton} />
+            ) : stopOptionsError ? (
+              <FeedbackState
+                kind="error"
+                title="No pudimos cargar las paradas"
+                description={stopOptionsError}
+                actionLabel="Reintentar paradas"
+                onAction={onRetry}
+              />
+            ) : stopPairs.length === 0 ? (
+              <FeedbackState
+                title="No hay bajadas disponibles"
+                description="El conductor actualizó este viaje. Cierra el detalle y consulta otros viajes."
+              />
+            ) : (
+              stopPairs.map((pair, index) => {
+                const selected = index === selectedPairIndex;
+                return (
+                  <TouchableOpacity
+                    key={`${pair.pickup.stopId}-${pair.dropoff.stopId}`}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Bajada ${index + 1}: ${
+                      pair.dropoff.name
+                    }, ${formatStopDistance(
+                      pair.dropoff.distanceMeters,
+                    )} aproximadamente de tu destino${
+                      pair.dropoff.stopId === recommendedDropoffId
+                        ? ', recomendada'
+                        : ''
+                    }`}
+                    accessibilityState={{ selected, disabled: requesting }}
+                    disabled={requesting}
+                    onPress={() => {
+                      if (!stopOptionsLoading) onSelectPair(index);
+                    }}
+                    style={[
+                      styles.stopOption,
+                      {
+                        borderColor: selected
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                        backgroundColor: selected
+                          ? theme.colors.primarySoft
+                          : theme.colors.surfaceRaised,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={
+                        selected
+                          ? 'radio-button-checked'
+                          : 'radio-button-unchecked'
+                      }
+                      size={22}
+                      color={
+                        selected ? theme.colors.primary : theme.colors.textMuted
+                      }
+                    />
+                    <View style={styles.stopOptionCopy}>
+                      <Text
+                        style={[
+                          styles.stopOptionName,
+                          { color: theme.colors.textPrimary },
+                        ]}
+                      >
+                        {index + 1}. {pair.dropoff.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.stopOptionName,
+                          { color: theme.colors.textPrimary },
+                        ]}
+                      >
+                        {pair.dropoff.stopId === recommendedDropoffId
+                          ? 'Recomendada · la más cercana'
+                          : pair.dropoff.address}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.stopOptionDistance,
+                          { color: theme.colors.textSecondary },
+                        ]}
+                      >
+                        {formatStopDistance(pair.dropoff.distanceMeters)} aprox.
+                        de tu destino
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              borderTopWidth: 0.5,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <Button
+              title={
+                alreadyRequested
+                  ? 'Ya solicitaste este viaje'
+                  : requesting
+                  ? 'Enviando solicitud...'
+                  : 'Solicitar unirse'
+              }
+              onPress={onRequest}
+              disabled={
+                alreadyRequested ||
+                requesting ||
+                stopOptionsLoading ||
+                !!stopOptionsError ||
+                stopPairs.length === 0
+              }
+              loading={requesting}
+              variant={alreadyRequested ? 'ghost' : 'primary'}
+              style={styles.modalCta}
+              iconName={alreadyRequested ? 'check' : 'event-seat'}
+            />
+          </View>
+        </>
       )}
     </AnimatedModal>
   );
@@ -958,7 +1110,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailLabel: {
-    fontSize: typography.size.xs,
+    fontSize: typography.size.sm,
     color: colors.text.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -987,8 +1139,7 @@ const styles = StyleSheet.create({
   },
   stopOption: {
     minHeight: 84,
-    borderWidth: 1.5,
-    borderRadius: radii.md,
+    borderBottomWidth: 0.5,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',

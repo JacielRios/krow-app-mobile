@@ -29,7 +29,7 @@ class KrowMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         if (!getSharedPreferences("krow_push", 0).getBoolean("session_active", false)) return
         val recipient = message.data["recipientId"]
-        if (recipient != null && recipient != getSharedPreferences("krow_push",0).getString("actor_id",null)) return
+        if (recipient == null || recipient != getSharedPreferences("krow_push",0).getString("actor_id",null)) return
         val ride = message.data["rideId"] ?: return
         val id = message.data["intentId"] ?: return
         try { UUID.fromString(ride); UUID.fromString(id) } catch (_: Exception) { return }
@@ -40,13 +40,19 @@ class KrowMessagingService : FirebaseMessagingService() {
         if (origin.scheme != "https" || origin.host.isNullOrBlank()) return
         createChannel(this)
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return
-        val uri = origin.buildUpon().appendPath("rides").appendPath(ride).build()
+        val link = origin.buildUpon().appendPath("rides").appendPath(ride)
+        val booking = if (message.data["kind"] == "booking") message.data["bookingId"] else null
+        if (booking != null) {
+            try { UUID.fromString(booking) } catch (_: Exception) { return }
+            link.appendQueryParameter("bookingId", booking)
+        }
+        val uri = link.build()
         val intent = Intent(this, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(uri)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(this, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("KROW · Actualización de viaje")
-            .setContentText("Abre tu viaje para consultar la información actual.")
+            .setContentTitle(if (message.data["kind"] == "reminder") "KROW · Tu viaje sale pronto" else "KROW · Actualización de viaje")
+            .setContentText(if (message.data["kind"] == "reminder") "Revisa el horario y tu parada antes de salir." else "Abre tu viaje para consultar la información actual.")
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setContentIntent(pending)
             .addAction(0, "Ver viaje", pending).setAutoCancel(true).setTimeoutAfter(remaining)
             .setPriority(NotificationCompat.PRIORITY_HIGH).build()

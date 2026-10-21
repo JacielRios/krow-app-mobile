@@ -26,6 +26,7 @@ jest.mock('react-native-maps', () => {
     }),
     Marker: View,
     Polyline: View,
+    Circle: View,
   };
 });
 let tree: Renderer.ReactTestRenderer;
@@ -150,7 +151,13 @@ test('tracking keeps its map and moves the camera only for new live coordinates'
   expect(mockCamera).not.toHaveBeenCalled();
   await act(() => tree.update(render(point.lat + 0.001, false, 'new-route')));
   expect(mockCamera).toHaveBeenCalledTimes(1);
-  expect(tree.root.findAllByType(IconButton)).toHaveLength(1);
+  expect(
+    tree.root
+      .findAllByType(IconButton)
+      .map(node => node.props.accessibilityLabel),
+  ).toEqual(
+    expect.arrayContaining(['Centrar recorrido', 'Siguiendo vehículo']),
+  );
   mockCamera.mockClear();
   await act(() => tree.update(render(point.lat + 0.002, true)));
   expect(mockCamera).not.toHaveBeenCalled();
@@ -236,6 +243,8 @@ test('oversized tracking panel padding preserves visible map space', async () =>
     );
   });
   await layOutMap(300);
+  expect(map().props.mapPadding).toBeUndefined();
+  await act(() => map().props.onMapReady());
   const padding = map().props.mapPadding;
   expect(padding.top + padding.bottom).toBeLessThanOrEqual(300 - 144);
 });

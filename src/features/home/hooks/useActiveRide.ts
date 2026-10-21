@@ -15,8 +15,9 @@ export function useActiveRide(): UseActiveRideResult {
   const context = user?.role === 'conductor' ? 'driver' : 'passenger';
   const q = useQuery({
     queryKey: ['active-ride', user?.userId, context],
-    queryFn: () => rideApi.active(context),
-    enabled: !!user,
+    queryFn: () => rideApi.active(context, user!.userId),
+    enabled: !!user && !user.offlineSavedAt,
+    refetchOnWindowFocus: 'always',
     refetchInterval: focused ? 5000 : false,
   });
   return {

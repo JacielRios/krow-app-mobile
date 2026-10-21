@@ -1,15 +1,15 @@
+import { KrowAlert as Alert } from '../../../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useEffect, useState } from 'react';
 import Config from 'react-native-config';
 import { runtimeApi } from '../../../ride-runtime/runtimeApi';
 import { nativeNavigation } from '../../../ride-runtime/nativeNavigation';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -21,17 +21,17 @@ import type {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-import { colors } from '../../../../shared/theme/colors';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../../shared/theme/legacyTheme';
 import { radii, spacing, typography } from '../../../../shared/theme/tokens';
 import { Avatar } from '../../../../shared/components/ui/Avatar';
 import { Button } from '../../../../shared/components/ui/Button';
 import { StatusBadge } from '../../../../shared/components/ui/StatusBadge';
 import { RideCancelledModal } from '../../../../shared/components/ui/RideCancelledModal';
 import { rideApi } from '../../api/rideApi';
-import {
-  useRideScheduled,
-  useUpdateBookingStatus,
-} from '../../hooks';
+import { useRideScheduled, useUpdateBookingStatus } from '../../hooks';
 import type {
   BookingRequest,
   BookingStatus,
@@ -85,6 +85,8 @@ const renderBookingStatusBadge = (status: BookingStatus) => {
 };
 
 export const RideScheduledScreen: React.FC = () => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const navigation = useNavigation<RideScheduledNav>();
   const route = useRoute<RideScheduledRouteProp>();
   const insets = useSafeAreaInsets();
@@ -145,12 +147,28 @@ export const RideScheduledScreen: React.FC = () => {
         {data?.ride && data.role === 'conductor' && (
           <RideMetaCard ride={data.ride} />
         )}
-        {Config.KROW_RUNTIME_ENABLED === 'true' && nativeNavigation.available && data?.role === 'conductor' && (
-          <Button title="Preparar navegación del viaje" onPress={() => {
-            void runtimeApi.enroll(rideId).then(() => navigation.replace('RuntimeRide', { rideId }))
-              .catch(cause => Alert.alert('No se pudo preparar', cause instanceof Error ? cause.message : 'Intenta de nuevo'));
-          }} />
-        )}
+        {Config.KROW_RUNTIME_ENABLED === 'true' &&
+          nativeNavigation.available &&
+          data?.role === 'conductor' && (
+            <Button
+              title="Preparar navegación del viaje"
+              onPress={() => {
+                void runtimeApi
+                  .enroll(rideId)
+                  .then(() => navigation.replace('RuntimeRide', { rideId }))
+                  .catch(cause =>
+                    Alert.alert(
+                      'No se pudo preparar',
+                      cause instanceof Error
+                        ? cause.message
+                        : 'Intenta de nuevo',
+                      undefined,
+                      { type: 'error' },
+                    ),
+                  );
+              }}
+            />
+          )}
 
         {showInitialLoader ? (
           <View style={styles.centered}>
@@ -192,55 +210,61 @@ const ScreenHeader: React.FC<{
   title: string;
   subtitle: string | null;
   onBack: () => void;
-}> = ({ title, subtitle, onBack }) => (
-  <View style={styles.header}>
-    <TouchableOpacity
-      onPress={onBack}
-      style={styles.backBtn}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <MaterialIcons
-        name="arrow-back"
-        size={24}
+}> = ({ title, subtitle, onBack }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.header}>
+      <IconButton
+        onPress={onBack}
+        style={styles.backBtn}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel="Volver a la pantalla anterior"
+        iconName="arrow-back"
+        variant="plain"
         color={colors.text.primary}
       />
-    </TouchableOpacity>
-    <View style={styles.headerText}>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle && (
-        <Text style={styles.subtitle} numberOfLines={2}>
-          {subtitle}
-        </Text>
-      )}
+      <View style={styles.headerText}>
+        <Text style={styles.title}>{title}</Text>
+        {subtitle && (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
-const RideMetaCard: React.FC<{ ride: RideHeader }> = ({ ride }) => (
-  <View style={styles.metaCard}>
-    <View style={styles.metaRow}>
-      <MaterialIcons
-        name="schedule"
-        size={16}
-        color={colors.text.secondary}
-      />
-      <Text style={styles.metaText}>Sale {formatTime(ride.departureTime)}</Text>
+const RideMetaCard: React.FC<{ ride: RideHeader }> = ({ ride }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.metaCard}>
+      <View style={styles.metaRow}>
+        <MaterialIcons
+          name="schedule"
+          size={16}
+          color={colors.text.secondary}
+        />
+        <Text style={styles.metaText}>
+          Sale {formatTime(ride.departureTime)}
+        </Text>
+      </View>
+      <View style={styles.metaSeparator} />
+      <View style={styles.metaRow}>
+        <MaterialIcons
+          name="event-seat"
+          size={16}
+          color={colors.text.secondary}
+        />
+        <Text style={styles.metaText}>
+          {ride.availableSeats} asiento
+          {ride.availableSeats === 1 ? '' : 's'} disponible
+          {ride.availableSeats === 1 ? '' : 's'}
+        </Text>
+      </View>
     </View>
-    <View style={styles.metaSeparator} />
-    <View style={styles.metaRow}>
-      <MaterialIcons
-        name="event-seat"
-        size={16}
-        color={colors.text.secondary}
-      />
-      <Text style={styles.metaText}>
-        {ride.availableSeats} asiento
-        {ride.availableSeats === 1 ? '' : 's'} disponible
-        {ride.availableSeats === 1 ? '' : 's'}
-      </Text>
-    </View>
-  </View>
-);
+  );
+};
 
 // =====================================================================
 // Vista conductor
@@ -254,6 +278,8 @@ const DriverView: React.FC<{
   navigation: RideScheduledNav;
   reload: () => void;
 }> = ({ data, navigation, reload }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { ride, pendingBookings, confirmedBookings } = data;
   const { updateStatus } = useUpdateBookingStatus();
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
@@ -275,7 +301,12 @@ const DriverView: React.FC<{
     );
     setActionBookingId(null);
     if (!success) {
-      Alert.alert('No se pudo confirmar', err ?? 'Inténtalo de nuevo.');
+      Alert.alert(
+        'No se pudo confirmar',
+        err ?? 'Inténtalo de nuevo.',
+        undefined,
+        { type: 'error' },
+      );
       return;
     }
     reload();
@@ -301,7 +332,9 @@ const DriverView: React.FC<{
             );
             setActionBookingId(null);
             if (!success) {
-              Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+              Alert.alert('Error', err ?? 'Inténtalo de nuevo.', undefined, {
+                type: 'error',
+              });
               return;
             }
             reload();
@@ -318,7 +351,12 @@ const DriverView: React.FC<{
       await rideApi.start(ride.rideId);
     } catch (error: any) {
       setRideAction(null);
-      Alert.alert('No se pudo iniciar el viaje', error?.message ?? 'Inténtalo de nuevo.');
+      Alert.alert(
+        'No se pudo iniciar el viaje',
+        error?.message ?? 'Inténtalo de nuevo.',
+        undefined,
+        { type: 'error' },
+      );
       return;
     }
     setRideAction(null);
@@ -341,7 +379,12 @@ const DriverView: React.FC<{
               await rideApi.cancel(ride.rideId);
             } catch (error: any) {
               setRideAction(null);
-              Alert.alert('Error', error?.message ?? 'No se pudo cancelar el viaje.');
+              Alert.alert(
+                'Error',
+                error?.message ?? 'No se pudo cancelar el viaje.',
+                undefined,
+                { type: 'error' },
+              );
               return;
             }
             setRideAction(null);
@@ -426,9 +469,7 @@ const DriverView: React.FC<{
           />
         )}
         <Button
-          title={
-            rideAction === 'cancelling' ? 'Cancelando…' : 'Cancelar viaje'
-          }
+          title={rideAction === 'cancelling' ? 'Cancelando…' : 'Cancelar viaje'}
           variant="outline"
           onPress={handleCancelRide}
           loading={rideAction === 'cancelling'}
@@ -444,21 +485,24 @@ const Section: React.FC<{
   count: number;
   emptyMessage: string;
   children: React.ReactNode;
-}> = ({ title, count, emptyMessage, children }) => (
-  <View style={styles.section}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCountBadge}>
-        <Text style={styles.sectionCountText}>{count}</Text>
+}> = ({ title, count, emptyMessage, children }) => {
+  const { styles } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={styles.sectionCountBadge}>
+          <Text style={styles.sectionCountText}>{count}</Text>
+        </View>
       </View>
+      {count === 0 ? (
+        <Text style={styles.sectionEmpty}>{emptyMessage}</Text>
+      ) : (
+        children
+      )}
     </View>
-    {count === 0 ? (
-      <Text style={styles.sectionEmpty}>{emptyMessage}</Text>
-    ) : (
-      children
-    )}
-  </View>
-);
+  );
+};
 
 const BookingCard: React.FC<{
   booking: BookingRequest;
@@ -477,6 +521,8 @@ const BookingCard: React.FC<{
   busy,
   anyActionBusy,
 }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const seatsAfterConfirm = rideAvailableSeats - booking.seatsReserved;
   const insufficientSeats = showActions && seatsAfterConfirm < 0;
   const passengerName = booking.passenger.fullName ?? 'Pasajero';
@@ -568,6 +614,8 @@ const PassengerView: React.FC<{
   data: PassengerData;
   reload: () => void;
 }> = ({ data, reload }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const { ride, myBooking, conductorInfo, vehicleInfo } = data;
   const { updateStatus } = useUpdateBookingStatus();
   const [cancelling, setCancelling] = useState(false);
@@ -606,7 +654,9 @@ const PassengerView: React.FC<{
             );
             setCancelling(false);
             if (!success) {
-              Alert.alert('Error', err ?? 'Inténtalo de nuevo.');
+              Alert.alert('Error', err ?? 'Inténtalo de nuevo.', undefined, {
+                type: 'error',
+              });
               return;
             }
             reload();
@@ -656,47 +706,52 @@ const PassengerView: React.FC<{
   );
 };
 
-const RoutePanel: React.FC<{ ride: RideHeader }> = ({ ride }) => (
-  <View style={styles.passengerCard}>
-    <View style={styles.routeRow}>
-      <MaterialIcons
-        name="trip-origin"
-        size={16}
-        color={colors.primary}
-        style={styles.routeIcon}
-      />
-      <Text style={styles.routeText} numberOfLines={2}>
-        {ride.originAddress ?? 'Origen'}
-      </Text>
+const RoutePanel: React.FC<{ ride: RideHeader }> = ({ ride }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  return (
+    <View style={styles.passengerCard}>
+      <View style={styles.routeRow}>
+        <MaterialIcons
+          name="trip-origin"
+          size={16}
+          color={colors.primary}
+          style={styles.routeIcon}
+        />
+        <Text style={styles.routeText} numberOfLines={2}>
+          {ride.originAddress ?? 'Origen'}
+        </Text>
+      </View>
+      <View style={styles.routeDivider} />
+      <View style={styles.routeRow}>
+        <MaterialIcons
+          name="place"
+          size={16}
+          color={colors.status.error}
+          style={styles.routeIcon}
+        />
+        <Text style={styles.routeText} numberOfLines={2}>
+          {ride.destinationAddress ?? 'Destino'}
+        </Text>
+      </View>
+      <View style={styles.routeFooter}>
+        <MaterialIcons
+          name="schedule"
+          size={14}
+          color={colors.text.secondary}
+        />
+        <Text style={styles.routeFooterText}>
+          Sale {formatTime(ride.departureTime)}
+        </Text>
+      </View>
     </View>
-    <View style={styles.routeDivider} />
-    <View style={styles.routeRow}>
-      <MaterialIcons
-        name="place"
-        size={16}
-        color={colors.status.error}
-        style={styles.routeIcon}
-      />
-      <Text style={styles.routeText} numberOfLines={2}>
-        {ride.destinationAddress ?? 'Destino'}
-      </Text>
-    </View>
-    <View style={styles.routeFooter}>
-      <MaterialIcons
-        name="schedule"
-        size={14}
-        color={colors.text.secondary}
-      />
-      <Text style={styles.routeFooterText}>
-        Sale {formatTime(ride.departureTime)}
-      </Text>
-    </View>
-  </View>
-);
+  );
+};
 
 const ConductorBlock: React.FC<{ conductor: ConductorInfo | null }> = ({
   conductor,
 }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   if (!conductor) {
     return (
       <Text style={styles.passengerEmptyText}>
@@ -707,11 +762,7 @@ const ConductorBlock: React.FC<{ conductor: ConductorInfo | null }> = ({
   const name = conductor.fullName ?? 'Conductor';
   return (
     <View style={styles.driverRow}>
-      <Avatar
-        uri={conductor.profilePhoto ?? undefined}
-        name={name}
-        size="md"
-      />
+      <Avatar uri={conductor.profilePhoto ?? undefined} name={name} size="md" />
       <View style={styles.driverRowText}>
         <Text style={styles.passengerName}>{name}</Text>
         {conductor.rating != null && (
@@ -721,9 +772,7 @@ const ConductorBlock: React.FC<{ conductor: ConductorInfo | null }> = ({
               size={14}
               color={colors.status.warning}
             />
-            <Text style={styles.ratingText}>
-              {conductor.rating.toFixed(1)}
-            </Text>
+            <Text style={styles.ratingText}>{conductor.rating.toFixed(1)}</Text>
           </View>
         )}
       </View>
@@ -732,6 +781,8 @@ const ConductorBlock: React.FC<{ conductor: ConductorInfo | null }> = ({
 };
 
 const VehicleBlock: React.FC<{ vehicle: VehicleInfo }> = ({ vehicle }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const title =
     [vehicle.brand, vehicle.model].filter(Boolean).join(' ') || 'Vehículo';
   const detailsParts: string[] = [];
@@ -740,18 +791,12 @@ const VehicleBlock: React.FC<{ vehicle: VehicleInfo }> = ({ vehicle }) => {
   return (
     <View style={styles.vehicleRow}>
       <View style={styles.vehicleIconWrap}>
-        <MaterialIcons
-          name="directions-car"
-          size={20}
-          color={colors.primary}
-        />
+        <MaterialIcons name="directions-car" size={20} color={colors.primary} />
       </View>
       <View style={styles.vehicleText}>
         <Text style={styles.vehicleTitle}>{title}</Text>
         {detailsParts.length > 0 && (
-          <Text style={styles.vehicleSubtitle}>
-            {detailsParts.join(' · ')}
-          </Text>
+          <Text style={styles.vehicleSubtitle}>{detailsParts.join(' · ')}</Text>
         )}
       </View>
     </View>
@@ -761,6 +806,8 @@ const VehicleBlock: React.FC<{ vehicle: VehicleInfo }> = ({ vehicle }) => {
 const BookingStatusMessage: React.FC<{ booking: MyBooking }> = ({
   booking,
 }) => {
+  const { styles } = useThemedStyles(createStyles);
+
   switch (booking.status) {
     case 'pending':
       return (
@@ -805,289 +852,288 @@ const BookingStatusMessage: React.FC<{ booking: MyBooking }> = ({
 // Estilos
 // =====================================================================
 
-const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    paddingHorizontal: spacing.lg,
-    flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: typography.size.xxl,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  metaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  metaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.primary,
-  },
-  cardMetaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  metaSeparator: {
-    width: 1,
-    height: 20,
-    backgroundColor: colors.border.default,
-    marginHorizontal: spacing.sm,
-  },
-  centered: {
-    paddingVertical: spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centeredTitle: {
-    marginTop: spacing.md,
-    fontSize: typography.size.xl,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  centeredText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    paddingHorizontal: spacing.md,
-    lineHeight: 22,
-  },
-  centeredErrorText: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.md,
-    color: colors.status.error,
-    textAlign: 'center',
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  sectionCountBadge: {
-    marginLeft: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  sectionCountText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary,
-  },
-  sectionEmpty: {
-    fontSize: typography.size.sm,
-    color: colors.text.muted,
-    fontStyle: 'italic',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  cardHeaderText: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  passengerName: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  ratingText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF8E1',
-    borderRadius: radii.md,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  warningText: {
-    marginLeft: spacing.sm,
-    fontSize: typography.size.sm,
-    color: '#E65100',
-    flex: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    columnGap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  actionItem: {
-    flex: 1,
-  },
-  driverActionStack: {
-    rowGap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  // Vista pasajero
-  passengerCard: {
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  passengerCardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  passengerCardLabel: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  passengerEmptyText: {
-    fontSize: typography.size.sm,
-    color: colors.text.muted,
-    fontStyle: 'italic',
-  },
-  passengerStatusMessage: {
-    fontSize: typography.size.md,
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-  passengerCancelWrap: {
-    marginTop: spacing.sm,
-  },
-  driverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  driverRowText: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  vehicleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  vehicleIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  vehicleText: {
-    flex: 1,
-  },
-  vehicleTitle: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  vehicleSubtitle: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  routeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeIcon: {
-    width: 24,
-    marginRight: spacing.xs,
-  },
-  routeText: {
-    flex: 1,
-    fontSize: typography.size.md,
-    color: colors.text.primary,
-  },
-  routeDivider: {
-    height: 16,
-    width: 1,
-    backgroundColor: colors.border.default,
-    marginLeft: 11,
-    marginVertical: spacing.xs,
-  },
-  routeFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  routeFooterText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    scroll: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      paddingHorizontal: spacing.lg,
+      flexGrow: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: spacing.md,
+    },
+    backBtn: {
+      width: 48,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    headerText: {
+      flex: 1,
+    },
+    title: {
+      fontSize: typography.size.xxl,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+    },
+    subtitle: {
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    metaCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    metaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.primary,
+    },
+    cardMetaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    metaSeparator: {
+      width: 1,
+      height: 20,
+      backgroundColor: colors.border.default,
+      marginHorizontal: spacing.sm,
+    },
+    centered: {
+      paddingVertical: spacing.xxl,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centeredTitle: {
+      marginTop: spacing.md,
+      fontSize: typography.size.xl,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+    },
+    centeredText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      paddingHorizontal: spacing.md,
+      lineHeight: 22,
+    },
+    centeredErrorText: {
+      marginTop: spacing.sm,
+      fontSize: typography.size.md,
+      color: colors.status.error,
+      textAlign: 'center',
+    },
+    section: {
+      marginBottom: spacing.xl,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    sectionTitle: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.bold,
+      color: colors.text.primary,
+    },
+    sectionCountBadge: {
+      marginLeft: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radii.full,
+      backgroundColor: colors.surface,
+      minWidth: 24,
+      alignItems: 'center',
+    },
+    sectionCountText: {
+      fontSize: typography.size.sm,
+      fontWeight: typography.weight.semibold,
+      color: colors.primary,
+    },
+    sectionEmpty: {
+      fontSize: typography.size.sm,
+      color: colors.text.muted,
+      fontStyle: 'italic',
+    },
+    card: {
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border.default,
+      marginBottom: spacing.md,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    cardHeaderText: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    passengerName: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 2,
+    },
+    ratingText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    warningBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    warningText: {
+      marginLeft: spacing.sm,
+      fontSize: typography.size.sm,
+      color: colors.status.warning,
+      flex: 1,
+    },
+    actions: {
+      flexDirection: 'row',
+      columnGap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    actionItem: {
+      flex: 1,
+    },
+    driverActionStack: {
+      rowGap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    // Vista pasajero
+    passengerCard: {
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border.default,
+      marginBottom: spacing.md,
+    },
+    passengerCardHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    passengerCardLabel: {
+      fontSize: typography.size.sm,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    passengerEmptyText: {
+      fontSize: typography.size.sm,
+      color: colors.text.muted,
+      fontStyle: 'italic',
+    },
+    passengerStatusMessage: {
+      fontSize: typography.size.md,
+      color: colors.text.primary,
+      lineHeight: 22,
+    },
+    passengerCancelWrap: {
+      marginTop: spacing.sm,
+    },
+    driverRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    driverRowText: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    vehicleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+    },
+    vehicleIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: radii.full,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    vehicleText: {
+      flex: 1,
+    },
+    vehicleTitle: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    vehicleSubtitle: {
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    routeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    routeIcon: {
+      width: 24,
+      marginRight: spacing.xs,
+    },
+    routeText: {
+      flex: 1,
+      fontSize: typography.size.md,
+      color: colors.text.primary,
+    },
+    routeDivider: {
+      height: 16,
+      width: 1,
+      backgroundColor: colors.border.default,
+      marginLeft: 11,
+      marginVertical: spacing.xs,
+    },
+    routeFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+    },
+    routeFooterText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+  });

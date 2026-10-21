@@ -1,6 +1,7 @@
+import { KrowAlert as Alert } from '../src/shared/components/ui-v2/dialogService';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import * as Keychain from 'react-native-keychain';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button, Input } from '../src/shared/components/ui-v2';
@@ -14,6 +15,7 @@ import { rideApi } from '../src/features/ride/api/rideApi';
 import type { FavoriteRoute, RideDetail } from '../src/features/ride/types';
 import { CAMPUS_ORIGIN } from '../src/features/ride/domain/driverRideRules';
 import { RideOriginSummary } from '../src/features/ride/components/RideOriginSummary';
+import { RecurrencePicker } from '../src/features/ride/components/RecurrencePicker';
 
 const mockNavigation = {
   replace: jest.fn(),
@@ -130,8 +132,34 @@ jest.mock('../src/features/ride/api/routeApi', () => ({
 
 let tree: Renderer.ReactTestRenderer;
 let cache: QueryClient;
+const publicationStorage = new Map<string, string>();
 beforeEach(() => {
   jest.clearAllMocks();
+  Object.defineProperty(globalThis, 'crypto', {
+    value: require('node:crypto').webcrypto,
+    configurable: true,
+  });
+  publicationStorage.clear();
+  jest.mocked(Keychain.getGenericPassword).mockImplementation(async options => {
+    const password = publicationStorage.get(options?.service ?? '');
+    return password
+      ? {
+          username: 'publication',
+          password,
+          service: options!.service!,
+          storage: 'Keystore' as Keychain.STORAGE_TYPE,
+        }
+      : false;
+  });
+  jest
+    .mocked(Keychain.setGenericPassword)
+    .mockImplementation(async (_user, password, options) => {
+      publicationStorage.set(options?.service ?? '', password);
+      return {
+        service: options?.service ?? '',
+        storage: 'Keystore' as Keychain.STORAGE_TYPE,
+      };
+    });
   mockParams = {};
   mockFavorites = [];
   mockRide = null;
@@ -140,7 +168,7 @@ beforeEach(() => {
   jest.mocked(rideApi.create).mockResolvedValue({ rideId: 'ride' });
   mockCreateFavorite.mockResolvedValue({ routeId: 'saved-favorite' });
   mockUpdateFavorite.mockResolvedValue({ routeId: 'saved-favorite' });
-  jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  jest.spyOn(Alert, 'alert').mockImplementation(() => 0);
 });
 afterEach(async () => {
   await act(() => tree?.unmount());
@@ -215,6 +243,61 @@ async function selectStop(stopId: string) {
       .onPress(),
   );
 }
+
+test('review presents real facts and ordered numbered stops without changing the publish payload', async () => {
+  await mount();
+  await chooseDestination();
+  await selectStop('b');
+  await fillDetails();
+  await act(() => button('Continuar').props.onPress());
+  const markers = tree.root.findByType(RoutePreviewMap).props.extraMarkers;
+  expect(
+    markers.map((marker: { id: string; label: string; selected: boolean }) => [
+      marker.id,
+      marker.label,
+      marker.selected,
+    ]),
+  ).toEqual([
+    ['a', '1', false],
+    ['b', '2', false],
+    ['c', '3', false],
+  ]);
+  expect(button('Ver las 3 paradas')).toBeDefined();
+  await act(() => button('Ver las 3 paradas').props.onPress());
+  expect(
+    button('Mostrar menos paradas').props.accessibilityState.expanded,
+  ).toBe(true);
+  expect(JSON.stringify(tree.toJSON())).toContain('Por asiento');
+  expect(rideApi.create).not.toHaveBeenCalled();
+});
+
+test('recurrence previews dates before confirmation and publishes each with its own durable ID', async () => {
+  jest.mocked(rideApi.create).mockImplementation(async (_payload, request) => ({
+    rideId: request!.requestId,
+  }));
+  await mount();
+  await chooseDestination();
+  await fillDetails();
+  await act(() => tree.root.findByType(RecurrencePicker).props.onToggle());
+  await act(() => tree.root.findByType(RecurrencePicker).props.onWeeks(2));
+  expect(tree.root.findByType(RecurrencePicker).props.dates).toHaveLength(2);
+  expect(rideApi.create).not.toHaveBeenCalled();
+  await act(() => button('Continuar').props.onPress());
+  expect(tree.root.findByType(RecurrencePicker).props.previewOnly).toBe(true);
+  const send = button('Publicar 2 viajes').props.onPress;
+  await act(async () => {
+    send();
+    send();
+  });
+  expect(rideApi.create).toHaveBeenCalledTimes(2);
+  const calls = jest.mocked(rideApi.create).mock.calls;
+  expect(calls[0][1]?.requestId).not.toBe(calls[1][1]?.requestId);
+  expect(calls[0][0].transport_stop_ids).toEqual(
+    calls[1][0].transport_stop_ids,
+  );
+  expect(calls[0][0].departure_time).not.toBe(calls[1][0].departure_time);
+  expect(mockNavigation.replace).toHaveBeenCalledWith('DriverTrips');
+});
 test('repeated taps publish once and keep the committed favorite when publication fails', async () => {
   let resolve!: (value: { rideId: string }) => void;
   jest.mocked(rideApi.create).mockRejectedValueOnce(new Error('Sin red'));
@@ -251,6 +334,9 @@ test('repeated taps publish once and keep the committed favorite when publicatio
     expect.objectContaining({ routeId: 'saved-favorite' }),
   );
   expect(rideApi.create).toHaveBeenCalledTimes(2);
+  expect(jest.mocked(rideApi.create).mock.calls[1][1]).toEqual(
+    jest.mocked(rideApi.create).mock.calls[0][1],
+  );
   await act(async () => resolve({ rideId: 'ride' }));
   expect(mockNavigation.replace).toHaveBeenCalledWith('RideScheduled', {
     rideId: 'ride',
@@ -300,6 +386,44 @@ test('recalculating a favorite preserves its corridor and only its selected cata
       origin_lng: CAMPUS_ORIGIN.location.lng,
       origin_address: CAMPUS_ORIGIN.address,
     }),
+    expect.objectContaining({
+      actorId: 'driver',
+      requestId: expect.any(String),
+    }),
+  );
+});
+
+test('updates all ride lists after publication and keeps success when a refresh fails', async () => {
+  await mount();
+  await chooseDestination();
+  await fillDetails();
+  await act(() => button('Continuar').props.onPress());
+  const invalidate = jest.spyOn(cache, 'invalidateQueries');
+  invalidate.mockRejectedValueOnce(new Error('Refresh unavailable'));
+  await act(async () => button('Publicar viaje').props.onPress());
+  for (const key of ['driver-rides', 'activity', 'recent-rides', 'active-ride'])
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: [key] });
+  expect(mockNavigation.replace).toHaveBeenCalledWith('RideScheduled', {
+    rideId: 'ride',
+  });
+  await act(async () => button('Publicar viaje').props.onPress());
+  expect(rideApi.create).toHaveBeenCalledTimes(1);
+});
+
+test('does not publish when its retry identifier could not be saved securely', async () => {
+  await mount();
+  await chooseDestination();
+  await fillDetails();
+  await act(() => button('Continuar').props.onPress());
+  jest.mocked(Keychain.setGenericPassword).mockResolvedValueOnce(false);
+  await act(async () => button('Publicar viaje').props.onPress());
+  expect(rideApi.create).not.toHaveBeenCalled();
+  expect(mockNavigation.replace).not.toHaveBeenCalled();
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'No se pudo publicar',
+    expect.stringContaining('forma segura'),
+    undefined,
+    { type: 'error' },
   );
 });
 
@@ -364,6 +488,10 @@ test('a new route needs an avenue and explicit stop selection; compatible stops 
     expect.objectContaining({
       corridor_id: 'avenue-one',
       transport_stop_ids: ['b'],
+    }),
+    expect.objectContaining({
+      actorId: 'driver',
+      requestId: expect.any(String),
     }),
   );
 });

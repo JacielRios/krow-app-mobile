@@ -1,5 +1,12 @@
+import { IconButton } from '../../shared/components/ui-v2';
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, FlatList, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  FlatList,
+  View,
+} from 'react-native';
 import {
   useNavigation,
   useRoute,
@@ -7,7 +14,7 @@ import {
 } from '@react-navigation/native';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCurrentUserRole } from '../home/hooks/useCurrentUserRole';
-import { pilotApi } from './pilotApi';
+import { pilotApi, type Message } from './pilotApi';
 import { newId } from './nativeTracking';
 import {
   ScreenContainer,
@@ -30,10 +37,29 @@ export function ChatScreen() {
   } = useCurrentUserRole();
   const focused = useIsFocused();
   const { theme } = useTheme();
+  const list = useRef<FlatList<Message>>(null);
+  const nearBottom = useRef(true);
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current += 1;
+    nearBottom.current = true;
+    setBody('');
+    setPending(null);
+    setFeedback('');
+    setSending(false);
+    sendPending.current = false;
+  }, [bookingId, user?.userId]);
+  useEffect(() => {
+    const listener = Keyboard.addListener('keyboardDidShow', () => {
+      if (nearBottom.current) list.current?.scrollToEnd({ animated: false });
+    });
+    return () => listener.remove();
+  }, []);
   const q = useInfiniteQuery({
     queryKey: ['chat', user?.userId, bookingId],
     enabled: !!user,
-    queryFn: ({ pageParam }) => pilotApi.messages(bookingId, pageParam),
+    queryFn: ({ pageParam }) =>
+      pilotApi.messages(bookingId, pageParam, user!.userId),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: last => last.nextCursor ?? undefined,
     refetchInterval: focused ? 5000 : false,
@@ -58,30 +84,38 @@ export function ChatScreen() {
     ...new Map(
       (q.data?.pages.flatMap(p => p.messages) ?? []).map(m => [m.messageId, m]),
     ).values(),
-  ];
+  ].sort(
+    (a, b) =>
+      Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+      a.messageId.localeCompare(b.messageId),
+  );
   const send = async () => {
     if (sendPending.current || !canWrite || (!body.trim() && !pending)) return;
     sendPending.current = true;
+    const revision = generation.current;
     const draft = pending ?? { clientId: newId(), body: body.trim() };
     setPending(draft);
     setSending(true);
     try {
-      await pilotApi.send(bookingId, draft.clientId, draft.body);
-      if (!mounted.current) return;
+      await pilotApi.send(bookingId, draft.clientId, draft.body, user!.userId);
+      if (!mounted.current || revision !== generation.current) return;
+      nearBottom.current = true;
       setBody('');
       setPending(null);
       setFeedback('Mensaje enviado');
       await q.refetch();
     } catch (e) {
-      if (mounted.current)
+      if (mounted.current && revision === generation.current)
         setFeedback(
           e instanceof Error
             ? e.message
             : 'No pudimos enviar. Puedes reintentar.',
         );
     } finally {
-      sendPending.current = false;
-      if (mounted.current) setSending(false);
+      if (revision === generation.current) {
+        sendPending.current = false;
+        if (mounted.current) setSending(false);
+      }
     }
   };
   return (
@@ -95,14 +129,40 @@ export function ChatScreen() {
           onBack={() => nav.goBack()}
         />
         <FlatList
-          inverted
+          ref={list}
           data={messages}
           keyExtractor={m => m.messageId}
           contentContainerStyle={{ gap: 12, paddingVertical: 16 }}
-          onEndReached={() => {
-            if (q.hasNextPage && !q.isFetchingNextPage) void q.fetchNextPage();
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={
+            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+          }
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onScroll={event => {
+            const { layoutMeasurement, contentOffset, contentSize } =
+              event.nativeEvent;
+            nearBottom.current =
+              contentSize.height - contentOffset.y - layoutMeasurement.height <
+              80;
           }}
-          onEndReachedThreshold={0.2}
+          scrollEventThrottle={32}
+          onContentSizeChange={() => {
+            if (nearBottom.current)
+              list.current?.scrollToEnd({ animated: false });
+          }}
+          ListHeaderComponent={
+            q.hasNextPage ? (
+              <Button
+                title="Cargar mensajes anteriores"
+                variant="text"
+                loading={q.isFetchingNextPage}
+                onPress={() => {
+                  nearBottom.current = false;
+                  if (!q.isFetchingNextPage) void q.fetchNextPage();
+                }}
+              />
+            ) : null
+          }
           ListEmptyComponent={
             <FeedbackState
               title={
@@ -115,6 +175,15 @@ export function ChatScreen() {
           }
           renderItem={({ item: m }) => (
             <Card
+              variant="filled"
+              padding="sm"
+              contentStyle={{
+                padding: 12,
+                backgroundColor:
+                  m.senderId === user?.userId
+                    ? theme.colors.primarySoft
+                    : theme.colors.surface,
+              }}
               style={{
                 alignSelf:
                   m.senderId === user?.userId ? 'flex-end' : 'flex-start',
@@ -146,20 +215,35 @@ export function ChatScreen() {
         )}
         {!!feedback && <Text accessibilityLiveRegion="polite">{feedback}</Text>}
         {canWrite ? (
-          <View style={{ paddingTop: 12 }}>
+          <View
+            style={{
+              paddingTop: 12,
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              gap: 8,
+            }}
+          >
             <Input
               label="Mensaje"
+              compact
+              containerStyle={{ flex: 1, width: undefined, marginBottom: 0 }}
+              style={{ maxHeight: 144 }}
               value={body}
               onChangeText={setBody}
               editable={!pending && !sending}
               multiline
               maxLength={2000}
             />
-            <Button
-              title={pending ? 'Reintentar envío' : 'Enviar mensaje'}
+            <IconButton
               onPress={() => void send()}
               disabled={!body.trim() && !pending}
               loading={sending}
+              iconName={pending ? 'refresh' : 'send'}
+              accessibilityLabel={
+                pending ? 'Reintentar envío' : 'Enviar mensaje'
+              }
+              variant="filled"
+              style={{ alignSelf: 'flex-end', marginBottom: 2 }}
             />
           </View>
         ) : q.data ? (

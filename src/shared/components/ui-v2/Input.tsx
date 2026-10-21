@@ -7,7 +7,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { depth } from '../../theme/materials';
 import { useTheme } from '../../theme/ThemeProvider';
 
 export interface InputProps extends TextInputProps {
@@ -17,6 +16,7 @@ export interface InputProps extends TextInputProps {
   icon?: React.ReactNode;
   rightElement?: React.ReactNode;
   success?: boolean;
+  compact?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -31,6 +31,7 @@ export const Input = forwardRef<RNTextInput, InputProps>(
       style,
       containerStyle,
       success,
+      compact = false,
       secureTextEntry,
       autoCapitalize,
       autoCorrect,
@@ -48,7 +49,7 @@ export const Input = forwardRef<RNTextInput, InputProps>(
       ? theme.colors.status.success
       : focused
       ? theme.colors.primary
-      : theme.colors.border;
+      : theme.colors.controlBorder;
     return (
       <View
         style={[
@@ -70,18 +71,23 @@ export const Input = forwardRef<RNTextInput, InputProps>(
         ) : null}
         <View
           style={{
-            ...depth(theme, 1),
             flexDirection: 'row',
             alignItems: 'center',
-            borderRadius: theme.radii.md,
-            backgroundColor: theme.colors.surfaceRaised,
-            minHeight: 50,
+            borderRadius: theme.radii.sm,
+            backgroundColor: theme.colors.surface,
+            minHeight: rest.multiline && !compact ? 112 : 52,
             borderColor,
-            borderWidth: focused || error || success ? 1.5 : 1,
+            borderWidth: 1,
           }}
         >
           {icon ? (
-            <View style={{ paddingLeft: theme.spacing.md }}>{icon}</View>
+            <View
+              style={{ paddingLeft: theme.spacing.md }}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {icon}
+            </View>
           ) : null}
           <RNTextInput
             {...rest}
@@ -96,10 +102,13 @@ export const Input = forwardRef<RNTextInput, InputProps>(
                 paddingVertical: theme.spacing.sm + 4,
                 fontSize: theme.typography.size.lg,
                 color: theme.colors.textPrimary,
+                textAlignVertical: rest.multiline ? 'top' : 'center',
+                minHeight: rest.multiline && !compact ? 110 : 50,
               },
               style,
             ]}
             placeholderTextColor={theme.colors.textMuted}
+            selectionColor={theme.colors.primary}
             secureTextEntry={secureTextEntry}
             autoCapitalize={
               autoCapitalize ?? (secureTextEntry ? 'none' : undefined)
@@ -113,7 +122,10 @@ export const Input = forwardRef<RNTextInput, InputProps>(
               setFocused(false);
               onBlur?.(event);
             }}
-            accessibilityState={{ disabled: Boolean(rest.editable === false) }}
+            accessibilityState={{
+              ...rest.accessibilityState,
+              disabled: Boolean(rest.editable === false),
+            }}
           />
           {rightElement ? (
             <View style={{ paddingRight: theme.spacing.md }}>

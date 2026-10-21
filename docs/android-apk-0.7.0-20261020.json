@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-20T22:23:17.8019286Z",
+  "apk": "artifacts/android/krow-0.7.0-trial.apk",
+  "sha256": "2BCFC430CE425955CE4A9C0524279F8D23F0CAAA384EE9A101411861F1DB05E1",
+  "bytes": 137078114,
+  "package": "com.krownmobileapp",
+  "versionCode": 12,
+  "versionName": "0.7.0-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3960320,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "firebase": {
+    "projectId": "krowapp",
+    "nativeResourcesVerified": true,
+    "pushEnabled": true,
+    "deliveryVerified": false
+  },
+  "features": [
+    "startup-notification-permission",
+    "automatic-registration-after-login",
+    "recurrence-batch",
+    "shared-invitations",
+    "departure-reminders",
+    "fresh-invitation-after-cancellation"
+  ],
+  "installed": false
+}

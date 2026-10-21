@@ -1,0 +1,42 @@
+{
+  "checkedAt": "2026-10-20T20:55:56.9334785Z",
+  "apk": "artifacts\\android\\krow-0.5.3-trial.apk",
+  "sha256": "2DF4BAE4F0B4ACE510CECDD72E31D1449C91C43DC730BA23B87E8D0CDF3DAEEA",
+  "bytes": 137027226,
+  "package": "com.krownmobileapp",
+  "versionCode": 10,
+  "versionName": "0.5.3-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3909432,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "firebase": {
+    "projectId": "krowapp",
+    "appId": "1:671728344534:android:8b8c61c0ec6b88fe801877",
+    "nativeResourcesVerified": true,
+    "clientConfigIgnoredByGit": true,
+    "pushEnabled": false,
+    "deliveryVerified": false
+  },
+  "linkOrigin": "https://krow-web-gamma.vercel.app",
+  "nativeManifestLinksVerified": true,
+  "installationGate": "API compatibility block cleared; ready for private device acceptance; Supabase Auth link verification pending",
+  "apiCompatibility": {
+    "checkedAt": "2026-10-20T21:08:50.879Z",
+    "deploymentId": "5d625538-76ab-4961-890d-493a72978442",
+    "status": "SUCCESS",
+    "requestIdAccepted": true,
+    "httpChecksPassed": 11,
+    "rebuildRequired": false
+  }
+}

@@ -1,10 +1,12 @@
+import { IconButton } from '../../../../shared/components/ui-v2';
+import { TripRoute, TripStatus } from '../../components/TripPresentation';
+import { ScreenHeader } from '../../../../shared/components/ui-v2/ScreenHeader';
 import { AmbientBackground } from '../../../../shared/components/ui-v2';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
 import {
@@ -12,7 +14,7 @@ import {
   Card,
   FeedbackState,
   Skeleton,
-  StatusBadge,
+  SegmentedControl,
 } from '../../../../shared/components/ui-v2';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { radii, spacing, typography } from '../../../../shared/theme/tokens';
@@ -26,14 +28,6 @@ const labels: Record<Tab, string> = {
   upcoming: 'Próximos',
   active: 'Activos',
   history: 'Historial',
-};
-
-const statusLabel: Record<DriverRideListItem['status'], string> = {
-  scheduled: 'Programado',
-  full: 'Lleno',
-  in_progress: 'En curso',
-  completed: 'Completado',
-  cancelled: 'Cancelado',
 };
 
 export const DriverTripsScreen: React.FC = () => {
@@ -69,167 +63,151 @@ export const DriverTripsScreen: React.FC = () => {
   return (
     <View style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <AmbientBackground />
-      <ScrollView
+      <FlatList
+        data={visible}
+        keyExtractor={trip => trip.rideId}
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: insets.top + spacing.md,
-            paddingBottom: insets.bottom + spacing.xl,
+            paddingTop: insets.top + 16,
+            paddingBottom: insets.bottom + 32,
           },
         ]}
-      >
-        <View style={styles.header}>
-          <Button
-            title="Volver"
-            variant="ghost"
-            size="sm"
-            fullWidth={false}
-            onPress={() => navigation.goBack()}
-          />
-          <View style={styles.headerCopy}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-              Mis viajes
-            </Text>
-            <Text
-              style={[styles.subtitle, { color: theme.colors.textSecondary }]}
-            >
-              Consulta, edita o continúa tus viajes publicados.
-            </Text>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.tabs,
-            { backgroundColor: theme.colors.surfaceOverlay },
-          ]}
-        >
-          {(Object.keys(labels) as Tab[]).map(item => (
-            <Button
-              key={item}
-              title={labels[item]}
-              size="sm"
-              variant={tab === item ? 'primary' : 'ghost'}
-              fullWidth={false}
-              onPress={() => setTab(item)}
-              style={styles.tab}
+        ListHeaderComponent={
+          <View style={{ gap: 16 }}>
+            <ScreenHeader
+              title="Mis viajes"
+              subtitle="Consulta, edita o continúa tus viajes publicados."
+              onBack={() => navigation.goBack()}
             />
-          ))}
-        </View>
-
-        {loading ? (
-          <>
-            <Skeleton height={160} />
-            <Skeleton height={160} style={{ marginTop: spacing.md }} />
-          </>
-        ) : error ? (
-          <FeedbackState
-            kind="error"
-            title="No pudimos cargar tus viajes"
-            description={error}
-            actionLabel="Reintentar"
-            onAction={() => reload()}
-          />
-        ) : visible.length === 0 ? (
-          <FeedbackState
-            title="No hay viajes en esta sección"
-            description={
-              tab === 'upcoming'
-                ? 'Publica un viaje para verlo aquí.'
-                : 'Cuando cambien de estado aparecerán aquí.'
-            }
-          />
-        ) : (
-          visible.map(trip => (
-            <Card
-              key={trip.rideId}
-              variant="outlined"
-              style={styles.card}
-              onPress={() => openTrip(trip)}
-            >
-              <View style={styles.cardHeader}>
-                <StatusBadge
-                  label={statusLabel[trip.status]}
-                  tone={
-                    trip.status === 'cancelled'
-                      ? 'error'
-                      : trip.status === 'completed'
-                      ? 'success'
-                      : 'info'
-                  }
-                  size="sm"
-                />
-                <Text
-                  style={[styles.date, { color: theme.colors.textSecondary }]}
-                >
-                  {new Date(trip.departureTime).toLocaleString('es-MX')}
-                </Text>
-              </View>
-              <Text style={[styles.route, { color: theme.colors.textPrimary }]}>
-                {trip.originAddress ?? 'Origen'} →{' '}
-                {trip.destinationAddress ?? 'Destino'}
+            <SegmentedControl
+              value={tab}
+              onChange={setTab}
+              options={(Object.keys(labels) as Tab[]).map(value => ({
+                value,
+                label: labels[value],
+              }))}
+            />
+            {!!error && !!visible.length && (
+              <Text style={{ color: theme.colors.status.error }}>
+                No pudimos actualizar. Se conserva la última información.
               </Text>
-              <View style={styles.meta}>
+            )}
+          </View>
+        }
+        renderItem={({ item: trip }) => (
+          <Card
+            variant="flat"
+            style={[
+              styles.card,
+              {
+                paddingVertical: 20,
+                borderBottomWidth: 0.5,
+                borderBottomColor: theme.colors.border,
+              },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <TripStatus status={trip.status} />
+              <Text
+                style={[styles.date, { color: theme.colors.textSecondary }]}
+              >
+                {new Date(trip.departureTime).toLocaleString('es-MX')}
+              </Text>
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <TripRoute
+                origin={trip.originAddress}
+                destination={trip.destinationAddress}
+                compact
+              />
+            </View>
+            <View style={styles.meta}>
+              <Text style={{ color: theme.colors.textSecondary }}>
+                {trip.availableSeats} asientos
+              </Text>
+              <Text style={{ color: theme.colors.textSecondary }}>
+                ${(trip.pricePerSeatCents / 100).toFixed(2)} MXN
+              </Text>
+              {trip.activeBookings > 0 && (
                 <Text style={{ color: theme.colors.textSecondary }}>
-                  {trip.availableSeats} asientos
+                  {trip.activeBookings} reservas activas
                 </Text>
-                <Text style={{ color: theme.colors.textSecondary }}>
-                  ${(trip.pricePerSeatCents / 100).toFixed(2)} MXN
-                </Text>
-                {trip.activeBookings > 0 && (
-                  <Text style={{ color: theme.colors.textSecondary }}>
-                    {trip.activeBookings} reservas activas
-                  </Text>
-                )}
-              </View>
-              <View style={styles.actions}>
-                <Button
-                  title="Ver viaje"
-                  variant="outline"
+              )}
+            </View>
+            <View style={styles.actions}>
+              <Button
+                title="Ver viaje"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={() => openTrip(trip)}
+              />
+              {trip.status === 'scheduled' && (
+                <IconButton
+                  variant="plain"
                   size="sm"
-                  onPress={() => openTrip(trip)}
+                  disabled={!trip.canEdit}
+                  onPress={() =>
+                    navigation.navigate('PublishRide', {
+                      editRideId: trip.rideId,
+                    })
+                  }
+                  iconName={trip.canEdit ? 'edit' : 'lock-outline'}
+                  accessibilityLabel={
+                    trip.canEdit
+                      ? 'Editar viaje'
+                      : 'Edición bloqueada por reservas activas'
+                  }
+                  accessibilityHint="Abre los datos del viaje para modificarlos."
                 />
-                {trip.status === 'scheduled' && (
-                  <Button
-                    title={trip.canEdit ? 'Editar' : 'Edición bloqueada'}
-                    size="sm"
-                    disabled={!trip.canEdit}
-                    leftIcon={
-                      <MaterialIcons
-                        name={trip.canEdit ? 'edit' : 'lock'}
-                        size={18}
-                        color={theme.colors.textInverse}
-                      />
-                    }
-                    onPress={() =>
-                      navigation.navigate('PublishRide', {
-                        editRideId: trip.rideId,
-                      })
-                    }
-                  />
-                )}
-                {trip.status === 'scheduled' && !trip.canEdit && (
-                  <Text
-                    style={[
-                      styles.blockReason,
-                      { color: theme.colors.textSecondary },
-                    ]}
-                  >
-                    Hay reservas activas; aún puedes cancelar desde el detalle.
-                  </Text>
-                )}
-              </View>
-            </Card>
-          ))
+              )}
+              {trip.status === 'scheduled' && !trip.canEdit && (
+                <Text
+                  style={[
+                    styles.blockReason,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  Hay reservas activas; aún puedes cancelar desde el detalle.
+                </Text>
+              )}
+            </View>
+          </Card>
         )}
-        {!loading && hasMore && (
-          <Button
-            title="Cargar más viajes"
-            variant="outline"
-            loading={loadingMore}
-            onPress={() => loadMore()}
-          />
-        )}
-      </ScrollView>
+        ListEmptyComponent={
+          loading ? (
+            <Skeleton height={160} />
+          ) : error ? (
+            <FeedbackState
+              kind="error"
+              title="No pudimos cargar tus viajes"
+              description={error}
+              actionLabel="Reintentar"
+              onAction={() => reload()}
+            />
+          ) : (
+            <FeedbackState
+              title="No hay viajes en esta sección"
+              description={
+                tab === 'upcoming'
+                  ? 'Publica un viaje para verlo aquí.'
+                  : 'Cuando cambien de estado aparecerán aquí.'
+              }
+            />
+          )
+        }
+        ListFooterComponent={
+          !loading && hasMore ? (
+            <Button
+              title="Cargar más"
+              variant="ghost"
+              loading={loadingMore}
+              onPress={() => loadMore()}
+            />
+          ) : null
+        }
+      />
     </View>
   );
 };
@@ -270,6 +248,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.sm,
   },
-  actions: { gap: spacing.sm, marginTop: spacing.md },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
   blockReason: { fontSize: typography.size.sm, lineHeight: 18 },
 });

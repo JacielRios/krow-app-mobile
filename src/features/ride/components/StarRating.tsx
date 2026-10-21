@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../shared/theme/colors';
-
+import { StarRating as SharedStarRating } from '../../../shared/components/ui/StarRating';
 interface StarRatingProps {
   maxStars?: number;
   rating?: number;
@@ -10,7 +7,7 @@ interface StarRatingProps {
   size?: number;
   disabled?: boolean;
 }
-
+/** Compatibility adapter preserving the existing local selection. */
 export const StarRating: React.FC<StarRatingProps> = ({
   maxStars = 5,
   rating: initialRating = 0,
@@ -19,46 +16,17 @@ export const StarRating: React.FC<StarRatingProps> = ({
   disabled = false,
 }) => {
   const [rating, setRating] = useState(initialRating);
-
-  const handlePress = (newRating: number) => {
-    if (!disabled) {
-      setRating(newRating);
-      onRatingChange && onRatingChange(newRating);
-    }
-  };
-
   return (
-    <View style={styles.container}>
-      {Array.from({ length: maxStars }).map((_, index) => {
-        const starNumber = index + 1;
-        return (
-          <TouchableOpacity
-            key={`star-${index}`}
-            activeOpacity={0.7}
-            disabled={disabled}
-            onPress={() => handlePress(starNumber)}
-          >
-            <MaterialIcons
-              name={starNumber <= rating ? 'star' : 'star-border'}
-              size={size}
-              color={starNumber <= rating ? colors.status.warning : colors.border.default}
-              style={styles.star}
-            />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <SharedStarRating
+      value={rating}
+      maxStars={maxStars}
+      size={size}
+      readOnly={disabled}
+      style={{ justifyContent: 'center', marginVertical: 10 }}
+      onChange={value => {
+        setRating(value);
+        onRatingChange?.(value);
+      }}
+    />
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 10,
-  },
-  star: {
-    marginHorizontal: 4,
-  },
-});

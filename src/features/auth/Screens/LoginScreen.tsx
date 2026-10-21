@@ -1,5 +1,5 @@
+import { IconButton } from '../../../shared/components/ui-v2';
 import { AmbientBackground } from '../../../shared/components/ui-v2';
-import { depth, glass } from '../../../shared/theme/materials';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -11,7 +11,6 @@ import {
   ScrollView,
   Image,
   Animated,
-  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,9 +51,8 @@ export default function LoginScreen({
   });
 
   // Animation handling
-  const { width } = Dimensions.get('window');
-  const containerWidth = width - 48; // paddingHorizontal: 24 per side
-  const slideWidth = (containerWidth - 12) / 2; // padding: 6 per side inside container
+  const [selectorWidth, setSelectorWidth] = useState(0);
+  const slideWidth = Math.max(0, (selectorWidth - 12) / 2);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -63,12 +61,15 @@ export default function LoginScreen({
       slideAnim.setValue(nextValue);
       return;
     }
-    Animated.spring(slideAnim, {
+    slideAnim.stopAnimation();
+    const animation = Animated.spring(slideAnim, {
       toValue: nextValue,
       useNativeDriver: true,
       bounciness: 4,
       speed: 12,
-    }).start();
+    });
+    animation.start();
+    return () => animation.stop();
   }, [motionEnabled, slideAnim, userType, slideWidth]);
 
   const showAlert = (
@@ -176,6 +177,7 @@ export default function LoginScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -192,10 +194,12 @@ export default function LoginScreen({
 
           <View style={styles.content}>
             <View
+              onLayout={event =>
+                setSelectorWidth(event.nativeEvent.layout.width)
+              }
               style={[
                 styles.typeSelectorContainer,
                 { backgroundColor: theme.colors.surfaceOverlay },
-                depth(theme, 1),
               ]}
             >
               <Animated.View
@@ -210,6 +214,9 @@ export default function LoginScreen({
               />
               <TouchableOpacity
                 style={styles.typeButton}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: userType === 'pasajero' }}
+                accessibilityLabel="Viajar como pasajero"
                 onPress={() => setUserType('pasajero')}
                 activeOpacity={0.8}
               >
@@ -228,6 +235,9 @@ export default function LoginScreen({
 
               <TouchableOpacity
                 style={styles.typeButton}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: userType === 'conductor' }}
+                accessibilityLabel="Viajar como conductor"
                 onPress={() => setUserType('conductor')}
                 activeOpacity={0.8}
               >
@@ -245,14 +255,7 @@ export default function LoginScreen({
               </TouchableOpacity>
             </View>
 
-            <View
-              style={[
-                styles.formContainer,
-                glass(theme),
-                depth(theme, 2),
-                { borderRadius: 28, padding: 20 },
-              ]}
-            >
+            <View style={[styles.formContainer]}>
               <Input
                 label="Correo institucional"
                 placeholder="tu.nombre@campus.tecnm.mx"
@@ -280,8 +283,7 @@ export default function LoginScreen({
                 returnKeyType="go"
                 error={formError || undefined}
                 rightElement={
-                  <TouchableOpacity
-                    accessibilityRole="button"
+                  <IconButton
                     accessibilityLabel={
                       showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
                     }
@@ -292,13 +294,10 @@ export default function LoginScreen({
                       alignItems: 'center',
                     }}
                     onPress={() => setShowPassword(v => !v)}
-                  >
-                    <Icon
-                      name={showPassword ? 'visibility-off' : 'visibility'}
-                      size={24}
-                      color={theme.colors.textSecondary}
-                    />
-                  </TouchableOpacity>
+                    iconName={showPassword ? 'visibility-off' : 'visibility'}
+                    variant="plain"
+                    color={theme.colors.textSecondary}
+                  />
                 }
                 value={password}
                 onChangeText={setPassword}
@@ -317,6 +316,7 @@ export default function LoginScreen({
                 onPress={handleLogin}
                 loading={loading}
                 style={styles.loginButton}
+                iconName="login"
               />
 
               <TouchableOpacity
@@ -363,6 +363,7 @@ export default function LoginScreen({
                     title="Crear cuenta"
                     variant="outline"
                     onPress={() => navigation.navigate('Register')}
+                    iconName="person-add"
                   />
                 </>
               )}
@@ -391,7 +392,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    minHeight: 210,
+    minHeight: 156,
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomLeftRadius: 30,
@@ -399,8 +400,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 88,
+    height: 88,
   },
   content: {
     flex: 1,
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
   typeSelectorContainer: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: 30, // more rounded
+    borderRadius: 12,
     padding: 6,
     marginBottom: 30,
     position: 'relative',
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
     left: 6,
     bottom: 6,
     backgroundColor: colors.primary,
-    borderRadius: 24, // highly rounded
+    borderRadius: 8,
   },
   typeButton: {
     flex: 1,
@@ -445,6 +446,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   forgotPasswordContainer: {
+    minHeight: 48,
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: 15,
     marginBottom: 5,

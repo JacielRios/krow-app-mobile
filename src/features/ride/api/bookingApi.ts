@@ -18,6 +18,7 @@ export const bookingApi = {
     pickupStopId: string,
     dropoffStopId: string,
     seats = 1,
+    expectedActorId?: string,
   ) => {
     if (Config.KROW_RUNTIME_ENABLED === 'true') {
       try {
@@ -26,6 +27,7 @@ export const bookingApi = {
           `/rides/${rideId}/bookings`,
           {
             method: 'POST',
+            expectedActorId,
             body: JSON.stringify({
               commandId: newCommandId(),
               seats,
@@ -40,10 +42,15 @@ export const bookingApi = {
     }
     return apiRequest<{ bookingId: string }>(`/rides/${rideId}/bookings`, {
       method: 'POST',
+      expectedActorId,
       body: JSON.stringify({ seats, pickupStopId, dropoffStopId }),
     });
   },
-  updateStatus: (bookingId: string, status: BookingMutableStatus) => {
+  updateStatus: (
+    bookingId: string,
+    status: BookingMutableStatus,
+    expectedActorId?: string,
+  ) => {
     const action =
       status === 'confirmed'
         ? 'accept'
@@ -52,7 +59,7 @@ export const bookingApi = {
         : 'cancel';
     return apiRequest<{ success: boolean }>(
       `/bookings/${bookingId}/${action}`,
-      { method: 'POST' },
+      { method: 'POST', expectedActorId },
     );
   },
 };

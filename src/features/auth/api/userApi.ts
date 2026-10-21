@@ -19,7 +19,8 @@ export interface CurrentUserResponse {
 }
 
 export const userApi = {
-  me: () => apiRequest<CurrentUserResponse>('/me'),
+  me: (expectedActorId?: string) =>
+    apiRequest<CurrentUserResponse>('/me', { expectedActorId }),
   upsertProfile: (profile: Record<string, unknown>) =>
     apiRequest<{ success: boolean }>('/me/profile', {
       method: 'PUT',

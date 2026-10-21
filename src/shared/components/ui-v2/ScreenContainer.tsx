@@ -1,5 +1,11 @@
 import React from 'react';
-import { StyleProp, View, ViewProps, ViewStyle } from 'react-native';
+import {
+  StyleProp,
+  View,
+  ViewProps,
+  ViewStyle,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeProvider';
 import { AmbientBackground } from './AmbientBackground';
@@ -21,6 +27,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   ...props
 }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { theme } = useTheme();
   return (
     <View
@@ -34,7 +41,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
             flex: 1,
             paddingTop: safeTop ? insets.top : 0,
             paddingBottom: safeBottom ? insets.bottom : 0,
-            paddingHorizontal: padded ? theme.spacing.lg : 0,
+            paddingHorizontal: padded ? (width < 360 ? 16 : 20) : 0,
           },
           contentStyle,
         ]}

@@ -5,8 +5,11 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Avatar } from '../../../shared/components/ui/Avatar';
 import { Button } from '../../../shared/components/ui/Button';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
-import { colors } from '../../../shared/theme/colors';
-import { radii, spacing, typography } from '../../../shared/theme/tokens';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../shared/theme/legacyTheme';
+import { spacing, typography } from '../../../shared/theme/tokens';
 import type { ActivePassenger } from '../hooks/useActiveRideData';
 
 export interface PassengerStopCardProps {
@@ -32,13 +35,19 @@ export const PassengerStopCard: React.FC<PassengerStopCardProps> = ({
   busy,
   onComplete,
 }) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+
   const name = passenger.fullName ?? 'Pasajero';
   const isCompleted = passenger.bookingStatus === 'completed';
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Avatar uri={passenger.profilePhoto ?? undefined} name={name} size="md" />
+        <Avatar
+          uri={passenger.profilePhoto ?? undefined}
+          name={name}
+          size="md"
+        />
         <View style={styles.headerText}>
           <Text style={styles.name} numberOfLines={1}>
             {name}
@@ -96,62 +105,62 @@ export const PassengerStopCard: React.FC<PassengerStopCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  headerText: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  name: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.semibold,
-    color: colors.text.primary,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  ratingText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  stopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: spacing.xs,
-  },
-  stopText: {
-    flex: 1,
-    marginLeft: spacing.xs,
-    fontSize: typography.size.md,
-    color: colors.text.primary,
-    lineHeight: 20,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  metaText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-  },
-  action: {
-    marginTop: spacing.md,
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border.default,
+      marginBottom: spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    headerText: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    name: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.semibold,
+      color: colors.text.primary,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 2,
+    },
+    ratingText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    stopRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginTop: spacing.xs,
+    },
+    stopText: {
+      flex: 1,
+      marginLeft: spacing.xs,
+      fontSize: typography.size.md,
+      color: colors.text.primary,
+      lineHeight: 20,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+    },
+    metaText: {
+      marginLeft: spacing.xs,
+      fontSize: typography.size.sm,
+      color: colors.text.secondary,
+    },
+    action: {
+      marginTop: spacing.md,
+    },
+  });

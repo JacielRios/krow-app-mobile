@@ -12,7 +12,12 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, {
+  Circle,
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+} from 'react-native-maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Button, IconButton } from '../../../shared/components/ui-v2';
 import { decodePolyline, isValidPoint, LatLng } from '../api/mapsApi';
@@ -39,7 +44,12 @@ export interface RoutePreviewMapProps {
   height?: number;
   trackingMode?: boolean;
   viewportInsets?: { top: number; bottom: number };
-  vehicle?: { point: LatLng; stale: boolean; heading?: number };
+  vehicle?: {
+    point: LatLng;
+    stale: boolean;
+    heading?: number;
+    accuracy?: number;
+  };
   onOriginDrag?: (point: LatLng) => void;
   onDestinationDrag?: (point: LatLng) => void;
   onMapPress?: (point: LatLng) => void;
@@ -344,12 +354,16 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
         initialRegion={region}
-        mapPadding={{
-          top: viewportTop,
-          bottom: viewportBottom,
-          left: 0,
-          right: 0,
-        }}
+        mapPadding={
+          ready && readyCanvas.current === canvasKey
+            ? {
+                top: viewportTop,
+                bottom: viewportBottom,
+                left: 0,
+                right: 0,
+              }
+            : undefined
+        }
         onMapReady={() => {
           if (!mounted.current) return;
           readyCanvas.current = canvasKey;
@@ -384,6 +398,18 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
         }
         pointerEvents={interactive ? 'auto' : 'none'}
       >
+        {vehicle &&
+          !vehicle.stale &&
+          Number.isFinite(vehicle.accuracy) &&
+          vehicle.accuracy! > 30 && (
+            <Circle
+              center={toCoord(vehicle.point)}
+              radius={vehicle.accuracy!}
+              fillColor={`${theme.colors.primary}18`}
+              strokeColor={`${theme.colors.primary}60`}
+              strokeWidth={1}
+            />
+          )}
         {vehicle && (
           <Marker
             coordinate={toCoord(vehicle.point)}
@@ -399,7 +425,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
               style={{
                 backgroundColor: vehicle.stale
                   ? theme.colors.textMuted
-                  : theme.colors.primary,
+                  : theme.colors.textPrimary,
                 borderRadius: 24,
                 padding: 8,
                 borderWidth: 3,
@@ -409,7 +435,7 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
               <MaterialIcons
                 name="navigation"
                 size={22}
-                color={theme.colors.textInverse}
+                color={theme.colors.background}
               />
             </View>
           </Marker>
@@ -573,43 +599,43 @@ export const RoutePreviewMap: React.FC<RoutePreviewMapProps> = ({
             size="sm"
             fullWidth={false}
             onPress={retryMap}
+            iconName="refresh"
           />
         </View>
       )}
       {loaded && interactive && visibleCoords.length > 0 && (
         <IconButton
           accessibilityLabel="Centrar recorrido"
-          variant="outline"
+          variant="plain"
           style={[
             styles.recenter,
             { top: viewportTop + 12 },
             { backgroundColor: theme.colors.surfaceRaised },
           ]}
-          icon={
-            <MaterialIcons
-              name="center-focus-strong"
-              size={22}
-              color={theme.colors.primary}
-            />
-          }
           onPress={() => {
             setFollowing(false);
             frameRoute();
           }}
+          iconName="center-focus-strong"
+          color={theme.colors.primary}
         />
       )}
       {loaded && vehicle && (
-        <Button
-          title={following ? 'Siguiendo vehículo' : 'Seguir vehículo'}
-          variant="outline"
-          fullWidth={false}
+        <IconButton
+          accessibilityLabel={
+            following ? 'Siguiendo vehículo' : 'Seguir vehículo'
+          }
+          accessibilityState={{ selected: following }}
+          variant="plain"
           style={{
             position: 'absolute',
-            left: 12,
+            right: 12,
             bottom: viewportBottom + 12,
             backgroundColor: theme.colors.surfaceRaised,
           }}
           onPress={() => setFollowing(true)}
+          iconName={following ? 'gps-fixed' : 'gps-not-fixed'}
+          color={theme.colors.primary}
         />
       )}
     </View>

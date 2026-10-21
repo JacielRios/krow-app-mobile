@@ -1,8 +1,10 @@
+import { IconButton } from '../src/shared/components/ui-v2';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
 } from 'react-native';
@@ -116,7 +118,9 @@ test.each(['android', 'ios'] as const)(
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ placeId: 'place-4' }),
       );
-      expect(tree.root.findAllByType(AnimatedModal)).toHaveLength(0);
+      expect(tree.root.findByType(AnimatedModal).props.visible).toBe(false);
+      await act(async () => jest.advanceTimersByTimeAsync(250));
+      expect(tree.root.findAllByType(Modal)).toHaveLength(0);
     } finally {
       Platform.OS = previousOS;
       dismiss.mockRestore();
@@ -150,7 +154,12 @@ test('closing the picker cancels place details and discards their late response'
       .props.onPress();
   });
   const signal = (getPlaceDetails as jest.Mock).mock.calls[0][1].signal;
-  await act(() => button('Cerrar').props.onPress());
+  await act(() =>
+    tree.root
+      .findAllByType(IconButton)
+      .find(node => node.props.accessibilityLabel === 'Cerrar')!
+      .props.onPress(),
+  );
   expect(signal.aborted).toBe(true);
   await act(async () =>
     resolve({
@@ -160,5 +169,7 @@ test('closing the picker cancels place details and discards their late response'
     }),
   );
   expect(onChange).not.toHaveBeenCalled();
-  expect(tree.root.findAllByType(AnimatedModal)).toHaveLength(0);
+  expect(tree.root.findByType(AnimatedModal).props.visible).toBe(false);
+  await act(async () => jest.advanceTimersByTimeAsync(250));
+  expect(tree.root.findAllByType(Modal)).toHaveLength(0);
 });

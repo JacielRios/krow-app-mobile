@@ -6,11 +6,13 @@ import { MainTabs } from './MainTabs';
 import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { ProfileScreen } from '../../features/pilot/ProfileScreen';
 import { HistoryScreen } from '../../features/pilot/HistoryScreen';
+import { DriverMetricsScreen } from '../../features/pilot/DriverMetricsScreen';
+import { ReportIncidentScreen } from '../../features/pilot/ReportIncidentScreen';
 import { ChatScreen } from '../../features/pilot/ChatScreen';
+import { BookingRequestsScreen } from '../../features/pilot/BookingRequestsScreen';
+import { RideInvitationScreen } from '../../features/pilot/RideInvitationScreen';
 import {
-  PassengerFinishedRideScreen,
   RequestRideScreen,
-  DriverFinishedRideScreen,
   DriverTripsScreen,
   FavoriteRoutesScreen,
   PublishRideScreen,
@@ -24,9 +26,13 @@ import {
 } from '../../features/ride-runtime/RuntimeEntry';
 
 export type MainStackParamList = {
+  RideInvitation: { rideId: string };
+  BookingRequests: { bookingId?: string; rideId?: string } | undefined;
   RuntimeRide: { rideId: string };
   Home: undefined;
   Profile: undefined;
+  DriverMetrics: undefined;
+  ReportIncident: { rideId: string };
   RideHistory: { rideId: string };
   Chat: { bookingId: string };
   // Passenger
@@ -67,8 +73,12 @@ export default function MainNavigator() {
         component={Config.KROW_PILOT_ENABLED === 'true' ? MainTabs : HomeScreen}
       />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="DriverMetrics" component={DriverMetricsScreen} />
+      <Stack.Screen name="ReportIncident" component={ReportIncidentScreen} />
       <Stack.Screen name="RideHistory" component={HistoryScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="BookingRequests" component={BookingRequestsScreen} />
+      <Stack.Screen name="RideInvitation" component={RideInvitationScreen} />
       <Stack.Screen name="RuntimeRide" component={RuntimeRideScreen} />
 
       {/* Passenger Flow */}
@@ -79,12 +89,8 @@ export default function MainNavigator() {
       />
       <Stack.Screen
         name="PassengerFinishedRide"
-        component={
-          Config.KROW_PILOT_ENABLED === 'true'
-            ? HistoryScreen
-            : PassengerFinishedRideScreen
-        }
-        options={{ animation: 'fade' }}
+        component={HistoryScreen}
+        options={{ animation: motionEnabled ? 'fade' : 'none' }}
       />
 
       {/* Driver Flow */}
@@ -95,12 +101,8 @@ export default function MainNavigator() {
       <Stack.Screen name="DriverActiveRide" component={DriverRuntimeEntry} />
       <Stack.Screen
         name="DriverFinishedRide"
-        component={
-          Config.KROW_PILOT_ENABLED === 'true'
-            ? HistoryScreen
-            : DriverFinishedRideScreen
-        }
-        options={{ animation: 'fade' }}
+        component={HistoryScreen}
+        options={{ animation: motionEnabled ? 'fade' : 'none' }}
       />
     </Stack.Navigator>
   );

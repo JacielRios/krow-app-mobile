@@ -1,7 +1,11 @@
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../../../shared/theme/colors';
+import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import {
+  useThemedStyles,
+  type LegacyColors,
+} from '../../../../shared/theme/legacyTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StarRating } from '../../components';
 import { Button } from '../../../../shared/components/ui/Button';
 
@@ -12,24 +16,34 @@ const initialPassengers = [
 ];
 
 export const DriverFinishedRideScreen = ({ navigation }: any) => {
+  const { styles, colors } = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const [passengers, setPassengers] = useState(initialPassengers);
 
   const updatePassengerRating = (id: string, rating: number) => {
-    setPassengers(prev => prev.map(p => p.id === id ? { ...p, rating } : p));
+    setPassengers(prev => prev.map(p => (p.id === id ? { ...p, rating } : p)));
   };
 
   const updatePassengerComment = (id: string, comment: string) => {
-    setPassengers(prev => prev.map(p => p.id === id ? { ...p, comment } : p));
+    setPassengers(prev => prev.map(p => (p.id === id ? { ...p, comment } : p)));
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity 
-        style={styles.closeButton} 
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <IconButton
+        style={[styles.closeButton, { top: insets.top + 8 }]}
         onPress={() => navigation.navigate('Home')}
-      >
-        <MaterialIcons name="close" size={24} color={colors.text.primary} />
-      </TouchableOpacity>
+        accessibilityLabel="Volver al inicio"
+        iconName="close"
+        variant="plain"
+        color={colors.text.primary}
+      />
 
       <View style={styles.header}>
         <Text style={styles.title}>¡Viaje Completado!</Text>
@@ -49,7 +63,7 @@ export const DriverFinishedRideScreen = ({ navigation }: any) => {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Califica a tus pasajeros</Text>
-        
+
         {passengers.map((p, index) => (
           <View key={p.id} style={styles.passengerFeedbackCard}>
             <View style={styles.passengerHeader}>
@@ -60,10 +74,10 @@ export const DriverFinishedRideScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.ratingContainer}>
-              <StarRating 
-                rating={p.rating} 
-                onRatingChange={(r) => updatePassengerRating(p.id, r)} 
-                size={32} 
+              <StarRating
+                rating={p.rating}
+                onRatingChange={r => updatePassengerRating(p.id, r)}
+                size={32}
               />
             </View>
 
@@ -72,7 +86,7 @@ export const DriverFinishedRideScreen = ({ navigation }: any) => {
               placeholder={`Añade un comentario sobre ${p.name}...`}
               placeholderTextColor={colors.text.placeholder}
               value={p.comment}
-              onChangeText={(text) => updatePassengerComment(p.id, text)}
+              onChangeText={text => updatePassengerComment(p.id, text)}
             />
 
             {index < passengers.length - 1 && <View style={styles.divider} />}
@@ -80,9 +94,10 @@ export const DriverFinishedRideScreen = ({ navigation }: any) => {
         ))}
 
         <View style={styles.submitSection}>
-          <Button 
-            title="Enviar calificaciones" 
-            onPress={() => navigation.navigate('Home')} 
+          <Button
+            title="Enviar calificaciones"
+            onPress={() => navigation.navigate('Home')}
+            iconName="star-outline"
           />
         </View>
       </View>
@@ -90,127 +105,128 @@ export const DriverFinishedRideScreen = ({ navigation }: any) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: colors.primary, // Fondo azul
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 20,
-    padding: 8,
-  },
-  header: {
-    paddingTop: 100,
-    paddingBottom: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.inverse,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.text.inverse,
-    opacity: 0.8,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    marginTop: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-  },
-  statBox: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.inverse,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.text.inverse,
-    opacity: 0.8,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 16,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  passengerFeedbackCard: {
-    marginBottom: 16,
-  },
-  passengerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarInitial: {
-    color: colors.text.inverse,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  passengerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginLeft: 12,
-  },
-  ratingContainer: {
-    marginBottom: 12,
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: 12,
-    padding: 12,
-    color: colors.text.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginTop: 24,
-  },
-  submitSection: {
-    marginTop: 24,
-    marginBottom: 40,
-  },
-});
+const createStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+    container: {
+      flexGrow: 1,
+      backgroundColor: colors.background,
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 50,
+      left: 20,
+      zIndex: 10,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 0,
+    },
+    header: {
+      paddingTop: 72,
+      paddingBottom: 40,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text.primary,
+      textAlign: 'center',
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.text.primary,
+      opacity: 0.8,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    statsRow: {
+      flexDirection: 'row',
+      marginTop: 24,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      alignItems: 'center',
+    },
+    statBox: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text.primary,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.text.primary,
+      opacity: 0.8,
+    },
+    statDivider: {
+      width: 1,
+      height: 30,
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+    },
+    card: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      padding: 24,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text.primary,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    passengerFeedbackCard: {
+      marginBottom: 16,
+    },
+    passengerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    avatarPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primaryLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarInitial: {
+      color: colors.text.primary,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    passengerName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text.primary,
+      marginLeft: 12,
+    },
+    ratingContainer: {
+      marginBottom: 12,
+    },
+    textInput: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      borderRadius: 12,
+      padding: 12,
+      color: colors.text.primary,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border.light,
+      marginTop: 24,
+    },
+    submitSection: {
+      marginTop: 24,
+      marginBottom: 40,
+    },
+  });

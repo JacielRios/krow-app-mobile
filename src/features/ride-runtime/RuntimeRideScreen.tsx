@@ -1,14 +1,13 @@
+import { KrowAlert as Alert } from '../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../shared/components/ui-v2';
 import { AmbientBackground, Button } from '../../shared/components/ui-v2';
-import { depth, glass } from '../../shared/theme/materials';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Config from 'react-native-config';
@@ -83,7 +82,31 @@ export function RuntimeRideScreen({
   }, []);
   const foreground = theme.colors.textPrimary;
   const button = (title: string, action: () => void, disabled = false) => (
-    <Button title={title} onPress={action} disabled={disabled} style={{ marginVertical: 4 }} />
+    <Button
+      title={title}
+      variant={
+        [
+          'Rechazar',
+          'Registrar ausencia',
+          'Cancelar reserva',
+          'Descartar acción y revisar viaje',
+          'Ayuda de seguridad',
+          'Activar avisos del viaje',
+        ].includes(title)
+          ? 'text'
+          : title.includes('navegación')
+          ? 'tonal'
+          : 'primary'
+      }
+      labelStyle={
+        ['Rechazar', 'Registrar ausencia', 'Cancelar reserva'].includes(title)
+          ? { color: theme.colors.status.error }
+          : undefined
+      }
+      onPress={action}
+      disabled={disabled}
+      style={{ marginVertical: 4 }}
+    />
   );
   const prepare = async () => {
     if (!snapshot) return;
@@ -103,6 +126,8 @@ export function RuntimeRideScreen({
         cause instanceof Error
           ? cause.message
           : 'No se pudo preparar la navegación',
+        undefined,
+        { type: 'error' },
       );
     } finally {
       setPreparing(false);
@@ -155,6 +180,8 @@ export function RuntimeRideScreen({
         cause instanceof Error
           ? cause.message
           : 'Revisa los permisos y la conexión',
+        undefined,
+        { type: 'error' },
       );
     } finally {
       starting.current = false;
@@ -184,12 +211,16 @@ export function RuntimeRideScreen({
                   result.humanAcknowledged
                     ? 'Un agente está atendiendo tu solicitud.'
                     : 'Pendiente de que un agente confirme la atención.',
+                  undefined,
+                  { type: 'success' },
                 ),
               )
               .catch(() =>
                 Alert.alert(
                   'No se pudo enviar',
                   'La solicitud no está confirmada. Si necesitas ayuda inmediata, llama al 911.',
+                  undefined,
+                  { type: 'error' },
                 ),
               );
           },
@@ -232,16 +263,16 @@ export function RuntimeRideScreen({
     >
       <AmbientBackground />
       <View style={styles.header}>
-        <TouchableOpacity
-          accessibilityRole="button"
+        <IconButton
+          iconName="arrow-back"
+          variant="plain"
+          color={foreground}
+          accessibilityLabel="Volver a la pantalla anterior"
           onPress={() => navigation.goBack()}
-          style={styles.back}
-        >
-          <Text style={{ color: foreground }}>Volver</Text>
-        </TouchableOpacity>
+        />
         <Text
           accessibilityRole="header"
-          style={[styles.title, { color: foreground }]}
+          style={[styles.title, { color: foreground, flex: 1, flexShrink: 1 }]}
         >
           {snapshot ? labels[snapshot.state] : 'Recuperando viaje'}
         </Text>
@@ -261,7 +292,9 @@ export function RuntimeRideScreen({
           {mapReady && snapshot.route && !terminal && (
             <Mapbox.MapView
               style={styles.map}
-              styleURL={Mapbox.StyleURL.Street}
+              styleURL={
+                theme.dark ? Mapbox.StyleURL.Dark : Mapbox.StyleURL.Street
+              }
             >
               <Mapbox.Camera
                 centerCoordinate={
@@ -293,7 +326,13 @@ export function RuntimeRideScreen({
                   coordinate={[vehiclePosition.lng, vehiclePosition.lat]}
                 >
                   <View
-                    style={[styles.vehicle, { backgroundColor: theme.colors.primary, opacity: fresh ? 1 : 0.4 }]}
+                    style={[
+                      styles.vehicle,
+                      {
+                        backgroundColor: theme.colors.primary,
+                        opacity: fresh ? 1 : 0.4,
+                      },
+                    ]}
                   />
                 </Mapbox.PointAnnotation>
               )}
@@ -338,7 +377,7 @@ export function RuntimeRideScreen({
                 </Text>
               )}
             {snapshot.role === 'driver' && guidance && !terminal && (
-              <View style={[styles.card, glass(theme), depth(theme, 2)]}>
+              <View style={[styles.card, { backgroundColor: 'transparent' }]}>
                 <Text style={{ color: foreground }}>
                   {guidance.instruction ||
                     'Navegación local hacia la próxima parada'}
@@ -354,7 +393,8 @@ export function RuntimeRideScreen({
             {next && !terminal && (
               <View
                 style={[
-                  styles.card, glass(theme), depth(theme, 2),
+                  styles.card,
+                  { backgroundColor: 'transparent' },
                   { backgroundColor: theme.colors.surfaceRaised },
                 ]}
               >
@@ -370,7 +410,10 @@ export function RuntimeRideScreen({
               </View>
             )}
             {model.pending.map(item => (
-              <View key={item.command.commandId} style={[styles.card, glass(theme), depth(theme, 2)]}>
+              <View
+                key={item.command.commandId}
+                style={[styles.card, { backgroundColor: 'transparent' }]}
+              >
                 <Text style={{ color: foreground }}>
                   {item.state === 'conflict'
                     ? 'El viaje cambió. Esta acción necesita revisión.'
@@ -416,7 +459,13 @@ export function RuntimeRideScreen({
                     {snapshot.bookings
                       .filter(b => b.status === 'pending')
                       .map(b => (
-                        <View key={b.bookingId} style={[styles.card, glass(theme), depth(theme, 2)]}>
+                        <View
+                          key={b.bookingId}
+                          style={[
+                            styles.card,
+                            { backgroundColor: 'transparent' },
+                          ]}
+                        >
                           <Text style={{ color: foreground }}>
                             Solicitud · {b.seats} asiento(s)
                           </Text>
@@ -513,7 +562,10 @@ export function RuntimeRideScreen({
             )}
             {snapshot.role === 'passenger' &&
               snapshot.bookings.map(b => (
-                <View key={b.bookingId} style={[styles.card, glass(theme), depth(theme, 2)]}>
+                <View
+                  key={b.bookingId}
+                  style={[styles.card, { backgroundColor: 'transparent' }]}
+                >
                   <Text style={{ color: foreground }}>
                     Tu descenso:{' '}
                     {
@@ -551,6 +603,8 @@ export function RuntimeRideScreen({
                     Alert.alert(
                       'Avisos activados',
                       'Este dispositivo quedó registrado.',
+                      undefined,
+                      { type: 'success' },
                     ),
                   )
                   .catch(cause =>
@@ -559,6 +613,8 @@ export function RuntimeRideScreen({
                       cause instanceof Error
                         ? cause.message
                         : 'Intenta de nuevo con conexión',
+                      undefined,
+                      { type: 'error' },
                     ),
                   );
               })}
@@ -580,8 +636,8 @@ const styles = StyleSheet.create({
   back: { minHeight: 48, justifyContent: 'center' },
   title: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, gap: 12 },
-  map: { height: '42%', marginHorizontal: 12, borderRadius: 28, overflow: 'hidden' },
-  card: { padding: 20, borderRadius: 24, gap: 12 },
+  map: { height: '42%', overflow: 'hidden' },
+  card: { paddingVertical: 20, gap: 12 },
   button: {
     minHeight: 52,
     borderRadius: 12,

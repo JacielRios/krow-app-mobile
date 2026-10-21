@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
   PressableProps,
   StyleProp,
+  StyleSheet,
   View,
   ViewStyle,
 } from 'react-native';
@@ -22,6 +23,7 @@ export interface AnimatedPressableProps
   radius?: number;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
+  stateLayerColor?: string;
 }
 
 export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
@@ -33,24 +35,28 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   radius,
   style,
   contentStyle,
+  stateLayerColor,
   onPressIn,
   onPressOut,
+  onFocus,
+  onBlur,
   accessibilityRole = 'button',
   ...props
 }) => {
   const pressed = useRef(new Animated.Value(0)).current;
+  const [focused, setFocused] = useState(false);
   const { theme, motionEnabled } = useTheme();
-  const resolvedRadius = radius ?? theme.radii.lg;
+  const resolvedRadius = radius ?? theme.radii.sm;
 
   useEffect(() => {
     pressed.stopAnimation();
     pressed.setValue(0);
     return () => pressed.stopAnimation();
-  }, [pressed, motionEnabled, feedback]);
+  }, [pressed, motionEnabled, feedback, disabled]);
   const animatePress = (value: number) => {
     pressed.stopAnimation();
     if (!motionEnabled || feedback === 'none') {
-      pressed.setValue(0);
+      pressed.setValue(feedback === 'none' ? 0 : value);
       return;
     }
     Animated.spring(pressed, {
@@ -62,7 +68,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   };
   const animatedStyle = {
     opacity:
-      feedback === 'opacity'
+      feedback === 'opacity' || (!motionEnabled && feedback === 'scale')
         ? pressed.interpolate({
             inputRange: [0, 1],
             outputRange: [1, 0.82],
@@ -72,7 +78,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
     transform: [
       {
         scale:
-          feedback === 'scale'
+          feedback === 'scale' && motionEnabled
             ? pressed.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, pressedScale],
@@ -92,6 +98,14 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
       accessibilityState={{
         ...props.accessibilityState,
         disabled: Boolean(disabled),
+      }}
+      onFocus={event => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={event => {
+        setFocused(false);
+        onBlur?.(event);
       }}
       onPressIn={event => {
         animatePress(1);
@@ -119,6 +133,23 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         ]}
       >
         {children}
+        <Animated.View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: stateLayerColor ?? theme.colors.textPrimary,
+              opacity: disabled
+                ? 0
+                : pressed.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [focused ? 0.1 : 0, 0.12],
+                  }),
+            },
+          ]}
+        />
       </View>
     </AnimatedPressableBase>
   );

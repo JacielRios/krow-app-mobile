@@ -1,20 +1,26 @@
+import { NotificationSettings } from './NotificationSettings';
+import { KrowAlert as Alert } from '../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../shared/components/ui-v2';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
+  Image,
   Platform,
   ScrollView,
   View,
 } from 'react-native';
 import Config from 'react-native-config';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../../app/navigation/MainNavigator';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUserRole } from '../home/hooks/useCurrentUserRole';
 import { userApi } from '../auth/api/userApi';
 import { sessionAdapter } from '../../core/auth/sessionAdapter';
+import { shareDiagnostics } from '../../core/diagnostics';
 import { setSessionLoginMode } from '../../app/sessionLoginMode';
-import { registerPilotPush, unregisterPilotPush } from './pilotPush';
+import { unregisterPilotPush } from './pilotPush';
 import { pilotTracking } from './nativeTracking';
 import { pilotApi } from './pilotApi';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -26,13 +32,15 @@ import {
   Button,
   FeedbackState,
   Skeleton,
+  ListRow,
 } from '../../shared/components/ui-v2';
 import { ScreenHeader } from '../../shared/components/ui-v2/ScreenHeader';
 export function ProfileScreen() {
   const { user, error, loading, reload } = useCurrentUserRole();
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cache = useQueryClient();
-  const { preference, setPreference } = useTheme();
+  const { theme, preference, setPreference } = useTheme();
   const q = useQuery({
     queryKey: ['me', user?.userId],
     queryFn: () => userApi.me(),
@@ -42,6 +50,8 @@ export function ProfileScreen() {
   const [name, setName] = useState('');
   const [institutionalId, setInstitutionalId] = useState('');
   const [program, setProgram] = useState('');
+  const [period, setPeriod] = useState('');
+  const [photo, setPhoto] = useState('');
   const [busy, setBusy] = useState(false);
   const actionPending = useRef(false);
   const [feedback, setFeedback] = useState('');
@@ -50,12 +60,27 @@ export function ProfileScreen() {
       setName(q.data.fullName ?? '');
       setInstitutionalId(q.data.institutionalId ?? '');
       setProgram(q.data.academicProgram ?? '');
+      setPeriod(
+        q.data.academicPeriod == null ? '' : String(q.data.academicPeriod),
+      );
+      setPhoto(q.data.profilePhoto ?? '');
     }
   }, [q.data, editing]);
   const save = async () => {
     if (actionPending.current) return;
     if (!name.trim()) {
       setFeedback('Escribe tu nombre');
+      return;
+    }
+    if (
+      period &&
+      (!/^\d{1,2}$/.test(period) || Number(period) < 1 || Number(period) > 20)
+    ) {
+      setFeedback('El semestre debe estar entre 1 y 20');
+      return;
+    }
+    if (photo.trim() && !/^https:\/\/[^\s]+$/i.test(photo.trim())) {
+      setFeedback('La foto debe usar una dirección HTTPS válida');
       return;
     }
     actionPending.current = true;
@@ -65,7 +90,8 @@ export function ProfileScreen() {
         fullName: name.trim(),
         institutionalId,
         academicProgram: program,
-        academicPeriod: q.data?.academicPeriod ?? null,
+        academicPeriod: period ? Number(period) : null,
+        profilePhoto: photo.trim() || null,
       });
       await cache.invalidateQueries({ queryKey: ['me'] });
       setEditing(false);
@@ -178,6 +204,7 @@ export function ProfileScreen() {
               variant="outline"
               loading={busy}
               onPress={logout}
+              iconName="logout"
             />
           </View>
         )}
@@ -191,7 +218,7 @@ export function ProfileScreen() {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingVertical: 24, gap: 16 }}
+          contentContainerStyle={{ paddingVertical: 24, gap: 32 }}
         >
           <ScreenHeader
             title="Tu perfil"
@@ -212,7 +239,29 @@ export function ProfileScreen() {
           )}
           <Card>
             <View style={{ gap: 12 }}>
-              <Text variant="title">{user?.displayName ?? 'Cargando…'}</Text>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
+                <Text variant="title" style={{ flex: 1 }}>
+                  {user?.displayName ?? 'Cargando…'}
+                </Text>
+                {!editing && (
+                  <IconButton
+                    iconName="edit"
+                    variant="tonal"
+                    accessibilityLabel="Editar perfil"
+                    disabled={!q.data}
+                    onPress={() => setEditing(true)}
+                  />
+                )}
+              </View>
+              {!!q.data?.profilePhoto && (
+                <Image
+                  source={{ uri: q.data.profilePhoto }}
+                  style={{ width: 72, height: 72, borderRadius: 36 }}
+                  accessibilityLabel="Tu foto de perfil"
+                />
+              )}
               <Text tone="secondary">{user?.email}</Text>
               <Text tone="secondary">
                 {user?.driverId
@@ -241,10 +290,26 @@ export function ProfileScreen() {
                     value={program}
                     onChangeText={setProgram}
                   />
+                  <Input
+                    label="Semestre"
+                    value={period}
+                    onChangeText={setPeriod}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Input
+                    label="Dirección HTTPS de tu foto (opcional)"
+                    value={photo}
+                    onChangeText={setPhoto}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    maxLength={500}
+                  />
                   <Button
                     title="Guardar cambios"
                     onPress={() => void save()}
                     loading={busy}
+                    iconName="check"
                   />
                   <Button
                     title="Cancelar edición"
@@ -253,27 +318,27 @@ export function ProfileScreen() {
                     onPress={() => setEditing(false)}
                   />
                 </>
-              ) : (
-                <Button
-                  title="Editar perfil"
-                  variant="outline"
-                  disabled={!q.data}
-                  onPress={() => setEditing(true)}
-                />
-              )}
+              ) : null}
             </View>
           </Card>
           {user?.driverId && (
             <Card>
               <View style={{ gap: 12 }}>
                 <Text variant="title">Cómo quieres viajar</Text>
+                <ListRow
+                  title="Ver mis métricas"
+                  iconName="bar-chart"
+                  onPress={() => navigation.navigate('DriverMetrics')}
+                />
                 <Text tone="secondary">
                   Cambiar de modo organiza tus viajes. La aprobación para
                   conducir se conserva.
                 </Text>
-                <Button
+                <ListRow
                   title="Como pasajero"
-                  variant={user.role === 'pasajero' ? 'primary' : 'outline'}
+                  iconName="person-outline"
+                  accessibilityRole="radio"
+                  selected={user.role === 'pasajero'}
                   onPress={() =>
                     void setSessionLoginMode('pasajero').catch(() =>
                       setFeedback(
@@ -282,9 +347,11 @@ export function ProfileScreen() {
                     )
                   }
                 />
-                <Button
+                <ListRow
                   title="Como conductor"
-                  variant={user.role === 'conductor' ? 'primary' : 'outline'}
+                  iconName="directions-car"
+                  accessibilityRole="radio"
+                  selected={user.role === 'conductor'}
                   onPress={() =>
                     void setSessionLoginMode('conductor').catch(() =>
                       setFeedback(
@@ -300,60 +367,42 @@ export function ProfileScreen() {
             <View style={{ gap: 12 }}>
               <Text variant="title">Apariencia</Text>
               {(['system', 'light', 'dark'] as const).map((p, i) => (
-                <Button
+                <ListRow
                   key={p}
                   title={['Seguir al dispositivo', 'Claro', 'Oscuro'][i]}
-                  variant={preference === p ? 'primary' : 'outline'}
+                  iconName={['brightness-auto', 'light-mode', 'dark-mode'][i]}
                   onPress={() => setPreference(p)}
-                  accessibilityState={{ selected: p === preference }}
+                  accessibilityRole="radio"
+                  selected={p === preference}
                 />
               ))}
             </View>
           </Card>
           {Config.KROW_PILOT_PUSH_ENABLED === 'true' && (
             <Card>
-              <View style={{ gap: 12 }}>
-                <Text variant="title">Avisos del viaje</Text>
-                <Text tone="secondary">
-                  Recibe solicitudes, mensajes y avisos de llegada a la parada.
-                </Text>
-                <Button
-                  title="Activar notificaciones"
-                  variant="outline"
-                  loading={busy}
-                  onPress={() => {
-                    if (actionPending.current) return;
-                    actionPending.current = true;
-                    setBusy(true);
-                    void registerPilotPush()
-                      .then(() => setFeedback('Notificaciones activadas'))
-                      .catch(e =>
-                        setFeedback(
-                          e instanceof Error
-                            ? e.message
-                            : 'No pudimos activar los avisos',
-                        ),
-                      )
-                      .finally(() => {
-                        actionPending.current = false;
-                        setBusy(false);
-                      });
-                  }}
-                />
-              </View>
+              <NotificationSettings />
             </Card>
           )}
           <Card>
             <View style={{ gap: 12 }}>
               <Text variant="title">Ayuda y privacidad</Text>
+              <ListRow
+                title="Compartir diagnóstico"
+                iconName="bug-report"
+                onPress={() =>
+                  void shareDiagnostics().catch(() =>
+                    setFeedback('No pudimos preparar el diagnóstico'),
+                  )
+                }
+              />
               <Text tone="secondary">
                 Solo los participantes autorizados pueden ver la ubicación
                 durante el viaje. El GPS se detiene al finalizar o cerrar
                 sesión.
               </Text>
-              <Button
+              <ListRow
                 title="Contactar soporte"
-                variant="outline"
+                iconName="help-outline"
                 disabled={!Config.KROW_SUPPORT_URL}
                 onPress={() =>
                   void Linking.openURL(Config.KROW_SUPPORT_URL!).catch(() =>
@@ -361,9 +410,9 @@ export function ProfileScreen() {
                   )
                 }
               />
-              <Button
+              <ListRow
                 title="Aviso de privacidad"
-                variant="ghost"
+                iconName="privacy-tip"
                 disabled={!Config.KROW_PRIVACY_URL}
                 onPress={() =>
                   void Linking.openURL(Config.KROW_PRIVACY_URL!).catch(() =>
@@ -384,16 +433,18 @@ export function ProfileScreen() {
           {Config.KROW_ACCOUNT_CLOSURE_ENABLED === 'true' && (
             <Button
               title="Solicitar cierre de cuenta"
-              variant="destructive"
+              variant="text"
+              labelStyle={{ color: theme.colors.status.error }}
               loading={busy}
               onPress={closeAccount}
             />
           )}
           <Button
             title="Cerrar sesión"
-            variant="destructive"
+            variant="outline"
             loading={busy}
             onPress={logout}
+            iconName="logout"
           />
         </ScrollView>
       </KeyboardAvoidingView>

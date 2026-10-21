@@ -13,17 +13,51 @@ export interface FeedbackStateProps {
   onAction?: () => void;
 }
 
-export const FeedbackState: React.FC<FeedbackStateProps> = ({ title, description, kind = 'empty', actionLabel, onAction }) => {
+export const FeedbackState: React.FC<FeedbackStateProps> = ({
+  title,
+  description,
+  kind = 'empty',
+  actionLabel,
+  onAction,
+}) => {
   const { theme } = useTheme();
   useEffect(() => {
-    if (kind === 'error') AccessibilityInfo.announceForAccessibility(`${title}. ${description ?? ''}`);
+    if (kind === 'error')
+      AccessibilityInfo.announceForAccessibility(
+        `${title}. ${description ?? ''}`,
+      );
   }, [description, kind, title]);
   return (
-    <View style={{ paddingVertical: theme.spacing.xxl, alignItems: 'center' }}>
-      <MaterialIcons name={kind === 'error' ? 'error-outline' : 'search-off'} size={44} color={kind === 'error' ? theme.colors.status.error : theme.colors.textMuted} />
-      <Text variant="title" tone={kind === 'error' ? 'error' : 'primary'} style={{ marginTop: theme.spacing.md, textAlign: 'center' }}>{title}</Text>
-      {description ? <Text tone="secondary" style={{ marginTop: theme.spacing.sm, textAlign: 'center' }}>{description}</Text> : null}
-      {actionLabel && onAction ? <Button title={actionLabel} onPress={onAction} style={{ marginTop: theme.spacing.lg }} /> : null}
+    <View style={{ paddingVertical: theme.spacing.xl, alignItems: 'center' }}>
+      <MaterialIcons
+        name={kind === 'error' ? 'error-outline' : 'search-off'}
+        size={32}
+        color={
+          kind === 'error' ? theme.colors.status.error : theme.colors.textMuted
+        }
+      />
+      <Text
+        variant="title"
+        tone={kind === 'error' ? 'error' : 'primary'}
+        style={{ marginTop: theme.spacing.md, textAlign: 'center' }}
+      >
+        {title}
+      </Text>
+      {description ? (
+        <Text
+          tone="secondary"
+          style={{ marginTop: theme.spacing.sm, textAlign: 'center' }}
+        >
+          {description}
+        </Text>
+      ) : null}
+      {actionLabel && onAction ? (
+        <Button
+          title={actionLabel}
+          onPress={onAction}
+          style={{ marginTop: theme.spacing.lg }}
+        />
+      ) : null}
     </View>
   );
 };

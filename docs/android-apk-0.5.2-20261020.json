@@ -1,0 +1,27 @@
+{
+  "checkedAt": "2026-10-20T19:55:33.6689346Z",
+  "apk": "artifacts/android/krow-0.5.2-trial.apk",
+  "sha256": "0F69224036D72C217288AFAACA5AB2E042D4BC7210B91E15CBF4D803D412D588",
+  "bytes": 137027094,
+  "package": "com.krownmobileapp",
+  "versionCode": 9,
+  "versionName": "0.5.2-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3909432,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "linkOrigin": "https://krow-web-gamma.vercel.app",
+  "nativeManifestLinksVerified": true,
+  "pushConfigured": false,
+  "installationGate": "API deployment pending; Supabase Auth redirect allowlist still requires confirmation"
+}

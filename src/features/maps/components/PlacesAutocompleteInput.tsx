@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { IconButton } from '../../../shared/components/ui-v2';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -15,6 +16,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { depth } from '../../../shared/theme/materials';
 import { usePlacesAutocomplete } from '../hooks/usePlacesAutocomplete';
 import { getPlaceDetails, LatLng } from '../api/mapsApi';
+import { ModalVisibilityContext } from '../../../shared/components/ui-v2/AnimatedModal';
 
 export interface PlacesAutocompleteValue {
   address: string;
@@ -67,6 +69,7 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
   scrollResults = false,
 }) => {
   const { theme } = useTheme();
+  const modalActive = useContext(ModalVisibilityContext);
   const {
     query,
     setQuery,
@@ -77,13 +80,21 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
     consumeSession,
     reset,
     retry,
-  } = usePlacesAutocomplete({ bias });
+  } = usePlacesAutocomplete({ bias, enabled: modalActive });
 
   const [resolving, setResolving] = useState(false);
   const [focused, setFocused] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const selection = useRef(0);
   const activeDetails = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!modalActive) {
+      selection.current += 1;
+      activeDetails.current?.abort();
+      setResolving(false);
+      setFocused(false);
+    }
+  }, [modalActive]);
   useEffect(
     () => () => {
       selection.current += 1;
@@ -176,19 +187,15 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
           resolving || loading ? (
             <ActivityIndicator size="small" color={theme.colors.primary} />
           ) : value || query ? (
-            <Pressable
+            <IconButton
               onPress={handleClear}
               hitSlop={8}
               style={styles.clear}
-              accessibilityRole="button"
               accessibilityLabel="Borrar dirección"
-            >
-              <MaterialIcons
-                name="close"
-                size={20}
-                color={theme.colors.textSecondary}
-              />
-            </Pressable>
+              iconName="close"
+              variant="plain"
+              color={theme.colors.textSecondary}
+            />
           ) : undefined
         }
         autoCorrect={false}
@@ -229,7 +236,15 @@ export const PlacesAutocompleteInput: React.FC<Props> = ({
             </View>
           )}
           {searchError && (
-            <Pressable onPress={retry} accessibilityRole="button">
+            <Pressable
+              onPress={retry}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                minHeight: 48,
+                justifyContent: 'center',
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
               <Text style={[styles.errorText, { color: theme.colors.primary }]}>
                 Reintentar búsqueda
               </Text>

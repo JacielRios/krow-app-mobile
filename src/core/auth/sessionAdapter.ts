@@ -31,16 +31,31 @@ export const sessionAdapter = {
     supabaseAuthClient.auth.updateUser({ password }),
   acceptAuthLink: async (url: string) => {
     if (!Config.KROW_AUTH_REDIRECT_URL) return false;
-    const parsed = new URL(url),
+    let parsed: URL, expected: URL;
+    try {
+      parsed = new URL(url);
       expected = new URL(Config.KROW_AUTH_REDIRECT_URL);
+    } catch {
+      return false;
+    }
     if (
       parsed.protocol !== 'https:' ||
+      parsed.username ||
+      parsed.password ||
       parsed.origin !== expected.origin ||
       parsed.pathname !== expected.pathname
     )
       return false;
-    const code = parsed.searchParams.get('code');
-    const tokenHash = parsed.searchParams.get('token_hash');
+    const codes = parsed.searchParams.getAll('code');
+    const hashes = parsed.searchParams.getAll('token_hash');
+    if (
+      codes.length > 1 ||
+      hashes.length > 1 ||
+      (codes.length && hashes.length)
+    )
+      return false;
+    const code = codes[0];
+    const tokenHash = hashes[0];
     if (code) {
       const { data, error } =
         await supabaseAuthClient.auth.exchangeCodeForSession(code);
@@ -52,6 +67,7 @@ export const sessionAdapter = {
         : 'authenticated';
     }
     const type = parsed.searchParams.get('type');
+    if (parsed.searchParams.getAll('type').length > 1) return false;
     if (tokenHash && (type === 'recovery' || type === 'signup')) {
       const { error } = await supabaseAuthClient.auth.verifyOtp({
         token_hash: tokenHash,

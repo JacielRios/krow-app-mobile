@@ -12,3 +12,5 @@ export * from './Surface';
 export * from './StatusBadge';
 export * from './Text';
 export * from './AmbientBackground';
+export * from './ListRow';
+export * from './SegmentedControl';

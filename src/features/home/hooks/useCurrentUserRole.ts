@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { sessionAdapter } from '../../../core/auth/sessionAdapter';
-import { userApi } from '../../auth/api/userApi';
+import { readProfile } from '../../pilot/readOnlyQueries';
+import { ApiError } from '../../../core/api/apiClient';
 import {
   useSessionMode,
   type SessionLoginMode,
@@ -14,6 +15,7 @@ export interface CurrentUser {
   driverId: string | null;
   driverStatus: string | null;
   canPublishRides: boolean;
+  offlineSavedAt?: number;
 }
 export interface UseCurrentUserRoleResult {
   user: CurrentUser | null;
@@ -58,10 +60,14 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
   }, []);
   const query = useQuery({
     queryKey: ['me', actor],
-    queryFn: () => userApi.me(),
+    queryFn: () => readProfile(actor!),
     enabled: !!actor,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: q => (q.state.data?.offlineSavedAt ? 15000 : false),
   });
-  const profile = query.data;
+  const denied =
+    query.error instanceof ApiError && [401, 403].includes(query.error.status);
+  const profile = denied ? undefined : query.data;
   const role = useSessionMode(actor, !!profile?.driverProfile);
   const user = useMemo(
     () =>
@@ -77,6 +83,7 @@ export function useCurrentUserRole(): UseCurrentUserRoleResult {
             driverId: profile.driverProfile?.driverId ?? null,
             driverStatus: profile.driverProfile?.status ?? null,
             canPublishRides: profile.canPublishRides,
+            offlineSavedAt: profile.offlineSavedAt,
           }
         : null,
     [profile, role, actor],

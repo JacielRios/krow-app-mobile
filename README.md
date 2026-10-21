@@ -2,6 +2,10 @@
 
 KROW es una aplicación móvil que permite a estudiantes compartir viajes de forma sencilla, económica y organizada.
 
+La actualización privada Android **0.7.0** solicita el permiso de notificaciones al abrir y registra el dispositivo automáticamente tras login si está concedido. Añade publicación de varias fechas con vista previa y recuperación, invitaciones compartidas con solicitud/aprobación y recordatorios de salida. Se conservan bandeja, confirmaciones, chat cronológico, fechas y consulta parcial sin conexión. La API compatible ya está desplegada; las pruebas físicas de permisos, push y recorridos siguen pendientes.
+
+Guías actuales: [permisos y continuación del plan](docs/permissions-recurrence-20261020.md), [solicitudes y aceptación](docs/booking-interactions-20261020.md), [Firebase Android](docs/firebase-android-setup.md), [consulta sin conexión](docs/offline-readonly.md), [filtros de fecha](docs/search-date-filters-20261020.md) y [verificación del APK 0.7.0](docs/android-apk-0.7.0-20261020.json).
+
 La idea es simple:
 **si varios van al mismo lugar, pueden ir juntos.**
 

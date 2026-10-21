@@ -13,7 +13,7 @@ export interface SurfaceProps extends ViewProps {
 
 export const Surface: React.FC<SurfaceProps> = ({
   children,
-  elevation = 2,
+  elevation = 0,
   radius,
   bordered = false,
   style,
@@ -21,7 +21,7 @@ export const Surface: React.FC<SurfaceProps> = ({
   ...props
 }) => {
   const { theme } = useTheme();
-  const resolvedRadius = radius ?? theme.radii.lg;
+  const resolvedRadius = radius ?? theme.radii.md;
 
   return (
     <View
@@ -34,7 +34,8 @@ export const Surface: React.FC<SurfaceProps> = ({
           {
             overflow: 'hidden',
             borderRadius: resolvedRadius,
-            ...(bordered ? { borderColor: theme.colors.border } : {}),
+            borderWidth: bordered ? 1 : 0,
+            borderColor: theme.colors.border,
           },
           contentStyle,
         ]}

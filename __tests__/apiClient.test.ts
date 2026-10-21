@@ -1,4 +1,5 @@
 import { apiRequest } from '../src/core/api/apiClient';
+import { sessionAdapter } from '../src/core/auth/sessionAdapter';
 
 jest.mock('../src/core/auth/sessionAdapter', () => ({
   sessionAdapter: {
@@ -25,6 +26,20 @@ const pendingFetch = () =>
         );
       }),
   );
+test('HTTP 204 is a normal empty result without trying to parse JSON', async () => {
+  const json = jest.fn(async () => {
+    throw new Error('No body');
+  });
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 204,
+    json,
+  });
+  await expect(
+    apiRequest('/rides/mine/active?context=driver'),
+  ).resolves.toBeNull();
+  expect(json).not.toHaveBeenCalled();
+});
 
 test('deadline applies even when a caller supplies a cancellation signal', async () => {
   pendingFetch();
@@ -48,6 +63,39 @@ test('caller cancellation stays a cancellation rather than a timeout', async () 
   await check;
   expect(jest.getTimerCount()).toBe(0);
 });
+test('a cached read is bound to the expected actor and does not leak its internal option to fetch', async () => {
+  const session = (id: string) =>
+    ({
+      data: { session: { access_token: 'test-token', user: { id } } },
+      error: null,
+    } as unknown as Awaited<ReturnType<typeof sessionAdapter.getSession>>);
+  jest
+    .mocked(sessionAdapter.getSession)
+    .mockResolvedValueOnce(session('other'));
+  await expect(
+    apiRequest('/activity', { expectedActorId: 'driver' }),
+  ).rejects.toMatchObject({ status: 401, body: { code: 'ACCOUNT_CHANGED' } });
+  expect(global.fetch).not.toHaveBeenCalled();
+  jest
+    .mocked(sessionAdapter.getSession)
+    .mockResolvedValueOnce(session('driver'));
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => [],
+  });
+  await apiRequest('/activity', {
+    expectedActorId: 'driver',
+    headers: { Authorization: 'Bearer other-token' },
+  });
+  expect((global.fetch as jest.Mock).mock.calls[0][1]).not.toHaveProperty(
+    'expectedActorId',
+  );
+  expect(
+    (global.fetch as jest.Mock).mock.calls[0][1].headers.Authorization,
+  ).toBe('Bearer test-token');
+});
+
 test('network failures are actionable and HTTP errors retain their code', async () => {
   (global.fetch as jest.Mock).mockRejectedValueOnce(
     new TypeError('Network request failed'),

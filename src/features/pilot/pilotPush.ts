@@ -3,6 +3,7 @@ import * as Keychain from 'react-native-keychain';
 import { apiRequest } from '../../core/api/apiClient';
 import { newId } from './nativeTracking';
 import { sessionAdapter } from '../../core/auth/sessionAdapter';
+import { notificationsAllowed } from './notificationPermission';
 const native = NativeModules.KrowNotifications as
   | {
       requestToken: () => Promise<string>;
@@ -12,15 +13,19 @@ const native = NativeModules.KrowNotifications as
   | undefined;
 let generation = 0;
 let registration: AbortController | null = null;
-function invalidateRegistration() {
+let registeredActor: string | undefined;
+function invalidateRegistration(deactivate = true) {
   generation += 1;
   registration?.abort();
   registration = null;
-  native?.setSessionActive(false);
+  if (deactivate) {
+    registeredActor = undefined;
+    native?.setSessionActive(false);
+  }
   return generation;
 }
 export async function registerPilotPush(interactive = true) {
-  const request = invalidateRegistration();
+  const request = invalidateRegistration(false);
   const assertCurrent = () => {
     if (request !== generation)
       throw new Error('La activación de avisos se canceló.');
@@ -28,20 +33,21 @@ export async function registerPilotPush(interactive = true) {
   const session = (await sessionAdapter.getSession()).data.session;
   const actor = session?.user.id;
   assertCurrent();
-  if (!actor) throw new Error('Inicia sesión para recibir avisos');
+  if (!actor) {
+    invalidateRegistration();
+    throw new Error('Inicia sesión para recibir avisos');
+  }
+  if (registeredActor !== actor) native?.setSessionActive(false);
   if (!native || Platform.OS !== 'android')
     throw new Error(
       'Las notificaciones requieren una compilación Android configurada.',
     );
   if (
-    Number(Platform.Version) >= 33 &&
-    !(interactive
+    !(interactive && Number(Platform.Version) >= 33
       ? (await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
         )) === PermissionsAndroid.RESULTS.GRANTED
-      : await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-        ))
+      : await notificationsAllowed())
   )
     throw new Error(
       'Permite las notificaciones para recibir avisos del viaje.',
@@ -92,18 +98,16 @@ export async function registerPilotPush(interactive = true) {
   assertCurrent();
   native.setSessionActor(actor);
   native.setSessionActive(true);
+  registeredActor = actor;
 }
 export async function synchronizePilotPush(active: boolean) {
-  const request = invalidateRegistration();
   if (!active) {
-    native?.setSessionActive(false);
+    invalidateRegistration();
     return;
   }
-  if (
-    (await Keychain.getGenericPassword({ service: 'krow.pilot.push' })) &&
-    request === generation
-  )
-    await registerPilotPush(false);
+  // OS permission is the consent. Register after login even on a fresh install;
+  // returning from Android settings also recovers a newly granted permission.
+  await registerPilotPush(false);
 }
 export async function unregisterPilotPush() {
   invalidateRegistration();

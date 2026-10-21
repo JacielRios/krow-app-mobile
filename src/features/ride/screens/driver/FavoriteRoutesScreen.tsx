@@ -1,5 +1,7 @@
+import { KrowAlert as Alert } from '../../../../shared/components/ui-v2/dialogService';
+import { IconButton } from '../../../../shared/components/ui-v2';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -108,7 +110,18 @@ export const FavoriteRoutesScreen: React.FC = () => {
           />
         ) : (
           favorites.map(favorite => (
-            <Card key={favorite.routeId} variant="outlined" style={styles.card}>
+            <Card
+              key={favorite.routeId}
+              variant="flat"
+              style={[
+                styles.card,
+                {
+                  paddingVertical: 20,
+                  borderBottomWidth: 0.5,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
               <View style={styles.cardHeader}>
                 <MaterialIcons
                   name={favorite.hasStaleStops ? 'warning-amber' : 'route'}
@@ -153,16 +166,18 @@ export const FavoriteRoutesScreen: React.FC = () => {
               <View style={styles.actions}>
                 <Button
                   title="Usar para publicar"
+                  variant="tonal"
                   size="sm"
+                  fullWidth={false}
                   onPress={() =>
                     navigation.navigate('PublishRide', {
                       favoriteRouteId: favorite.routeId,
                     })
                   }
+                  iconName="add-road"
                 />
-                <Button
-                  title="Editar"
-                  variant="outline"
+                <IconButton
+                  variant="plain"
                   size="sm"
                   onPress={() =>
                     navigation.navigate('PublishRide', {
@@ -170,13 +185,19 @@ export const FavoriteRoutesScreen: React.FC = () => {
                       favoriteOnly: true,
                     })
                   }
+                  iconName="edit"
+                  accessibilityLabel={`Editar ruta ${favorite.name}`}
+                  color={theme.colors.primary}
+                  disabled={deleting}
                 />
-                <Button
-                  title="Eliminar"
-                  variant="text"
+                <IconButton
+                  variant="plain"
                   size="sm"
                   disabled={deleting}
                   onPress={() => confirmDelete(favorite)}
+                  iconName="delete-outline"
+                  accessibilityLabel={`Eliminar ruta ${favorite.name}`}
+                  color={theme.colors.status.error}
                 />
               </View>
             </Card>
@@ -220,5 +241,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   warning: { fontSize: typography.size.sm, marginTop: spacing.sm },
-  actions: { gap: spacing.sm, marginTop: spacing.md },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
 });

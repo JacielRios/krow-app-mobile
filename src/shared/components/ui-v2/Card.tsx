@@ -3,7 +3,6 @@ import { StyleProp, ViewStyle } from 'react-native';
 import { AnimatedPressable } from './AnimatedPressable';
 import { Surface } from './Surface';
 import { useTheme } from '../../theme/ThemeProvider';
-import { glass } from '../../theme/materials';
 
 export type CardVariant = 'elevated' | 'outlined' | 'filled' | 'flat';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
@@ -22,9 +21,9 @@ export interface CardProps {
 
 export const Card: React.FC<CardProps> = ({
   children,
-  variant = 'elevated',
+  variant = 'flat',
   padding = 'md',
-  radius = 'lg',
+  radius = 'md',
   onPress,
   style,
   contentStyle,
@@ -37,19 +36,23 @@ export const Card: React.FC<CardProps> = ({
     md: theme.spacing.md,
     lg: theme.spacing.lg,
   }[padding];
-  const radiusValue = theme.radii[radius];
-  const fill = variant === 'filled' ? theme.colors.primarySoft : undefined;
+  const radiusValue = variant === 'flat' ? 0 : theme.radii[radius];
+  const fill = variant === 'flat' ? 'transparent' : theme.colors.surface;
   const innerStyle: StyleProp<ViewStyle> = [
-    glass(theme),
-    { padding: paddingValue },
-    fill ? { backgroundColor: fill } : {},
+    {
+      padding: variant === 'flat' ? 0 : paddingValue,
+      backgroundColor: fill,
+      borderWidth: variant === 'outlined' ? 1 : 0,
+      borderColor: theme.colors.border,
+    },
     contentStyle,
   ];
 
   if (onPress) {
     return (
       <AnimatedPressable
-        elevation={variant === 'flat' ? 0 : 2}
+        elevation={variant === 'elevated' ? 1 : 0}
+        feedback="opacity"
         radius={radiusValue}
         onPress={onPress}
         style={style}
@@ -63,7 +66,7 @@ export const Card: React.FC<CardProps> = ({
   }
   return (
     <Surface
-      elevation={variant === 'flat' ? 0 : 2}
+      elevation={variant === 'elevated' ? 1 : 0}
       radius={radiusValue}
       bordered={variant === 'outlined'}
       style={style}
