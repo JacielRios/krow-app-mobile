@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-21T22:47:54.8505412Z",
+  "apk": "artifacts/android/krow-0.8.1-trial.apk",
+  "sha256": "F0AF920E6AF0B2C81DE9558F206ED48FAD41C03B917F0153444A7CF08E416769",
+  "bytes": 137099586,
+  "package": "com.krownmobileapp",
+  "versionCode": 14,
+  "versionName": "0.8.1-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3981792,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "sourceCommit": "074009efa96e0ae0260d2a561430143f8fcf900e",
+  "exclusiveDropoffBundleVerified": true,
+  "configurationPublicOnlyValidated": true,
+  "firebaseConfigurationValidated": true,
+  "tests": {
+    "suiteCount": 48,
+    "testCount": 289,
+    "initialPassed": 288,
+    "initialTimeouts": 1,
+    "retriedSuite": "requestRideFlow.test.tsx",
+    "retriedSuitePassed": 18,
+    "retryResult": "passed without changing test timeouts"
+  }
+}
