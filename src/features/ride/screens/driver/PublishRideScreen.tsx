@@ -29,6 +29,7 @@ import { ApiError } from '../../../../core/api/apiClient';
 import { money, rideDate } from '../../../../shared/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Config from 'react-native-config';
 
 import type { MainStackParamList } from '../../../../app/navigation/MainNavigator';
 import {
@@ -1249,8 +1250,14 @@ export const PublishRideScreen: React.FC = () => {
                         style={[
                           styles.stopCard,
                           {
-                            borderBottomWidth: 0.5,
-                            borderBottomColor: theme.colors.border,
+                            borderWidth: 1,
+                            borderRadius: radii.md,
+                            borderColor: selected
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                            backgroundColor: selected
+                              ? theme.colors.primarySoft
+                              : theme.colors.surface,
                           },
                         ]}
                       >
@@ -1516,6 +1523,11 @@ export const PublishRideScreen: React.FC = () => {
                             value: money(
                               Math.round(Number(pricePerSeat) * 100),
                             ),
+                            detail:
+                              !favoriteOnly &&
+                              Config.KROW_PILOT_ENABLED === 'true'
+                                ? 'Pago en efectivo de cada pasajero'
+                                : 'Importe por cada asiento reservado',
                           },
                         ]
                       : []),
@@ -1820,7 +1832,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   stopList: { marginBottom: spacing.md },
-  stopCard: { paddingVertical: 12, marginBottom: spacing.sm },
+  stopCard: { padding: 12, marginBottom: spacing.sm },
   stopRow: { flexDirection: 'row', alignItems: 'center' },
   stopCopy: { flex: 1, marginLeft: spacing.sm },
   stopName: {

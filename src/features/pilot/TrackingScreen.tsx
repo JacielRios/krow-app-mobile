@@ -285,15 +285,19 @@ export function TrackingScreen() {
     : snapshot?.myStop?.address ??
       (data.role === 'pasajero' ? data.myBooking.dropoffAddress : '');
   const target = placeLabel(targetAddress, 'Destino del viaje');
-  const panelHeight = Math.max(
-    220,
-    Math.min(
-      mapHeight - insets.top - 72,
-      expanded
-        ? mapHeight * 0.76
-        : Math.max(270, 240 * Math.min(fontScale, 1.6)),
-    ),
+  const availablePanelHeight = Math.max(0, mapHeight - insets.top - 72);
+  const collapsedPanelHeight = Math.min(
+    availablePanelHeight,
+    Math.max(driver && next ? 360 : 290, 260 * Math.min(fontScale, 1.6)),
   );
+  const panelHeight = expanded
+    ? Math.min(
+        availablePanelHeight,
+        Math.max(collapsedPanelHeight, mapHeight * 0.76),
+      )
+    : collapsedPanelHeight;
+  const pickupAction = next?.pickups?.[0];
+  const dropoffAction = pickupAction ? undefined : next?.dropoffs?.[0];
   const positionLabel =
     tracking.state !== 'live'
       ? tracking.ageSeconds != null
@@ -449,65 +453,66 @@ export function TrackingScreen() {
                 </Text>
               </View>
             </View>
-            {expanded && (
-              <>
-                {!!snapshot?.route?.error && (
-                  <Text tone="error">{snapshot.route.error}</Text>
-                )}
-                {!!tracking.error && (
-                  <Text tone="error">
-                    No pudimos actualizar el GPS. Reintentando conexión…
-                  </Text>
-                )}
-                {driver && (
-                  <>
-                    <Card>
-                      <View style={{ gap: 12 }}>
-                        <Text variant="title">Movimientos de pasajeros</Text>
-                        {!next && (
-                          <TripNotice
-                            title="Sin paradas pendientes"
-                            description="Continúa al destino. La opción de finalizar aparecerá cuando el viaje lo permita."
-                          />
-                        )}
-                        {proximity != null && proximity < 200 && (
-                          <Text
-                            accessibilityLiveRegion="polite"
-                            style={{ color: theme.colors.primary }}
+            <>
+              {expanded && !!snapshot?.route?.error && (
+                <Text tone="error">{snapshot.route.error}</Text>
+              )}
+              {expanded && !!tracking.error && (
+                <Text tone="error">
+                  No pudimos actualizar el GPS. Reintentando conexión…
+                </Text>
+              )}
+              {driver && (
+                <>
+                  <Card>
+                    <View style={{ gap: 12 }}>
+                      <Text variant="title">En esta parada</Text>
+                      {!next && (
+                        <TripNotice
+                          title="Sin paradas pendientes"
+                          description="Continúa al destino. La opción de finalizar aparecerá cuando el viaje lo permita."
+                        />
+                      )}
+                      {proximity != null && proximity < 200 && (
+                        <Text
+                          accessibilityLiveRegion="polite"
+                          style={{ color: theme.colors.primary }}
+                        >
+                          Estás cerca de la parada · {Math.round(proximity)} m
+                        </Text>
+                      )}
+                      {next?.pickups?.map(p => (
+                        <View key={p.bookingId} style={{ gap: 8 }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
                           >
-                            Estás cerca de la parada · {Math.round(proximity)} m
-                          </Text>
-                        )}
-                        {next?.pickups?.map(p => (
-                          <View key={p.bookingId} style={{ gap: 8 }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 12,
-                              }}
-                            >
-                              <Avatar name={p.name} size="md" />
-                              <View style={{ flex: 1, gap: 2 }}>
-                                <Text style={{ fontWeight: '600' }}>
-                                  {p.name}
-                                </Text>
-                                <Text variant="caption" tone="secondary">
-                                  Sube en esta parada
-                                </Text>
-                              </View>
-                              <IconButton
-                                variant="plain"
-                                accessibilityLabel={`Abrir chat con ${p.name}`}
-                                onPress={() =>
-                                  navigation.navigate('Chat', {
-                                    bookingId: p.bookingId,
-                                  })
-                                }
-                                iconName="chat-bubble-outline"
-                                color={theme.colors.primary}
-                              />
+                            <Avatar name={p.name} size="md" />
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <Text style={{ fontWeight: '600' }}>
+                                {p.name}
+                              </Text>
+                              <Text variant="caption" tone="secondary">
+                                Sube en esta parada
+                              </Text>
                             </View>
+                            <IconButton
+                              variant="plain"
+                              accessibilityLabel={`Abrir chat con ${p.name}`}
+                              onPress={() =>
+                                navigation.navigate('Chat', {
+                                  bookingId: p.bookingId,
+                                })
+                              }
+                              iconName="chat-bubble-outline"
+                              color={theme.colors.primary}
+                            />
+                          </View>
+                          {(canFinish ||
+                            p.bookingId !== pickupAction?.bookingId) && (
                             <Button
                               title={`Confirmar subida de ${p.name}`}
                               loading={busy}
@@ -523,51 +528,54 @@ export function TrackingScreen() {
                                 )
                               }
                             />
-                            <Button
-                              title="No se presentó"
-                              variant="text"
-                              size="sm"
-                              disabled={busy}
-                              onPress={() =>
-                                confirmAction({
-                                  title: 'Confirmar ausencia',
-                                  message: `${p.name} no podrá seguir este viaje.`,
-                                  confirmLabel: 'Confirmar ausencia',
-                                  onConfirm: () =>
-                                    void run(
-                                      () =>
-                                        pilotApi.attend(
-                                          rideId,
-                                          p.bookingId,
-                                          'no-show',
-                                        ),
-                                      'Ausencia registrada',
-                                    ),
-                                  destructive: true,
-                                })
-                              }
-                            />
-                          </View>
-                        ))}
-                        {next?.dropoffs?.map(p => (
-                          <View key={p.bookingId} style={{ gap: 8 }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 12,
-                              }}
-                            >
-                              <Avatar name={p.name} size="md" />
-                              <View style={{ flex: 1, gap: 2 }}>
-                                <Text style={{ fontWeight: '600' }}>
-                                  {p.name}
-                                </Text>
-                                <Text variant="caption" tone="secondary">
-                                  Baja en esta parada
-                                </Text>
-                              </View>
+                          )}
+                          <Button
+                            title="No se presentó"
+                            variant="text"
+                            size="sm"
+                            disabled={busy}
+                            onPress={() =>
+                              confirmAction({
+                                title: 'Confirmar ausencia',
+                                message: `${p.name} no podrá seguir este viaje.`,
+                                confirmLabel: 'Confirmar ausencia',
+                                onConfirm: () =>
+                                  void run(
+                                    () =>
+                                      pilotApi.attend(
+                                        rideId,
+                                        p.bookingId,
+                                        'no-show',
+                                      ),
+                                    'Ausencia registrada',
+                                  ),
+                                destructive: true,
+                              })
+                            }
+                          />
+                        </View>
+                      ))}
+                      {next?.dropoffs?.map(p => (
+                        <View key={p.bookingId} style={{ gap: 8 }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <Avatar name={p.name} size="md" />
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <Text style={{ fontWeight: '600' }}>
+                                {p.name}
+                              </Text>
+                              <Text variant="caption" tone="secondary">
+                                Baja en esta parada
+                              </Text>
                             </View>
+                          </View>
+                          {(canFinish ||
+                            p.bookingId !== dropoffAction?.bookingId) && (
                             <Button
                               title={`Confirmar bajada de ${p.name}`}
                               loading={busy}
@@ -583,106 +591,114 @@ export function TrackingScreen() {
                                 )
                               }
                             />
-                            <Button
-                              title="Ver cobro y reserva"
-                              variant="text"
-                              size="sm"
-                              onPress={() =>
-                                navigation.navigate('RideHistory', { rideId })
-                              }
-                            />
-                          </View>
-                        ))}
-                      </View>
-                    </Card>
-                    {!!gpsError && (
-                      <Text tone="error" accessibilityLiveRegion="polite">
-                        {gpsError}
-                      </Text>
-                    )}
-                    <Button
-                      title="Reanudar GPS"
-                      variant="ghost"
-                      onPress={() =>
-                        void pilotTracking
-                          .start(rideId)
-                          .then(() => {
-                            if (screenActive.current) setGpsError(null);
-                          })
-                          .catch(e => {
-                            if (screenActive.current)
-                              setFeedback(
-                                e instanceof Error
-                                  ? e.message
-                                  : 'No pudimos reanudar el GPS',
-                              );
-                          })
-                      }
-                      iconName="my-location"
-                    />
-                    <Button
-                      title="Actualizar recorrido"
-                      variant="ghost"
-                      disabled={!snapshot || tracking.state !== 'live' || busy}
-                      onPress={() =>
-                        confirmAction({
-                          title: 'Actualizar recorrido',
-                          message:
-                            'Se calculará desde tu ubicación actual, conservando las paradas pendientes. Los pasajeros verán el mismo recorrido.',
-                          confirmLabel: 'Actualizar',
-                          onConfirm: () =>
-                            void run(
-                              () =>
-                                pilotApi.reroute(
-                                  rideId,
-                                  snapshot!.route.version,
-                                ),
-                              'Recorrido actualizado para todos los participantes',
-                            ),
-                          destructive: false,
-                        })
-                      }
-                      iconName="refresh"
-                    />
-                  </>
-                )}
-                {data.role === 'pasajero' && (
-                  <View style={{ gap: 16 }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 12,
-                      }}
-                    >
-                      <Avatar
-                        name={data.driver.fullName ?? undefined}
-                        size="md"
-                      />
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <Text style={{ fontWeight: '600' }}>
-                          {data.driver.fullName ?? 'Tu conductor'}
-                        </Text>
-                        <TripStatus status={data.myBooking.status} />
-                      </View>
+                          )}
+                          <Button
+                            title="Ver cobro y reserva"
+                            variant="text"
+                            size="sm"
+                            onPress={() =>
+                              navigation.navigate('RideHistory', { rideId })
+                            }
+                          />
+                        </View>
+                      ))}
                     </View>
-                    <TripFacts
-                      items={[
-                        {
-                          icon: 'directions-car',
-                          label: 'Tu vehículo',
-                          value:
-                            [
-                              data.driver.vehicleBrand,
-                              data.driver.vehicleModel,
-                              data.driver.vehicleColor,
-                              data.driver.vehicleLicensePlate,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ') || 'Sin datos del vehículo',
-                        },
-                      ]}
+                  </Card>
+                  {expanded && (
+                    <>
+                      {!!gpsError && (
+                        <Text tone="error" accessibilityLiveRegion="polite">
+                          {gpsError}
+                        </Text>
+                      )}
+                      <Button
+                        title="Reanudar GPS"
+                        variant="ghost"
+                        onPress={() =>
+                          void pilotTracking
+                            .start(rideId)
+                            .then(() => {
+                              if (screenActive.current) setGpsError(null);
+                            })
+                            .catch(e => {
+                              if (screenActive.current)
+                                setFeedback(
+                                  e instanceof Error
+                                    ? e.message
+                                    : 'No pudimos reanudar el GPS',
+                                );
+                            })
+                        }
+                        iconName="my-location"
+                      />
+                      <Button
+                        title="Actualizar recorrido"
+                        variant="ghost"
+                        disabled={
+                          !snapshot || tracking.state !== 'live' || busy
+                        }
+                        onPress={() =>
+                          confirmAction({
+                            title: 'Actualizar recorrido',
+                            message:
+                              'Se calculará desde tu ubicación actual, conservando las paradas pendientes. Los pasajeros verán el mismo recorrido.',
+                            confirmLabel: 'Actualizar',
+                            onConfirm: () =>
+                              void run(
+                                () =>
+                                  pilotApi.reroute(
+                                    rideId,
+                                    snapshot!.route.version,
+                                  ),
+                                'Recorrido actualizado para todos los participantes',
+                              ),
+                            destructive: false,
+                          })
+                        }
+                        iconName="refresh"
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              {data.role === 'pasajero' && (
+                <View style={{ gap: 16 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <Avatar
+                      name={data.driver.fullName ?? undefined}
+                      size="md"
                     />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontWeight: '600' }}>
+                        {data.driver.fullName ?? 'Tu conductor'}
+                      </Text>
+                      <TripStatus status={data.myBooking.status} />
+                    </View>
+                  </View>
+                  <TripFacts
+                    items={[
+                      {
+                        icon: 'directions-car',
+                        label: 'Tu vehículo',
+                        value:
+                          [
+                            data.driver.vehicleBrand,
+                            data.driver.vehicleModel,
+                            data.driver.vehicleColor,
+                            data.driver.vehicleLicensePlate,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || 'Sin datos del vehículo',
+                      },
+                    ]}
+                  />
+                  {expanded && (
                     <TripRoute
                       origin={snapshot?.myPickup?.address}
                       destination={
@@ -693,8 +709,10 @@ export function TrackingScreen() {
                       destinationLabel="Bajada"
                       expandable
                     />
-                  </View>
-                )}
+                  )}
+                </View>
+              )}
+              {expanded && (
                 <ListRow
                   title="Estado de conexión"
                   subtitle={
@@ -704,25 +722,25 @@ export function TrackingScreen() {
                   }
                   onPress={() => setShowConnection(value => !value)}
                 />
-                {showConnection && (
-                  <View style={{ gap: 8 }}>
-                    {!!position && (
-                      <Text variant="caption" tone="secondary">
-                        Precisión aproximada: {Math.round(position.accuracy)} m
-                      </Text>
-                    )}
+              )}
+              {expanded && showConnection && (
+                <View style={{ gap: 8 }}>
+                  {!!position && (
                     <Text variant="caption" tone="secondary">
-                      {tracking.ageSeconds != null
-                        ? 'Última ubicación hace ' + tracking.ageSeconds + ' s'
-                        : 'Aún no hay una ubicación disponible.'}
+                      Precisión aproximada: {Math.round(position.accuracy)} m
                     </Text>
-                  </View>
-                )}
-                {!!feedback && (
-                  <Text accessibilityLiveRegion="polite">{feedback}</Text>
-                )}
-              </>
-            )}
+                  )}
+                  <Text variant="caption" tone="secondary">
+                    {tracking.ageSeconds != null
+                      ? 'Última ubicación hace ' + tracking.ageSeconds + ' s'
+                      : 'Aún no hay una ubicación disponible.'}
+                  </Text>
+                </View>
+              )}
+              {!!feedback && (
+                <Text accessibilityLiveRegion="polite">{feedback}</Text>
+              )}
+            </>
           </ScrollView>
           <View
             style={{
@@ -740,6 +758,27 @@ export function TrackingScreen() {
                   loading={busy}
                   onPress={finish}
                   iconName="flag"
+                />
+              ) : pickupAction || dropoffAction ? (
+                <Button
+                  title={
+                    pickupAction
+                      ? `Confirmar subida de ${pickupAction.name}`
+                      : `Confirmar bajada de ${dropoffAction!.name}`
+                  }
+                  loading={busy}
+                  onPress={() =>
+                    void run(
+                      () =>
+                        pilotApi.attend(
+                          rideId,
+                          (pickupAction ?? dropoffAction)!.bookingId,
+                          pickupAction ? 'board' : 'dropoff',
+                        ),
+                      pickupAction ? 'Subida confirmada' : 'Bajada confirmada',
+                    )
+                  }
+                  iconName={pickupAction ? 'person-add' : 'where-to-vote'}
                 />
               ) : (
                 <Button

@@ -2,6 +2,7 @@ import { TripFacts, TripRoute } from './TripPresentation';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Config from 'react-native-config';
 
 import { colors } from '../../../shared/theme/colors';
 import { radii, spacing, typography } from '../../../shared/theme/tokens';
@@ -168,14 +169,23 @@ export const RideCard: React.FC<RideCardProps> = ({
       </AnimatedPressable>
       <View style={styles.footer}>
         <View style={styles.priceWrap}>
-          <Text style={[styles.price, { color: theme.colors.primary }]}>
-            {formatPriceMxn(ride.pricePerSeat)}
-          </Text>
-          <Text
-            style={[styles.priceUnit, { color: theme.colors.textSecondary }]}
-          >
-            / asiento
-          </Text>
+          <View style={styles.priceRow}>
+            <Text style={[styles.price, { color: theme.colors.textPrimary }]}>
+              {formatPriceMxn(ride.pricePerSeat)}
+            </Text>
+            <Text
+              style={[styles.priceUnit, { color: theme.colors.textSecondary }]}
+            >
+              / asiento
+            </Text>
+          </View>
+          {Config.KROW_PILOT_ENABLED === 'true' && (
+            <Text
+              style={[styles.cashLabel, { color: theme.colors.textSecondary }]}
+            >
+              Pago en efectivo
+            </Text>
+          )}
         </View>
         <View style={styles.actionWrap}>
           <Button
@@ -200,11 +210,14 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   headerText: {
     flex: 1,
+    minWidth: 120,
     marginLeft: spacing.sm,
   },
   driverName: {
@@ -282,9 +295,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   priceWrap: {
+    gap: 2,
+    flexShrink: 1,
+  },
+  priceRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
   },
+  cashLabel: { fontSize: typography.size.sm },
   price: {
     fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,

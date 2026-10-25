@@ -66,6 +66,17 @@ export function BookingNoticeCard({
     }
   };
   const driver = item.role === 'driver';
+  const guidance = driver
+    ? item.canRespond
+      ? 'Revisa la subida, la bajada y la aportación antes de responder.'
+      : 'Consulta el estado y los detalles de esta reserva.'
+    : item.status === 'confirmed'
+    ? 'Tu lugar está reservado. Revisa el punto de encuentro antes de salir.'
+    : item.status === 'pending'
+    ? 'Espera la respuesta del conductor. Enviar la solicitud todavía no reserva tu lugar.'
+    : item.status === 'rejected' || item.status === 'cancelled'
+    ? 'Esta reserva ya no está disponible. Puedes buscar otro viaje.'
+    : 'Consulta el detalle para revisar el estado de tu reserva.';
   return (
     <View
       style={{
@@ -77,7 +88,9 @@ export function BookingNoticeCard({
     >
       <Text variant="title" accessibilityRole="header">
         {driver
-          ? 'Solicitud para tu viaje'
+          ? item.canRespond
+            ? 'Solicitud para tu viaje'
+            : 'Estado de la solicitud'
           : item.status === 'confirmed'
           ? '¡Tu lugar está confirmado!'
           : 'Tu solicitud cambió'}
@@ -96,23 +109,20 @@ export function BookingNoticeCard({
         </View>
       </View>
       <TripStatus status={item.status} />
+      <Text tone="secondary">{guidance}</Text>
       <TripRoute
         origin={item.pickupAddress}
         destination={item.dropoffAddress}
         originLabel="Subida solicitada"
         destinationLabel="Parada de bajada"
       />
-      <Text tone="secondary">
-        {item.origin || 'Origen del viaje'} →{' '}
-        {item.destination || 'Destino del viaje'}
-      </Text>
       {!driver && !!item.vehicle && <Text>{item.vehicle}</Text>}
       <TripFacts
         items={[
           { icon: 'event-seat', label: 'Lugares', value: String(item.seats) },
           {
             icon: 'payments',
-            label: 'Aportación',
+            label: 'Total en efectivo',
             value: money(item.amountCents),
           },
         ]}

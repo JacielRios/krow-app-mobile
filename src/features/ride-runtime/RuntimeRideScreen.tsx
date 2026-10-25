@@ -22,6 +22,7 @@ import { nativeNavigation, type NativeGuidance } from './nativeNavigation';
 import type { RuntimeAction } from './protocol';
 import * as Keychain from 'react-native-keychain';
 import { registerTripNotifications } from './pushRegistration';
+import { TripRoute, TripStatus } from '../ride/components/TripPresentation';
 
 const labels = {
   scheduled: 'Viaje programado',
@@ -469,6 +470,22 @@ export function RuntimeRideScreen({
                           <Text style={{ color: foreground }}>
                             Solicitud · {b.seats} asiento(s)
                           </Text>
+                          <TripStatus status={b.status} />
+                          <TripRoute
+                            compact
+                            origin={
+                              snapshot.stops.find(
+                                s => s.stopId === b.pickupStopId,
+                              )?.address
+                            }
+                            destination={
+                              snapshot.stops.find(
+                                s => s.stopId === b.dropoffStopId,
+                              )?.address
+                            }
+                            originLabel="Subida solicitada"
+                            destinationLabel="Parada de bajada"
+                          />
                           {button(
                             'Aceptar',
                             () => dispatch('accept_booking', b.bookingId),
@@ -566,14 +583,25 @@ export function RuntimeRideScreen({
                   key={b.bookingId}
                   style={[styles.card, { backgroundColor: 'transparent' }]}
                 >
-                  <Text style={{ color: foreground }}>
-                    Tu descenso:{' '}
-                    {
+                  <TripStatus status={b.status} />
+                  <TripRoute
+                    origin={
+                      snapshot.stops.find(s => s.stopId === b.pickupStopId)
+                        ?.address
+                    }
+                    destination={
                       snapshot.stops.find(s => s.stopId === b.dropoffStopId)
                         ?.address
                     }
-                  </Text>
-                  <Text style={{ color: foreground }}>Reserva: {b.status}</Text>
+                    originLabel="Tu punto de encuentro"
+                    destinationLabel="Tu parada de descenso"
+                  />
+                  {b.status === 'pending' && (
+                    <Text style={{ color: theme.colors.textSecondary }}>
+                      Espera la respuesta del conductor. Tu lugar aún no está
+                      confirmado.
+                    </Text>
+                  )}
                   {['pending', 'confirmed'].includes(b.status) &&
                     button(
                       'Cancelar reserva',
@@ -637,7 +665,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, gap: 12 },
   map: { height: '42%', overflow: 'hidden' },
-  card: { paddingVertical: 20, gap: 12 },
+  card: { padding: 16, borderRadius: 20, gap: 12 },
   button: {
     minHeight: 52,
     borderRadius: 12,

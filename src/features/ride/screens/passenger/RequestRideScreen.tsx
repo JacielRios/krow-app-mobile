@@ -634,6 +634,7 @@ const RideDetailModal: React.FC<{
 }) => {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const selectedDropoff = stopPairs[selectedPairIndex]?.dropoff;
 
   return (
     <AnimatedModal
@@ -654,9 +655,25 @@ const RideDetailModal: React.FC<{
             style={{
               paddingHorizontal: 20,
               paddingBottom: 8,
-              alignItems: 'flex-end',
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: 12,
             }}
           >
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text
+                accessibilityRole="header"
+                style={[
+                  styles.stopOptionsTitle,
+                  { color: theme.colors.textPrimary },
+                ]}
+              >
+                Elige dónde bajar
+              </Text>
+              <Text style={{ color: theme.colors.textSecondary }}>
+                Toca una parada en el mapa o en la lista.
+              </Text>
+            </View>
             <IconButton
               variant="plain"
               disabled={requesting}
@@ -670,38 +687,6 @@ const RideDetailModal: React.FC<{
             contentContainerStyle={styles.modalContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.modalHeader}>
-              <Avatar name={ride.driverName ?? 'Conductor'} size="lg" />
-              <View style={styles.modalHeaderText}>
-                <Text
-                  style={[
-                    styles.modalDriver,
-                    { color: theme.colors.textPrimary },
-                  ]}
-                >
-                  {ride.driverName ?? 'Conductor'}
-                </Text>
-                {ride.driverRating != null && (
-                  <View style={styles.ratingRow}>
-                    <MaterialIcons
-                      name="star"
-                      size={14}
-                      color={theme.colors.status.warning}
-                    />
-                    <Text
-                      style={[
-                        styles.ratingText,
-                        { color: theme.colors.textSecondary },
-                      ]}
-                    >
-                      {ride.driverRating.toFixed(1)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <StatusBadge tone="info" label="Programado" size="sm" />
-            </View>
-
             <View style={styles.modalMapWrap}>
               <RoutePreviewMap
                 origin={ride.origin}
@@ -757,6 +742,155 @@ const RideDetailModal: React.FC<{
                   })),
                 ]}
               />
+            </View>
+
+            <Text
+              style={[
+                styles.stopOptionsHint,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              Puedes elegir cualquier parada habilitada de este viaje.
+              Recomendamos la más cercana; las distancias son aproximadas en
+              línea recta.
+            </Text>
+            {stopOptionsLoading ? (
+              <Skeleton height={84} style={styles.stopOptionSkeleton} />
+            ) : stopOptionsError ? (
+              <FeedbackState
+                kind="error"
+                title="No pudimos cargar las paradas"
+                description={stopOptionsError}
+                actionLabel="Reintentar paradas"
+                onAction={onRetry}
+              />
+            ) : stopPairs.length === 0 ? (
+              <FeedbackState
+                title="No hay bajadas disponibles"
+                description="El conductor actualizó este viaje. Cierra el detalle y consulta otros viajes."
+              />
+            ) : (
+              stopPairs.map((pair, index) => {
+                const selected = index === selectedPairIndex;
+                return (
+                  <TouchableOpacity
+                    key={`${pair.pickup.stopId}-${pair.dropoff.stopId}`}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Bajada ${index + 1}: ${
+                      pair.dropoff.name
+                    }, ${formatStopDistance(
+                      pair.dropoff.distanceMeters,
+                    )} aproximadamente de tu destino${
+                      pair.dropoff.stopId === recommendedDropoffId
+                        ? ', recomendada'
+                        : ''
+                    }`}
+                    accessibilityState={{ selected, disabled: requesting }}
+                    disabled={requesting}
+                    onPress={() => {
+                      if (!stopOptionsLoading) onSelectPair(index);
+                    }}
+                    style={[
+                      styles.stopOption,
+                      {
+                        borderColor: selected
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                        backgroundColor: selected
+                          ? theme.colors.primarySoft
+                          : theme.colors.surfaceRaised,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={
+                        selected
+                          ? 'radio-button-checked'
+                          : 'radio-button-unchecked'
+                      }
+                      size={22}
+                      color={
+                        selected ? theme.colors.primary : theme.colors.textMuted
+                      }
+                    />
+                    <View style={styles.stopOptionCopy}>
+                      <Text
+                        style={[
+                          styles.stopOptionName,
+                          { color: theme.colors.textPrimary },
+                        ]}
+                      >
+                        {index + 1}. {pair.dropoff.name}
+                      </Text>
+                      {pair.dropoff.stopId === recommendedDropoffId && (
+                        <Text
+                          style={[
+                            styles.stopOptionRecommendation,
+                            { color: theme.colors.primary },
+                          ]}
+                        >
+                          Recomendada · la más cercana
+                        </Text>
+                      )}
+                      {!!pair.dropoff.address && (
+                        <Text style={{ color: theme.colors.textSecondary }}>
+                          {pair.dropoff.address}
+                        </Text>
+                      )}
+                      <Text
+                        style={[
+                          styles.stopOptionDistance,
+                          { color: theme.colors.textSecondary },
+                        ]}
+                      >
+                        {formatStopDistance(pair.dropoff.distanceMeters)} aprox.
+                        de tu destino
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
+            <Text
+              style={[
+                styles.tripDetailsTitle,
+                { color: theme.colors.textPrimary },
+              ]}
+              accessibilityRole="header"
+            >
+              Información del viaje
+            </Text>
+            <View style={styles.modalHeader}>
+              <Avatar name={ride.driverName ?? 'Conductor'} size="lg" />
+              <View style={styles.modalHeaderText}>
+                <Text
+                  style={[
+                    styles.modalDriver,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  {ride.driverName ?? 'Conductor'}
+                </Text>
+                {ride.driverRating != null && (
+                  <View style={styles.ratingRow}>
+                    <MaterialIcons
+                      name="star"
+                      size={14}
+                      color={theme.colors.status.warning}
+                    />
+                    <Text
+                      style={[
+                        styles.ratingText,
+                        { color: theme.colors.textSecondary },
+                      ]}
+                    >
+                      {ride.driverRating.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <StatusBadge tone="info" label="Programado" size="sm" />
             </View>
 
             <View
@@ -849,117 +983,6 @@ const RideDetailModal: React.FC<{
                 />
               )}
             </View>
-
-            <Text
-              style={[
-                styles.stopOptionsTitle,
-                { color: theme.colors.textPrimary },
-              ]}
-            >
-              Elige dónde bajar
-            </Text>
-            <Text
-              style={[
-                styles.stopOptionsHint,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              Puedes elegir cualquier parada habilitada de este viaje.
-              Recomendamos la más cercana; las distancias son aproximadas en
-              línea recta.
-            </Text>
-            {stopOptionsLoading ? (
-              <Skeleton height={84} style={styles.stopOptionSkeleton} />
-            ) : stopOptionsError ? (
-              <FeedbackState
-                kind="error"
-                title="No pudimos cargar las paradas"
-                description={stopOptionsError}
-                actionLabel="Reintentar paradas"
-                onAction={onRetry}
-              />
-            ) : stopPairs.length === 0 ? (
-              <FeedbackState
-                title="No hay bajadas disponibles"
-                description="El conductor actualizó este viaje. Cierra el detalle y consulta otros viajes."
-              />
-            ) : (
-              stopPairs.map((pair, index) => {
-                const selected = index === selectedPairIndex;
-                return (
-                  <TouchableOpacity
-                    key={`${pair.pickup.stopId}-${pair.dropoff.stopId}`}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`Bajada ${index + 1}: ${
-                      pair.dropoff.name
-                    }, ${formatStopDistance(
-                      pair.dropoff.distanceMeters,
-                    )} aproximadamente de tu destino${
-                      pair.dropoff.stopId === recommendedDropoffId
-                        ? ', recomendada'
-                        : ''
-                    }`}
-                    accessibilityState={{ selected, disabled: requesting }}
-                    disabled={requesting}
-                    onPress={() => {
-                      if (!stopOptionsLoading) onSelectPair(index);
-                    }}
-                    style={[
-                      styles.stopOption,
-                      {
-                        borderColor: selected
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                        backgroundColor: selected
-                          ? theme.colors.primarySoft
-                          : theme.colors.surfaceRaised,
-                      },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name={
-                        selected
-                          ? 'radio-button-checked'
-                          : 'radio-button-unchecked'
-                      }
-                      size={22}
-                      color={
-                        selected ? theme.colors.primary : theme.colors.textMuted
-                      }
-                    />
-                    <View style={styles.stopOptionCopy}>
-                      <Text
-                        style={[
-                          styles.stopOptionName,
-                          { color: theme.colors.textPrimary },
-                        ]}
-                      >
-                        {index + 1}. {pair.dropoff.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.stopOptionName,
-                          { color: theme.colors.textPrimary },
-                        ]}
-                      >
-                        {pair.dropoff.stopId === recommendedDropoffId
-                          ? 'Recomendada · la más cercana'
-                          : pair.dropoff.address}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.stopOptionDistance,
-                          { color: theme.colors.textSecondary },
-                        ]}
-                      >
-                        {formatStopDistance(pair.dropoff.distanceMeters)} aprox.
-                        de tu destino
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
           </ScrollView>
           <View
             style={{
@@ -969,6 +992,68 @@ const RideDetailModal: React.FC<{
               borderColor: theme.colors.border,
             }}
           >
+            <View style={styles.requestSummary}>
+              <View style={styles.requestSummaryStop}>
+                <MaterialIcons
+                  name="place"
+                  size={20}
+                  color={theme.colors.primary}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text
+                    style={{ color: theme.colors.textSecondary, fontSize: 12 }}
+                  >
+                    Tu bajada
+                  </Text>
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    style={{
+                      color: theme.colors.textPrimary,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {stopOptionsLoading
+                      ? 'Consultando paradas…'
+                      : stopOptionsError
+                      ? 'Revisa las paradas para continuar'
+                      : selectedDropoff?.name ??
+                        'Selecciona una parada disponible'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.requestSummaryAmount}>
+                <Text
+                  style={{ color: theme.colors.textSecondary, fontSize: 12 }}
+                >
+                  Total por 1 asiento
+                </Text>
+                <Text
+                  style={[
+                    styles.requestTotal,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  {formatPriceMxn(ride.pricePerSeat)} MXN
+                </Text>
+                {Config.KROW_PILOT_ENABLED === 'true' && (
+                  <Text
+                    style={{ color: theme.colors.textSecondary, fontSize: 12 }}
+                  >
+                    Pago en efectivo
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.requestHint,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              {alreadyRequested
+                ? 'Solicitud enviada. Espera la respuesta del conductor.'
+                : 'El conductor debe aceptar tu solicitud para confirmar tu lugar.'}
+            </Text>
             <Button
               title={
                 alreadyRequested
@@ -1063,11 +1148,14 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     alignItems: 'center',
     marginBottom: spacing.md,
   },
   modalHeaderText: {
     flex: 1,
+    minWidth: 120,
     marginLeft: spacing.sm,
   },
   modalDriver: {
@@ -1124,6 +1212,40 @@ const styles = StyleSheet.create({
   modalCta: {
     marginTop: spacing.sm,
   },
+  tripDetailsTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  requestSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  requestSummaryStop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flexGrow: 1,
+    flexBasis: 160,
+    gap: 8,
+  },
+  requestTotal: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+  },
+  requestSummaryAmount: {
+    maxWidth: '100%',
+    flexShrink: 1,
+    gap: 2,
+  },
+  requestHint: {
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+    marginTop: spacing.sm,
+  },
   stopOptionsTitle: {
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
@@ -1139,7 +1261,8 @@ const styles = StyleSheet.create({
   },
   stopOption: {
     minHeight: 84,
-    borderBottomWidth: 0.5,
+    borderWidth: 1,
+    borderRadius: radii.md,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1157,5 +1280,10 @@ const styles = StyleSheet.create({
   stopOptionDistance: {
     fontSize: typography.size.sm,
     marginTop: spacing.xs,
+  },
+  stopOptionRecommendation: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    marginBottom: 4,
   },
 });

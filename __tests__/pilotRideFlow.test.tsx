@@ -4,6 +4,7 @@ import Renderer, { act } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button } from '../src/shared/components/ui-v2';
+import { PanelHandle } from '../src/shared/components/ui-v2/PanelHandle';
 import { TrackingScreen } from '../src/features/pilot/TrackingScreen';
 import { ScheduledScreen } from '../src/features/pilot/ScheduledScreen';
 import { HistoryScreen } from '../src/features/pilot/HistoryScreen';
@@ -196,8 +197,11 @@ test('keeps the route visible while exposing and confirming the next passenger d
     'operative',
   );
   const map = tree.root.findByType(RoutePreviewMap);
+  // The next-stop action is available before opening secondary trip details.
+  expect(button('Confirmar bajada de Ana')).toBeDefined();
+  expect(pilotApi.attend).not.toHaveBeenCalled();
   const initialInset = map.props.viewportInsets.bottom;
-  await act(() => button('Ver pasajeros y acciones').props.onPress());
+  await act(() => tree.root.findByType(PanelHandle).props.onChange(true));
   expect(tree.root.findByType(RoutePreviewMap)).toBe(map);
   expect(map.props.viewportInsets.bottom).toBeGreaterThan(initialInset);
   await act(async () => button('Confirmar bajada de Ana').props.onPress());
@@ -213,7 +217,6 @@ test('a rapid double tap confirms a passenger action only once', async () => {
       }),
   );
   await mount(<TrackingScreen />);
-  await act(() => button('Ver pasajeros y acciones').props.onPress());
   const confirm = button('Confirmar bajada de Ana');
   await act(() => {
     confirm.props.onPress();
@@ -222,6 +225,22 @@ test('a rapid double tap confirms a passenger action only once', async () => {
   expect(pilotApi.attend).toHaveBeenCalledTimes(1);
   await act(async () => resolve(undefined));
 });
+test('expanding details never shrinks the panel in a short window', async () => {
+  await mount(<TrackingScreen />);
+  const map = tree.root.findByType(RoutePreviewMap);
+  await act(() =>
+    map.parent!.props.onLayout({ nativeEvent: { layout: { height: 400 } } }),
+  );
+  const collapsed =
+    tree.root.findByType(RoutePreviewMap).props.viewportInsets.bottom;
+  await act(() => tree.root.findByType(PanelHandle).props.onChange(true));
+  const expanded =
+    tree.root.findByType(RoutePreviewMap).props.viewportInsets.bottom;
+  expect(expanded).toBeGreaterThanOrEqual(collapsed);
+  expect(expanded).toBeLessThanOrEqual(328);
+  expect(button('Confirmar bajada de Ana')).toBeDefined();
+});
+
 test('does not display a current ETA or animate a stale vehicle', async () => {
   mockState = 'stale';
   await mount(<TrackingScreen />);
@@ -291,12 +310,36 @@ test('requires resolving pending requests before beginning the trip', async () =
   );
   expect(pilotTracking.prepare).not.toHaveBeenCalled();
 });
+test.each([
+  ['pending', 1, 'Solicitud enviada'],
+  ['confirmed', 2, 'Lugar confirmado'],
+  ['in_progress', 3, 'Subida confirmada'],
+  ['completed', 4, 'Descenso confirmado'],
+])(
+  'reservation %s only announces its server-confirmed stage',
+  async (status, now, text) => {
+    await mount(<ReservationProgress status={status as string} />);
+    const progress = tree.root.findAll(
+      node => node.props.accessibilityRole === 'progressbar',
+    )[0];
+    expect(progress.props.accessibilityValue).toEqual({
+      min: 1,
+      max: 4,
+      now,
+      text,
+    });
+  },
+);
+
 test('a cancelled reservation never presents boarding or dropoff as completed milestones', async () => {
   await mount(<ReservationProgress status="cancelled" />);
   const output = JSON.stringify(tree.toJSON());
   expect(output).toContain('Esta reserva se canceló');
   expect(output).not.toContain('Descenso confirmado');
   expect(output).not.toContain('Subida confirmada');
+  expect(
+    tree.root.findAll(node => node.props.accessibilityRole === 'progressbar'),
+  ).toHaveLength(0);
 });
 
 test('a new reservation stays scheduled after an earlier cancellation on the same trip', async () => {
@@ -404,8 +447,8 @@ test('a cancelled reservation in an ongoing ride never offers passenger tracking
   expect(button('Volver al seguimiento')).toBeUndefined();
   expect(button('Confirmar efectivo recibido')).toBeUndefined();
   const output = JSON.stringify(tree.toJSON());
-  expect(output).toContain('Importe de la reserva');
-  expect(output).toContain('Anulado');
+  expect(output).toContain('Total de la reserva · MXN');
+  expect(output).toContain('Cobro anulado');
 });
 
 test('dismissing finish keeps GPS and the trip running, then double confirmation finishes once', async () => {

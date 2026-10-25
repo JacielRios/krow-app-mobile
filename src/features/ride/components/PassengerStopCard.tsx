@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import { Avatar } from '../../../shared/components/ui/Avatar';
-import { Button } from '../../../shared/components/ui/Button';
+import { Button } from '../../../shared/components/ui-v2';
 import { StatusBadge } from '../../../shared/components/ui/StatusBadge';
 import {
   useThemedStyles,
@@ -49,9 +49,7 @@ export const PassengerStopCard: React.FC<PassengerStopCardProps> = ({
           size="md"
         />
         <View style={styles.headerText}>
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
+          <Text style={styles.name}>{name}</Text>
           {passenger.rating != null && (
             <View style={styles.ratingRow}>
               <MaterialIcons
@@ -74,7 +72,7 @@ export const PassengerStopCard: React.FC<PassengerStopCardProps> = ({
 
       <View style={styles.stopRow}>
         <MaterialIcons name="place" size={16} color={colors.status.error} />
-        <Text style={styles.stopText} numberOfLines={2}>
+        <Text style={styles.stopText}>
           {passenger.dropoffAddress ?? 'Parada del pasajero'}
         </Text>
       </View>
@@ -98,6 +96,10 @@ export const PassengerStopCard: React.FC<PassengerStopCardProps> = ({
             onPress={onComplete}
             loading={busy}
             disabled={anyActionBusy}
+            iconName="where-to-vote"
+            accessibilityLabel={`Confirmar llegada de ${name} a ${
+              passenger.dropoffAddress ?? 'su parada'
+            }`}
           />
         </View>
       )}
@@ -116,11 +118,14 @@ const createStyles = (colors: LegacyColors) =>
     },
     header: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
       alignItems: 'center',
       marginBottom: spacing.sm,
     },
     headerText: {
       flex: 1,
+      minWidth: 120,
       marginLeft: spacing.sm,
     },
     name: {

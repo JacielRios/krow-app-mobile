@@ -2,7 +2,8 @@ import { KrowAlert as Alert } from '../src/shared/components/ui-v2/dialogService
 import { IconButton } from '../src/shared/components/ui-v2';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { PermissionsAndroid } from 'react-native';
+import { PermissionsAndroid, Text } from 'react-native';
+import Config from 'react-native-config';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
 import { Button } from '../src/shared/components/ui-v2';
@@ -116,6 +117,7 @@ let tree: Renderer.ReactTestRenderer;
 let cache: QueryClient;
 beforeEach(() => {
   jest.clearAllMocks();
+  Config.KROW_PILOT_ENABLED = 'true';
   jest.spyOn(Alert, 'alert').mockImplementation(() => 0);
   jest.mocked(rideApi.stopOptions).mockResolvedValue(options);
   jest.mocked(rideApi.search).mockResolvedValue([ride]);
@@ -405,6 +407,20 @@ test('a passenger can choose an enabled 4.8 km drop-off beyond the matching radi
       (item: { id: string }) => item.id === 'dropoff-far-ride',
     );
   await act(() => marker.onPress());
+  expect(
+    tree.root.findAll(
+      node =>
+        node.props.accessibilityLiveRegion === 'polite' &&
+        node.props.children === 'Descenso preferido',
+    ).length,
+  ).toBeGreaterThan(0);
+  const content = tree.root
+    .findAllByType(Text)
+    .map(node => node.props.children);
+  expect(content).toContain('Total por 1 asiento');
+  expect(content).toContain(
+    'El conductor debe aceptar tu solicitud para confirmar tu lugar.',
+  );
   expect(button('Solicitar unirse').props.disabled).toBe(false);
   await act(async () => button('Solicitar unirse').props.onPress());
   expect(bookingApi.request).toHaveBeenCalledWith(
@@ -414,6 +430,28 @@ test('a passenger can choose an enabled 4.8 km drop-off beyond the matching radi
     1,
   );
 });
+
+test.each(['true', 'false'])(
+  'only advertises cash for search and confirmation when pilot mode is enabled (%s)',
+  async pilot => {
+    Config.KROW_PILOT_ENABLED = pilot;
+    await mount();
+    await chooseRoute();
+    await act(async () => button('Buscar viajes').props.onPress());
+    const card = tree.root.findByType(RideCard);
+    expect(
+      card.findAll(node => node.props.children === 'Pago en efectivo').length >
+        0,
+    ).toBe(pilot === 'true');
+    await act(async () => tree.root.findByType(RideCard).props.onRequest());
+    const confirmation = button('Solicitar unirse').parent;
+    expect(
+      (confirmation?.findAll(node => node.props.children === 'Pago en efectivo')
+        .length ?? 0) > 0,
+    ).toBe(pilot === 'true');
+    expect(bookingApi.request).not.toHaveBeenCalled();
+  },
+);
 
 test('ignores stop responses from a previously opened trip', async () => {
   let resolve!: (value: RideStopOptions) => void;

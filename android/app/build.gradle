@@ -149,8 +149,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("trial")) { variant ->
         variant.outputs.each { output ->
-            output.versionCode.set(14)
-            output.versionName.set("0.8.1-trial")
+            output.versionCode.set(15)
+            output.versionName.set("0.9.0-trial")
         }
     }
 }

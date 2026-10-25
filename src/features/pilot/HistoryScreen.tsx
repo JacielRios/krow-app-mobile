@@ -22,6 +22,7 @@ import { ScreenHeader } from '../../shared/components/ui-v2/ScreenHeader';
 import { StarRating } from '../../shared/components/ui/StarRating';
 import { money } from '../../shared/format';
 import { Avatar } from '../../shared/components/ui/Avatar';
+import { CashPaymentSummary } from '../ride/components/CashPaymentSummary';
 import {
   TripFacts,
   TripNotice,
@@ -91,24 +92,10 @@ function BookingSummary({
           destinationLabel="Bajada"
           expandable
         />
-        <TripFacts
-          items={[
-            {
-              icon: 'payments',
-              label: 'Importe de la reserva',
-              value: money(booking.amountCents),
-            },
-            {
-              icon: 'receipt-long',
-              label: 'Cobro',
-              value:
-                booking.cashStatus === 'collected'
-                  ? 'Efectivo recibido'
-                  : booking.cashStatus === 'void'
-                  ? 'Anulado'
-                  : 'Pendiente',
-            },
-          ]}
+        <CashPaymentSummary
+          amountCents={booking.amountCents}
+          role={driver ? 'driver' : 'passenger'}
+          cashStatus={booking.cashStatus}
         />
         {driver &&
           ['in_progress', 'completed'].includes(booking.status) &&
@@ -118,11 +105,11 @@ function BookingSummary({
               loading={busy}
               onPress={() =>
                 confirmAction({
-                  title: 'Registrar efectivo',
+                  title: 'Confirmar efectivo recibido',
                   message: `Confirma que recibiste ${money(
                     booking.amountCents,
-                  )}.`,
-                  confirmLabel: 'Confirmar',
+                  )}. El cobro quedará registrado para esta reserva.`,
+                  confirmLabel: 'Confirmar efectivo recibido',
                   onConfirm: () =>
                     void run(
                       () => pilotApi.collect(booking.bookingId),
@@ -262,7 +249,11 @@ export function HistoryScreen() {
                 <TripNotice
                   icon="navigation"
                   title="El viaje sigue en curso"
-                  description="Aquí puedes revisar las reservas y el efectivo. Vuelve al mapa para continuar el recorrido."
+                  description={
+                    data.role === 'driver'
+                      ? 'Revisa las reservas y registra el efectivo recibido. Vuelve al mapa para continuar el recorrido.'
+                      : 'Puedes consultar tu reserva y el estado del efectivo. Vuelve al mapa para seguir al conductor.'
+                  }
                 />
               )}
               {headingStatus === 'cancelled' && (
@@ -282,7 +273,10 @@ export function HistoryScreen() {
                     },
                     {
                       icon: 'payments',
-                      label: 'Efectivo recibido',
+                      label:
+                        data.role === 'driver'
+                          ? 'Efectivo recibido'
+                          : 'Efectivo registrado por el conductor',
                       value: money(
                         data.bookings
                           .filter(b => b.cashStatus === 'collected')

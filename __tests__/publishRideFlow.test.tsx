@@ -1,6 +1,7 @@
 import { KrowAlert as Alert } from '../src/shared/components/ui-v2/dialogService';
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
+import Config from 'react-native-config';
 import * as Keychain from 'react-native-keychain';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/shared/theme/ThemeProvider';
@@ -135,6 +136,7 @@ let cache: QueryClient;
 const publicationStorage = new Map<string, string>();
 beforeEach(() => {
   jest.clearAllMocks();
+  Config.KROW_PILOT_ENABLED = 'false';
   Object.defineProperty(globalThis, 'crypto', {
     value: require('node:crypto').webcrypto,
     configurable: true,
@@ -270,6 +272,24 @@ test('review presents real facts and ordered numbered stops without changing the
   expect(JSON.stringify(tree.toJSON())).toContain('Por asiento');
   expect(rideApi.create).not.toHaveBeenCalled();
 });
+
+test.each(['true', 'false'])(
+  'review identifies the seat price and limits cash instructions to pilot mode (%s)',
+  async pilot => {
+    Config.KROW_PILOT_ENABLED = pilot;
+    await mount();
+    await chooseDestination();
+    await selectStop('b');
+    await fillDetails();
+    await act(() => button('Continuar').props.onPress());
+    const content = JSON.stringify(tree.toJSON());
+    expect(content).toContain('Por asiento');
+    expect(content.includes('Pago en efectivo de cada pasajero')).toBe(
+      pilot === 'true',
+    );
+    expect(rideApi.create).not.toHaveBeenCalled();
+  },
+);
 
 test('recurrence previews dates before confirmation and publishes each with its own durable ID', async () => {
   jest.mocked(rideApi.create).mockImplementation(async (_payload, request) => ({

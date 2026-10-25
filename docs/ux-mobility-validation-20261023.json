@@ -1,0 +1,169 @@
+{
+  "checkedAt": "2026-10-23T19:39:49.881Z",
+  "tests": {
+    "suites": 50,
+    "totalSuites": 50,
+    "passed": 310,
+    "total": 310,
+    "failed": 0,
+    "success": true,
+    "cacheDirectory": ".tmp/jest-ux-mobility-root",
+    "testTimeoutMs": 15000
+  },
+  "typecheck": "passed",
+  "eslint": "passed --quiet (no errors)",
+  "bundles": [
+    {
+      "platform": "android",
+      "path": "C:\\Users\\Novasys\\Documents\\krow-app-mobile\\.tmp\\ux-mobility-20261023\\android\\index.bundle",
+      "bytes": 3438373,
+      "sha256": "69c5a5dffeb3b88a5a74601d6558e0df5db0c0233a852331682c2ee9c8356be0",
+      "sourceChecks": [
+        {
+          "path": "src/features/pilot/ReservationProgress.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/TrackingScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/ScheduledScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/HistoryScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/BookingRequestsScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/BookingNoticeCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride-runtime/RuntimeRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/screens/passenger/RequestRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/screens/driver/PublishRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/RideCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/PassengerStopCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/CashPaymentSummary.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        }
+      ]
+    },
+    {
+      "platform": "ios",
+      "path": "C:\\Users\\Novasys\\Documents\\krow-app-mobile\\.tmp\\ux-mobility-20261023\\ios\\index.bundle",
+      "bytes": 3425527,
+      "sha256": "ac8080606c52d4a728cd08c9edf40b9406720c11b1a9841bd9476764756fb7c7",
+      "sourceChecks": [
+        {
+          "path": "src/features/pilot/ReservationProgress.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/TrackingScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/ScheduledScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/HistoryScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/BookingRequestsScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/pilot/BookingNoticeCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride-runtime/RuntimeRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/screens/passenger/RequestRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/screens/driver/PublishRideScreen.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/RideCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/PassengerStopCard.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        },
+        {
+          "path": "src/features/ride/components/CashPaymentSummary.tsx",
+          "included": true,
+          "matchesCurrentSource": true
+        }
+      ]
+    }
+  ],
+  "newIcons": [
+    {
+      "name": "person-add",
+      "available": true
+    },
+    {
+      "name": "where-to-vote",
+      "available": true
+    },
+    {
+      "name": "payments",
+      "available": true
+    }
+  ],
+  "nativeVisualQa": "Pending: adb devices -l returned no connected devices",
+  "businessChanges": "None; API, contracts, data and commands unchanged"
+}

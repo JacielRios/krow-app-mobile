@@ -1,4 +1,5 @@
 import { Avatar } from '../../shared/components/ui/Avatar';
+import { CashPaymentSummary } from '../ride/components/CashPaymentSummary';
 import {
   TripFacts,
   TripNotice,
@@ -34,7 +35,6 @@ import {
   FeedbackState,
 } from '../../shared/components/ui-v2';
 import { ScreenHeader } from '../../shared/components/ui-v2/ScreenHeader';
-import { money } from '../../shared/format';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { invitationLink } from '../ride-runtime/deepLinks';
 export function ScheduledScreen() {
@@ -207,14 +207,14 @@ export function ScheduledScreen() {
                 items={[
                   {
                     icon: 'people-outline',
-                    label: 'Confirmados',
+                    label: 'Reservas confirmadas',
                     value: String(
                       bookings.filter(b => b.status === 'confirmed').length,
                     ),
                   },
                   {
                     icon: 'mark-email-unread',
-                    label: 'Por revisar',
+                    label: 'Solicitudes pendientes',
                     value: String(pendingCount),
                   },
                 ]}
@@ -270,14 +270,9 @@ export function ScheduledScreen() {
                         destinationLabel="Bajada"
                         compact
                       />
-                      <TripFacts
-                        items={[
-                          {
-                            icon: 'payments',
-                            label: 'Aportación',
-                            value: money(b.amountCents),
-                          },
-                        ]}
+                      <CashPaymentSummary
+                        amountCents={b.amountCents}
+                        role={driver ? 'driver' : 'passenger'}
                       />
                       {driver && b.status === 'pending' && (
                         <>
@@ -382,11 +377,11 @@ export function ScheduledScreen() {
             borderColor: theme.colors.border,
           }}
         >
-          {pendingCount > 0 && (
-            <Text variant="caption" tone="secondary">
-              Acepta o rechaza las solicitudes antes de comenzar.
-            </Text>
-          )}
+          <Text variant="caption" tone="secondary">
+            {pendingCount > 0
+              ? 'Acepta o rechaza las solicitudes antes de comenzar.'
+              : 'Al comenzar podrás seguir la ruta y confirmar las subidas en cada parada.'}
+          </Text>
           <Button
             title="Comenzar viaje"
             loading={busy}

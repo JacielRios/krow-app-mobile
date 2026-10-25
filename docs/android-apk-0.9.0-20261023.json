@@ -1,0 +1,104 @@
+{
+  "checkedAt": "2026-10-23T19:50:34.7740876Z",
+  "apk": "artifacts/android/krow-0.9.0-trial.apk",
+  "sha256": "7C916AA3A203AAEB424606A66E2A91977760853BD5EA12B433FFD3E5497ABE79",
+  "bytes": 137106934,
+  "package": "com.krownmobileapp",
+  "versionCode": 15,
+  "versionName": "0.9.0-trial",
+  "minimumAndroidApi": 24,
+  "signing": "Debug certificate for private testing",
+  "signingSha1": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25",
+  "signatureVerified": true,
+  "debuggable": false,
+  "cleartextTraffic": false,
+  "bundledHermes": true,
+  "bundleBytes": 3989136,
+  "architectures": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "physicalInstallationVerified": false,
+  "physicalGpsVerified": false,
+  "redesign": {
+    "sourceChecks": [
+      {
+        "path": "src/features/pilot/ReservationProgress.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/pilot/TrackingScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/pilot/ScheduledScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/pilot/HistoryScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/pilot/BookingRequestsScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/pilot/BookingNoticeCard.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride-runtime/RuntimeRideScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride/screens/passenger/RequestRideScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride/screens/driver/PublishRideScreen.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride/components/RideCard.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride/components/PassengerStopCard.tsx",
+        "matchesCurrentSource": true
+      },
+      {
+        "path": "src/features/ride/components/CashPaymentSummary.tsx",
+        "matchesCurrentSource": true
+      }
+    ],
+    "packagedBundleMatchesGenerated": true,
+    "bundleSha256": "2dd6803625bea7736b4cb24687595d856474e50c574d71606dcdce74fc5f2efe",
+    "strings": [
+      {
+        "text": "Total por 1 asiento",
+        "present": true
+      },
+      {
+        "text": "Por responder",
+        "present": true
+      },
+      {
+        "text": "Pago pendiente",
+        "present": true
+      },
+      {
+        "text": "Estado por verificar",
+        "present": true
+      },
+      {
+        "text": "Elige dónde bajar",
+        "present": true
+      }
+    ]
+  },
+  "tests": {
+    "suites": 50,
+    "passed": 310,
+    "report": "ux-mobility-validation-20261023.json"
+  }
+}

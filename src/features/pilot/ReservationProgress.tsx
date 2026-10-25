@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Card, Text } from '../../shared/components/ui-v2';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { statusText } from '../../shared/format';
@@ -47,71 +46,40 @@ export function ReservationProgress({ status }: { status: string }) {
         {current == null ? (
           <Text>{statusText(status)}</Text>
         ) : (
-          <View style={styles.stages}>
-            {stages.map((label, index) => {
-              const done = index < current || status === 'completed';
-              const selected = index === current;
-              const progress = done
-                ? 'Completado'
-                : selected
-                ? 'Actual'
-                : 'Pendiente';
-              return (
+          <View
+            style={styles.stages}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Progreso de tu reserva"
+            accessibilityValue={{
+              min: 1,
+              max: stages.length,
+              now: current + 1,
+              text: stages[current],
+            }}
+          >
+            <View style={styles.row}>
+              <Text style={styles.label}>{stages[current]}</Text>
+              <Text variant="caption" tone="secondary">
+                {current + 1} de {stages.length}
+              </Text>
+            </View>
+            <View style={styles.track}>
+              {stages.map((label, index) => (
                 <View
                   key={label}
-                  style={styles.row}
-                  accessible
-                  accessibilityLabel={`${label}. ${progress}. Etapa ${
-                    index + 1
-                  } de ${stages.length}`}
-                >
-                  <View
-                    style={[
-                      styles.marker,
-                      {
-                        backgroundColor: done
+                  style={[
+                    styles.segment,
+                    {
+                      backgroundColor:
+                        index <= current
                           ? theme.colors.primary
-                          : theme.colors.surfaceOverlay,
-                        borderColor:
-                          selected || done
-                            ? theme.colors.primary
-                            : theme.colors.border,
-                      },
-                    ]}
-                  >
-                    {done ? (
-                      <MaterialIcons
-                        name="check"
-                        size={16}
-                        color={theme.colors.textInverse}
-                      />
-                    ) : (
-                      <Text
-                        variant="caption"
-                        style={{
-                          color: selected
-                            ? theme.colors.primary
-                            : theme.colors.textSecondary,
-                        }}
-                      >
-                        {index + 1}
-                      </Text>
-                    )}
-                  </View>
-                  <Text
-                    tone={selected || done ? 'primary' : 'secondary'}
-                    style={styles.label}
-                  >
-                    {label}
-                  </Text>
-                  {selected && status !== 'completed' && (
-                    <Text variant="caption" tone="secondary">
-                      Actual
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
+                          : theme.colors.border,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
           </View>
         )}
         <Text tone="secondary">
@@ -126,13 +94,7 @@ const styles = StyleSheet.create({
   content: { gap: 16 },
   stages: { gap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  marker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: { flex: 1 },
+  track: { flexDirection: 'row', gap: 6 },
+  segment: { flex: 1, height: 4, borderRadius: 2 },
+  label: { flex: 1, fontWeight: '600' },
 });
